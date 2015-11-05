@@ -1,0 +1,18 @@
+#
+# There is some very useful information on compilation on the Mac, where we need
+# to take a lot of things into account (bitness, OS level, endianness), here:
+# http://www.kyngchaos.com/macosx/notes/universal64 
+#
+CC = /usr/bin/g++-4.0
+ARCH = -arch i386 -arch ppc
+SDK = -isysroot /Developer/SDKs/MacOSX10.4u.sdk -isysroot /Developer/SDKs/MacOSX10.5.sdk
+TARGET = gsportmac
+OBJECTS = $(OBJECTS1) scc_macdriver.o macsnd_driver.o macdriver_generic.o macdriver_console.o
+CCOPTS = -O2 -DMAC $(ARCH) $(SDK)
+CPPOPTS = $(ARCH) $(SDK)
+SUFFIX =
+NAME = gsportmac
+
+XOPTS = -Wall -fpascal-strings -mdynamic-no-pic
+XLIBS =
+LDOPTS = -I. -prebind -framework Carbon -framework Quicktime

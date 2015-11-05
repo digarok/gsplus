@@ -1,0 +1,44 @@
+ -----
+ GSport Ethernet
+ -----
+ David Schmidt (david__schmidt at users dot souceforge dot net)
+ -----
+
+GSport Emulated Ethernet
+
+ The Uthernet (TFE) support in GSport was made possible by implementing the GPL source written by Spiro Trikaliotis for the {{{http://www.viceteam.org/}Vice emulator}}.
+This version of GSport contains the latest code from VICE 2.2.
+
+* Details
+
+ Right now Uthernet emulation only works under Windows.
+Support for emulation under OS X and Linux is planned. 
+In order to use Uthernet emulation, you must install {{{http://www.WinPcap.org/install/default.html}WinPCap}} and 
+have a wired (not wireless) Ethernet connection on the host computer.
+
+* GSport Setup
+
+ After GSport starts, press F4 to enter the text based menu and select the "Ethernet Card Configuration" option.
+
+ By default, Uthernet emulation is turned off.  Enable it by setting "Uthernet Card in Slot 3" to "On".
+
+ Next, select the host interface you wish to use to communicate with the outside world. A list of available
+interfaces is provided on screen. For most the default of interface "0" is correct.
+
+ Return back to the main menu and save your configuration for good measure. Due to limitations, you must exit
+and restart GSport for the changes you made to take effect.
+
+* GS/OS Setup
+
+ In order to use TCP/IP connectivity under GS/OS, you need to install the latest version of Marinetti
+and its Uthernet Link Layer.
+Ewen Wannop has prepared a ready-made hard drive image with everything pre-installed, and that image
+is available in a version tuned specifically to GSport's Uthernet emulation.
+Download and use the disk image in the "GSport Internet Starter Kit":
+
+ {{{http://sourceforge.net/projects/gsport/files/Emulator%20Software%20Images/}http://sourceforge.net/projects/gsport/files/Emulator Software Images/}}
+
+* 8-bit Applications
+
+ Uthernet enabled versions of Contiki and ADTPro work fine with GSport. Other 8-bit software should also work but
+are untested.
