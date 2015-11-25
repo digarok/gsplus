@@ -112,6 +112,7 @@ static void elap_clone_host_mac(pcap_if_t* device)
 
 	free(addresses);
 #else
+  #ifdef AF_PACKET
 	struct pcap_addr* address;
 	for (address = device->addresses; address != 0; address = address->next)
 		if (address->addr->sa_family == AF_PACKET)
@@ -119,6 +120,7 @@ static void elap_clone_host_mac(pcap_if_t* device)
 			struct sockaddr_ll* ll = (struct sockaddr_ll*)address->addr;
 			memcpy(&HW_LOCAL.mac, ll->sll_addr, sizeof(HW_LOCAL.mac));
 		}
+  #endif
 #endif
 }
 
