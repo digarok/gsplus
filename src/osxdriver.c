@@ -403,7 +403,6 @@ SDL_bool IsFullScreen(SDL_Window *win)
 void
 handle_sdl_key_event(SDL_Event event)
 {
-	printf("*");
 
 		int	state_xor;
 		int state = 0;
@@ -413,21 +412,21 @@ handle_sdl_key_event(SDL_Event event)
 
 		// simulate xmask style here
 		//state = state & (ControlMask | LockMask | ShiftMask);
-		printf("\n              %04x\n", mod);
-		if( mod & KMOD_LCTRL  || mod & KMOD_RCTRL || event.key.keysym.sym == SDLK_LCTRL || event.key.keysym.sym == SDLK_RCTRL) {
+
+		// when mod key is first press, comes as event, otherwise just a modifier
+		if( mod & KMOD_LCTRL  || mod & KMOD_RCTRL ||
+			event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LCTRL || event.key.keysym.sym == SDLK_RCTRL)) {
 			printf("CTL");
 			state = state | ControlMask;
 		}
-		if( (mod & KMOD_LSHIFT)  || (mod & KMOD_RSHIFT) || event.key.keysym.sym == SDLK_LSHIFT || event.key.keysym.sym == SDLK_RSHIFT) {
+		if( (mod & KMOD_LSHIFT)  || (mod & KMOD_RSHIFT) ||
+		     event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LSHIFT || event.key.keysym.sym == SDLK_RSHIFT)) {
 			printf("SHFT");
 			state = state | ShiftMask;
 		}
 		if( mod & KMOD_CAPS) {
 			printf("CAPS");
 			state = state | LockMask;
-		}
-		if( mod & KMOD_LSHIFT ) {
-			printf("lshift");
 		}
 
 		state_xor = kb_shift_control_state ^ state;
@@ -1345,18 +1344,15 @@ x_update_mouse(int raw_x, int raw_y, int button_states, int buttons_valid)
 int
 handle_sdl_mouse_motion_event(SDL_Event event) {
 	int x, y;
-	printf (" %04x\t", event.motion.state &7);
+	// @todo: FIX MOUSE BUTTON MAPPING, AT LEAST CLEAN UP AND DOCUMENT BEHAVIOR
+	//printf (" %04x\t", event.motion.state &7);
 	x = event.motion.x - BASE_MARGIN_LEFT;
 	y = event.motion.y - BASE_MARGIN_TOP;
 	if (event.type == SDL_MOUSEBUTTONUP) {
 		return update_mouse(x, y,0 , event.motion.state &7 );
-
 	} else {
 		return update_mouse(x, y, event.motion.state, event.motion.state &7 );
 	}
-
-
-
 }
 
 void
@@ -1431,19 +1427,12 @@ check_input_events()
 		case EnterNotify:
 		case LeaveNotify:
 			/* These events are disabled now */
-			printf("Enter/Leave event for winow %08x, sub: %08x\n",
-				(word32)ev.xcrossing.window,
-				(word32)ev.xcrossing.subwindow);
-			printf("Enter/L mode: %08x, detail: %08x, type:%02x\n",
-				ev.xcrossing.mode, ev.xcrossing.detail,
-				ev.xcrossing.type);
 			break;
 		case ButtonPress:
 			buttons = (1 << ev.xbutton.button) >> 1;
 			printf( "%04x  %04x", buttons, buttons & 7);
 			motion |= x_update_mouse(ev.xbutton.x, ev.xbutton.y,
 				buttons, buttons & 7);
-
 			break;
 		case ButtonRelease:
 			buttons = (1 << ev.xbutton.button) >> 1;
