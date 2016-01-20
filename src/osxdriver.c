@@ -1341,12 +1341,20 @@ x_update_mouse(int raw_x, int raw_y, int button_states, int buttons_valid)
 	return update_mouse(x, y, button_states, buttons_valid & 7);
 }
 
+
 int
 handle_sdl_mouse_motion_event(SDL_Event event) {
 	int x, y;
+	printf (" %04x\t", event.motion.state &7);
 	x = event.motion.x - BASE_MARGIN_LEFT;
 	y = event.motion.y - BASE_MARGIN_TOP;
-	return update_mouse(x, y, 0, 0 );
+	if (event.type == SDL_MOUSEBUTTONUP) {
+		return update_mouse(x, y,0 , event.motion.state &7 );
+
+	} else {
+		return update_mouse(x, y, event.motion.state, event.motion.state &7 );
+	}
+
 
 
 }
@@ -1366,6 +1374,8 @@ check_input_events_sdl()
 				handle_sdl_key_event(event);
 				break;
 			case SDL_MOUSEMOTION:
+			case SDL_MOUSEBUTTONUP:
+			case SDL_MOUSEBUTTONDOWN:
 				motion |= handle_sdl_mouse_motion_event(event);
 				break;
 			case SDL_QUIT:
@@ -1430,6 +1440,7 @@ check_input_events()
 			break;
 		case ButtonPress:
 			buttons = (1 << ev.xbutton.button) >> 1;
+			printf( "%04x  %04x", buttons, buttons & 7);
 			motion |= x_update_mouse(ev.xbutton.x, ev.xbutton.y,
 				buttons, buttons & 7);
 
