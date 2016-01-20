@@ -413,11 +413,12 @@ handle_sdl_key_event(SDL_Event event)
 
 		// simulate xmask style here
 		//state = state & (ControlMask | LockMask | ShiftMask);
-		if( mod & KMOD_LCTRL  || mod & KMOD_RCTRL) {
+		printf("\n              %04x\n", mod);
+		if( mod & KMOD_LCTRL  || mod & KMOD_RCTRL || event.key.keysym.sym == SDLK_LCTRL || event.key.keysym.sym == SDLK_RCTRL) {
 			printf("CTL");
 			state = state | ControlMask;
 		}
-		if( (mod & KMOD_LSHIFT)  || (mod & KMOD_RSHIFT)) {
+		if( (mod & KMOD_LSHIFT)  || (mod & KMOD_RSHIFT) || event.key.keysym.sym == SDLK_LSHIFT || event.key.keysym.sym == SDLK_RSHIFT) {
 			printf("SHFT");
 			state = state | ShiftMask;
 		}
@@ -639,6 +640,10 @@ osx_dev_video_init()
 		                               SDL_TEXTUREACCESS_STREAMING,
 		                               BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
     // The window is open: could enter program loop here (see SDL_PollEvent())
+
+
+
+		SDL_ShowCursor(SDL_DISABLE);
 
     //SDL_Delay(3000);  // Pause execution for 3000 milliseconds, for example
 
@@ -1336,11 +1341,21 @@ x_update_mouse(int raw_x, int raw_y, int button_states, int buttons_valid)
 	return update_mouse(x, y, button_states, buttons_valid & 7);
 }
 
+int
+handle_sdl_mouse_motion_event(SDL_Event event) {
+	int x, y;
+	x = event.motion.x - BASE_MARGIN_LEFT;
+	y = event.motion.y - BASE_MARGIN_TOP;
+	return update_mouse(x, y, 0, 0 );
 
+
+}
 
 void
 check_input_events_sdl()
 {
+	// @todo: make sure it's not queueing events / processing full queue each call
+	int	motion = 0;
   SDL_Event event;
 	int is_up = 0;
 	int a2code = 0x00;
@@ -1348,7 +1363,10 @@ check_input_events_sdl()
 		switch( event.type ){
 			case SDL_KEYDOWN:
 			case SDL_KEYUP:
-				handle_sdl_key_event( event );
+				handle_sdl_key_event(event);
+				break;
+			case SDL_MOUSEMOTION:
+				motion |= handle_sdl_mouse_motion_event(event);
 				break;
 			case SDL_QUIT:
 				//quit = 1;     /* SDL_QUIT event (window close) */
