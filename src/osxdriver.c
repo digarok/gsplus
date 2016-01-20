@@ -244,8 +244,8 @@ int a2_key_to_sdlkeycode[][3] = {
 	{ 0x55,	SDLK_KP_3, XK_KP_Page_Down },
 
 	{ 0x36,	XK_Control_L, XK_Control_R },
-	{ 0x3a,	XK_Print, XK_Sys_Req },		/* Option */
-	{ 0x37,	XK_Scroll_Lock, 0 },		/* Command */
+	{ 0x3a,	SDLK_LALT, SDLK_RALT },		/* Option */
+	{ 0x37,	SDLK_LGUI, SDLK_RGUI, 0 },		/* Command */
 	{ 0x31,	' ', 0 },
 	{ 0x3b,	SDLK_LEFT, 0 },
 	{ 0x3d,	SDLK_DOWN, 0 },
@@ -416,16 +416,13 @@ handle_sdl_key_event(SDL_Event event)
 		// when mod key is first press, comes as event, otherwise just a modifier
 		if( mod & KMOD_LCTRL  || mod & KMOD_RCTRL ||
 			event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LCTRL || event.key.keysym.sym == SDLK_RCTRL)) {
-			printf("CTL");
 			state = state | ControlMask;
 		}
 		if( (mod & KMOD_LSHIFT)  || (mod & KMOD_RSHIFT) ||
 		     event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LSHIFT || event.key.keysym.sym == SDLK_RSHIFT)) {
-			printf("SHFT");
 			state = state | ShiftMask;
 		}
 		if( mod & KMOD_CAPS) {
-			printf("CAPS");
 			state = state | LockMask;
 		}
 
@@ -445,10 +442,6 @@ handle_sdl_key_event(SDL_Event event)
 		}
 
 		kb_shift_control_state = state;
-
-
-
-
 
 
 
