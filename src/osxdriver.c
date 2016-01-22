@@ -47,25 +47,6 @@ int XShmQueryExtension(Display *display);
 
 #define FONT_NAME_STATUS	"8x13"
 
-extern int Verbose;
-
-extern int g_warp_pointer;
-extern int g_screen_depth;
-extern int g_force_depth;
-int g_screen_mdepth = 0;
-
-extern int _Xdebug;
-
-extern int g_send_sound_to_file;
-
-extern int g_quit_sim_now;
-
-int	g_has_focus = 0;
-int	g_auto_repeat_on = -1;
-int	g_x_shift_control_state = 0;
-int kb_shift_control_state = 0;
-
-
 Display *g_display = 0;
 Visual	*g_vis = 0;
 Window g_a2_win;
@@ -74,10 +55,35 @@ Atom    WM_DELETE_WINDOW;
 XFontStruct *g_text_FontSt;
 Colormap g_a2_colormap = 0;
 Colormap g_default_colormap = 0;
+XColor g_xcolor_a2vid_array[256];
+int	g_alt_left_up = 1;
+int	g_alt_right_up = 1;
 int	g_needs_cmap = 0;
 int	g_win_status_debug = 0;			// Current visibility of status lines.
 int g_win_status_debug_request = 0;	// Desired visibility of status lines.
+int g_screen_mdepth = 0;
+int	g_has_focus = 0;
+int	g_auto_repeat_on = -1;
+int	g_x_shift_control_state = 0;
+int kb_shift_control_state = 0;
 
+
+#ifdef X_SHARED_MEM
+int g_use_shmem = 1;
+#else
+int g_use_shmem = 0;
+#endif
+
+
+
+extern int Verbose;
+extern int g_warp_pointer;
+extern int g_screen_depth;
+extern int g_force_depth;
+extern int _Xdebug;
+extern int g_send_sound_to_file;
+extern int g_quit_sim_now;
+extern Kimage g_mainwin_kimage;
 extern word32 g_red_mask;
 extern word32 g_green_mask;
 extern word32 g_blue_mask;
@@ -87,43 +93,21 @@ extern int g_blue_left_shift;
 extern int g_red_right_shift;
 extern int g_green_right_shift;
 extern int g_blue_right_shift;
-
-#ifdef X_SHARED_MEM
-int g_use_shmem = 1;
-#else
-int g_use_shmem = 0;
-#endif
-
-extern Kimage g_mainwin_kimage;
-
 extern int Max_color_size;
-
-XColor g_xcolor_a2vid_array[256];
-
-extern word32 g_palette_8to1624[256];
-extern word32 g_a2palette_8to1624[256];
-
-int	g_alt_left_up = 1;
-int	g_alt_right_up = 1;
-
-extern word32 g_full_refresh_needed;
-
 extern int g_border_sides_refresh_needed;
 extern int g_border_special_refresh_needed;
 extern int g_status_refresh_needed;
-
 extern int g_lores_colors[];
 extern int g_cur_a2_stat;
-
 extern int g_a2vid_palette;
-
 extern int g_installed_full_superhires_colormap;
-
 extern int g_screen_redraw_skip_amt;
-
 extern word32 g_a2_screen_buffer_changed;
-
+extern word32 g_full_refresh_needed;
 extern char *g_status_ptrs[MAX_STATUS_LINES];
+extern word32 g_palette_8to1624[256];
+extern word32 g_a2palette_8to1624[256];
+
 
 Cursor	g_cursor;
 Pixmap	g_cursor_shape;
@@ -134,6 +118,7 @@ XColor	g_xcolor_white = { 0, 0xffff, 0xffff, 0xffff, DoRed|DoGreen|DoBlue, 0 };
 
 int g_depth_attempt_list[] = { 16, 24, 15, 8 };
 
+void DoSdlIcon();
 
 #define X_EVENT_LIST_ALL_WIN						\
 	(ExposureMask | ButtonPressMask | ButtonReleaseMask |		\
@@ -383,9 +368,6 @@ main(int argc, char **argv)
 
 
 
-
-
-
 SDL_Window *window;                    // Declare a pointer
 SDL_Renderer *renderer;
 SDL_Texture *texture;
@@ -404,45 +386,44 @@ void
 handle_sdl_key_event(SDL_Event event)
 {
 
-		int	state_xor;
-		int state = 0;
-		int	is_up;
+	int	state_xor;
+	int state = 0;
+	int	is_up;
 
-		int mod = event.key.keysym.mod;
+	int mod = event.key.keysym.mod;
 
-		// simulate xmask style here
-		//state = state & (ControlMask | LockMask | ShiftMask);
+	// simulate xmask style here
+	//state = state & (ControlMask | LockMask | ShiftMask);
 
-		// when mod key is first press, comes as event, otherwise just a modifier
-		if( mod & KMOD_LCTRL  || mod & KMOD_RCTRL ||
-			event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LCTRL || event.key.keysym.sym == SDLK_RCTRL)) {
-			state = state | ControlMask;
-		}
-		if( (mod & KMOD_LSHIFT)  || (mod & KMOD_RSHIFT) ||
-		     event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LSHIFT || event.key.keysym.sym == SDLK_RSHIFT)) {
-			state = state | ShiftMask;
-		}
-		if( mod & KMOD_CAPS) {
-			state = state | LockMask;
-		}
+	// when mod key is first press, comes as event, otherwise just a modifier
+	if( mod & KMOD_LCTRL  || mod & KMOD_RCTRL ||
+		event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LCTRL || event.key.keysym.sym == SDLK_RCTRL)) {
+		state = state | ControlMask;
+	}
+	if( (mod & KMOD_LSHIFT)  || (mod & KMOD_RSHIFT) ||
+	     event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LSHIFT || event.key.keysym.sym == SDLK_RSHIFT)) {
+		state = state | ShiftMask;
+	}
+	if( mod & KMOD_CAPS) {
+		state = state | LockMask;
+	}
 
-		state_xor = kb_shift_control_state ^ state;
-		is_up = 0;
-		if(state_xor & ControlMask) {
-			is_up = ((state & ControlMask) == 0);
-			adb_physical_key_update(0x36, is_up);
-		}
-		if(state_xor & LockMask) {
-			is_up = ((state & LockMask) == 0);
-			adb_physical_key_update(0x39, is_up);
-		}
-		if(state_xor & ShiftMask) {
-			is_up = ((state & ShiftMask) == 0);
-			adb_physical_key_update(0x38, is_up);
-		}
+	state_xor = kb_shift_control_state ^ state;
+	is_up = 0;
+	if(state_xor & ControlMask) {
+		is_up = ((state & ControlMask) == 0);
+		adb_physical_key_update(0x36, is_up);
+	}
+	if(state_xor & LockMask) {
+		is_up = ((state & LockMask) == 0);
+		adb_physical_key_update(0x39, is_up);
+	}
+	if(state_xor & ShiftMask) {
+		is_up = ((state & ShiftMask) == 0);
+		adb_physical_key_update(0x38, is_up);
+	}
 
-		kb_shift_control_state = state;
-
+	kb_shift_control_state = state;
 
 
 	is_up = 0;
@@ -453,12 +434,15 @@ handle_sdl_key_event(SDL_Event event)
 	switch( event.key.keysym.sym ){
 		case SDLK_F11:
 			printf("Toggle Fullscreen");
-			if (!IsFullScreen(window)) {
-				SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-			} else {
-				SDL_SetWindowFullscreen(window, 0);
+			if (!is_up) {
+				if (!IsFullScreen(window)) {
+					SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+				} else {
+					SDL_SetWindowFullscreen(window, 0);
+					SDL_SetWindowSize(window, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
+				}
 			}
-
+			break;
 		default:
 			a2code = sdl_keysym_to_a2code(event.key.keysym.sym, is_up);
 			if(a2code >= 0) {
@@ -468,6 +452,48 @@ handle_sdl_key_event(SDL_Event event)
 }
 
 
+int
+sdl_keysym_to_a2code(int keysym, int is_up)
+{
+	int	i;
+
+	if(keysym == 0) {
+		return -1;
+	}
+
+	if((keysym == SDLK_LSHIFT) || (keysym == SDLK_RSHIFT)) {
+		if(is_up) {
+			kb_shift_control_state &= ~ShiftMask;
+		} else {
+			kb_shift_control_state |= ShiftMask;
+		}
+	}
+	if(keysym == SDLK_CAPSLOCK) {
+		if(is_up) {
+			kb_shift_control_state &= ~LockMask;
+		} else {
+			kb_shift_control_state |= LockMask;
+		}
+	}
+	if((keysym == SDLK_LCTRL) || (keysym == SDLK_RCTRL)) {
+		if(is_up) {
+			kb_shift_control_state &= ~ControlMask;
+		} else {
+			kb_shift_control_state |= ControlMask;
+		}
+	}
+
+	/* Look up Apple 2 keycode */
+	for(i = g_num_a2_keycodes - 1; i >= 0; i--) {
+		if((keysym == a2_key_to_sdlkeycode[i][1]) ||
+			(keysym == a2_key_to_sdlkeycode[i][2])) {
+			//printf("Found keysym:%04x = a[%d] = %04x or %04x\n",(int)keysym, i, a2_key_to_xsym[i][1], a2_key_to_sdlkeycode[i][2]);
+			return a2_key_to_sdlkeycode[i][0];
+		}
+	}
+
+	return -1;
+}
 
 
 
@@ -481,13 +507,17 @@ handle_sdl_key_event(SDL_Event event)
 
 
 
+
+
+
+// called by src/sim65816.c
 void
 x_dialog_create_gsport_conf(const char *str)
 {
 	// Just write the config file already...
 	config_write_config_gsport_file();
 }
-
+// called by src/sim65816.c
 int
 x_show_alert(int is_fatal, const char *str)
 {
@@ -620,6 +650,7 @@ osx_dev_video_init()
 		renderer = SDL_CreateRenderer(window, -1, 0);
 
 		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  // make the scaled rendering look smoother.
+	//			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");  // make the scaled rendering look smoother.
 		SDL_RenderSetLogicalSize(renderer, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
 
 		// SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
@@ -1242,41 +1273,61 @@ x_redraw_status_lines()
 // };
 
 
+void sdl_push_kimage(Kimage *kimage_ptr,
+	int destx, int desty, int srcx, int srcy, int width, int height)
+{
+
+	byte *src_ptr;
+	int pixel_size = 4;
+	src_ptr = kimage_ptr->data_ptr + (srcy * kimage_ptr->width_act + srcx) * pixel_size;
+  //src_ptr = kimage_ptr->data_ptr;
+  //src_ptr = kimage_ptr->data_ptr;
+	//src_ptr = xim->data;
+	SDL_Rect dstrect;
+	dstrect.x = destx;
+	dstrect.y = desty;
+	dstrect.w = width;
+	dstrect.h = height;
+	int pitch = 640;
+	if (width < 560) {
+		pitch = EFF_BORDER_WIDTH;
+	}
+	//SDL_UpdateTexture(texture, NULL, src_ptr, 640 * sizeof (Uint32));
+	SDL_UpdateTexture(texture, &dstrect, src_ptr, pitch*4 );
+	SDL_RenderClear(renderer);
+	SDL_RenderCopy(renderer, texture, NULL, NULL);
+	SDL_RenderPresent(renderer);
+
+}
+
 void
 x_push_kimage(Kimage *kimage_ptr, int destx, int desty, int srcx, int srcy,
 	int width, int height)
 {
-
-
-	byte *src_ptr;
-  src_ptr = kimage_ptr->data_ptr;
-
-	SDL_Rect dstrect;
-	dstrect.x = 50;
-	dstrect.y = 30;
-	dstrect.w = 640;
-	dstrect.h = 400;
-
-	//SDL_UpdateTexture(texture, NULL, src_ptr, 640 * sizeof (Uint32));
-	SDL_UpdateTexture(texture, &dstrect, src_ptr, 640*4 );
-  // int r = rand() % 255;
-	// SDL_SetRenderDrawColor(renderer, r, 0, 255, 255);
-	// SDL_RenderClear(renderer);
-	// SDL_RenderPresent(renderer);
-
-	SDL_RenderClear(renderer);
-	SDL_RenderCopy(renderer, texture, NULL, NULL);
-	SDL_RenderPresent(renderer);
-	// printf("get_shm bits_per_pix: %d != %d\n",
-	// 		xim->bits_per_pixel, g_screen_mdepth);
+	sdl_push_kimage(kimage_ptr, destx, desty, srcx, srcy, width, height);
 	XImage	*xim;
-
 	xim = (XImage *)kimage_ptr->dev_handle;
 
+
+
+/*
+Bool XShmPutImage(
+Display *display;						//points to the X Serve
+Drawable d;
+GC gc;
+XImage *image;
+
+int src_x, src_y, dest_x, dest_y;
+unsigned int width, height;
+bool send_event);
+*/
 #ifdef X_SHARED_MEM
+	// my mac is using shared mem
 	if(g_use_shmem) {
 		XShmPutImage(g_display, g_a2_win, g_a2_winGC, xim,
 			srcx, srcy, destx, desty, width, height, False);
+		printf("w/h: %d, %d\tsrcx/y: %d, %d\tdestx/y: %d %d\n", width, height, srcx, srcy, destx, desty);
+	//	int c= getchar();
 	}
 #endif
 	if(!g_use_shmem) {
@@ -1369,6 +1420,14 @@ check_input_events_sdl()
 				break;
 			case SDL_QUIT:
 				//quit = 1;     /* SDL_QUIT event (window close) */
+				SDL_DestroyWindow(window);
+				iwm_shut();
+
+				// Clean up
+				SDL_Quit();
+
+				my_exit(1);
+
 				break;
 			default:
 				break;
@@ -1459,13 +1518,13 @@ check_input_events()
 				(word32)ev.xcolormap.colormap,
 				ev.xcolormap.new, ev.xcolormap.state);
 			break;
-                case ClientMessage:
-                        if (ev.xclient.data.l[0] == (long)WM_DELETE_WINDOW)
-                        {
-                                iwm_shut();
-                                my_exit(1);
-                        }
-                        break;
+    case ClientMessage:
+            if (ev.xclient.data.l[0] == (long)WM_DELETE_WINDOW)
+            {
+                    iwm_shut();
+                    my_exit(1);
+            }
+            break;
 		default:
 			printf("X event 0x%08x is unknown!\n",
 				ev.type);
@@ -1594,53 +1653,6 @@ handle_keysym(XEvent *xev_in)
 		printf("Keysym: %04x of keycode: %02x unknown\n",
 			(word32)keysym, keycode);
 	}
-}
-
-int
-sdl_keysym_to_a2code(int keysym, int is_up)
-{
-	int	i;
-
-	if(keysym == 0) {
-		return -1;
-	}
-
-	if((keysym == SDLK_LSHIFT) || (keysym == SDLK_RSHIFT)) {
-		if(is_up) {
-			kb_shift_control_state &= ~ShiftMask;
-		} else {
-			kb_shift_control_state |= ShiftMask;
-		}
-	}
-	if(keysym == SDLK_CAPSLOCK) {
-		if(is_up) {
-			kb_shift_control_state &= ~LockMask;
-		} else {
-			kb_shift_control_state |= LockMask;
-		}
-	}
-	if((keysym == SDLK_LCTRL) || (keysym == SDLK_RCTRL)) {
-		if(is_up) {
-			kb_shift_control_state &= ~ControlMask;
-		} else {
-			kb_shift_control_state |= ControlMask;
-		}
-	}
-
-	/* Look up Apple 2 keycode */
-	for(i = g_num_a2_keycodes - 1; i >= 0; i--) {
-		if((keysym == a2_key_to_sdlkeycode[i][1]) ||
-					(keysym == a2_key_to_sdlkeycode[i][2])) {
-
-			printf("Found keysym:%04x = a[%d] = %04x or %04x\n",
-				(int)keysym, i, a2_key_to_xsym[i][1],
-				a2_key_to_sdlkeycode[i][2]);
-
-			return a2_key_to_sdlkeycode[i][0];
-		}
-	}
-
-	return -1;
 }
 
 int
