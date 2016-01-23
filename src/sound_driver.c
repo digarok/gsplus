@@ -1,21 +1,21 @@
 /*
  GSport - an Apple //gs Emulator
  Copyright (C) 2010 - 2012 by GSport contributors
- 
+
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -24,6 +24,9 @@
 
 #ifdef HPUX
 # include <sys/audio.h>
+#endif
+#ifdef HAVE_SDL
+# include "SDL.h"
 #endif
 
 #if defined(__linux__) || defined(OSS)
@@ -65,10 +68,12 @@ void child_sound_init_linux();
 void child_sound_init_hpdev();
 void child_sound_initWIN_SOUND();
 void child_sound_init_mac();
+void child_sound_init_sdl();
 
 void
 reliable_buf_write(word32 *shm_addr, int pos, int size)
 {
+  printf("bbbbbb");
 	byte	*ptr;
 	int	ret;
 
@@ -84,14 +89,14 @@ reliable_buf_write(word32 *shm_addr, int pos, int size)
 	size = size * 4;
 
 	while(size > 0) {
-#ifdef WIN_SOUND
+#if defined(HAVE_SDL)
+    ret = sdl_send_audio();
+#elif defined(WIN_SOUND)
 		ret = win32_send_audio(ptr, size);
-#else
-# ifdef MAC
+#elif defined(MAC) && !defined(HAVE_SDL)
 		ret = mac_send_audio(ptr, size);
-# else
+#else
 		ret = write(g_audio_socket, ptr, size);
-# endif
 #endif
 
 		if(ret < 0) {
@@ -121,6 +126,7 @@ reliable_zero_write(int amt)
 void
 child_sound_loop(int read_fd, int write_fd, word32 *shm_addr)
 {
+  printf("child_sound_loop\n" );
 #ifdef HPUX
 	long	status_return;
 #endif
@@ -139,17 +145,17 @@ child_sound_loop(int read_fd, int write_fd, word32 *shm_addr)
 	g_childsnd_vbl = 0;
 	g_childsnd_shm_addr = shm_addr;
 
-#ifdef HPUX
-	child_sound_init_hpdev();
-#endif
-#if defined(__linux__) || defined(OSS)
+#if defined(HAVE_SDL)
+  child_sound_init_sdl();
+  return;
+#elif defined(__linux__) || defined(OSS)
 	child_sound_init_linux();
-#endif
-#ifdef WIN_SOUND
+#elif HPUX
+	child_sound_init_hpdev();
+#elif WIN_SOUND
 	child_sound_init_win32();
 	return;
-#endif
-#ifdef MAC
+#elif defined(MAC) && !defined(HAVE_SDL)
 	child_sound_init_mac();
 	return;
 #endif
@@ -188,11 +194,12 @@ child_sound_loop(int read_fd, int write_fd, word32 *shm_addr)
 void
 child_sound_playit(word32 tmp)
 {
+  printf("playit ");
 	int	size;
 
 	size = tmp & 0xffffff;
 
-	//printf("child_sound_playit: %08x\n", tmp);
+	printf("child_sound_playit: %08x\n", tmp);
 
 	if((tmp >> 24) == 0xa2) {
 		/* play sound here */
@@ -432,7 +439,7 @@ child_sound_init_linux()
 		printf("Audio rate of %d which is < 8000!\n", rate);
 		exit(1);
 	}
-	
+
 	g_audio_rate = rate;
 
 	printf("Sound initialized\n");

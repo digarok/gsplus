@@ -1,21 +1,21 @@
 /*
  GSport - an Apple //gs Emulator
  Copyright (C) 2010 - 2012 by GSport contributors
- 
+
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -24,11 +24,10 @@
 
 extern int Verbose;
 extern int g_use_shmem;
-extern word32 g_vbl_count;
 extern int g_preferred_rate;
 extern int g_c03ef_doc_ptr;
-
 extern double g_last_vbl_dcycs;
+extern word32 g_vbl_count;
 
 void U_STACK_TRACE();
 
@@ -46,7 +45,8 @@ int	g_queued_samps = 0;
 int	g_queued_nonsamps = 0;
 int	g_num_osc_interrupting = 0;
 
-#if defined(HPUX) || defined(__linux__) || defined(WIN_SOUND) || defined(MAC)	/* Workaround - gcc in cygwin wasn't defining _WIN32, substituted WIN_SOUND instead */
+/* Workaround - gcc in cygwin wasn't defining _WIN32, substituted WIN_SOUND instead */
+#if defined(HPUX) || defined(__linux__) || defined(WIN_SOUND) || defined(MAC) || defined(HAVE_SDL)
 int	g_audio_enable = -1;
 #else
 # if defined(OSS)
@@ -263,17 +263,21 @@ sound_init()
 void
 sound_init_general()
 {
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__)	/* Workaround - gcc in cygwin wasn't defining _WIN32 */
+  printf("SOUND INIT GENERAL\n");
+/* Workaround - gcc in cygwin wasn't defining _WIN32 */
+#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__) && !defined(HAVE_SDL)
 	int	pid;
 	int	shmid;
 	int	tmp;
 	int	i;
 #endif
+
 	word32	*shmaddr;
 	int	size;
 	int	ret;
 
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__)	/* Workaround - gcc in cygwin wasn't defining _WIN32 */
+/* Workaround - gcc in cygwin wasn't defining _WIN32 */
+#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__) && !defined(HAVE_SDL)
 	if(!g_use_shmem) {
 		if(g_audio_enable < 0) {
 			printf("Defaulting audio off for slow X display\n");
@@ -281,6 +285,7 @@ sound_init_general()
 		}
 	}
 #endif
+
 	ret = 0;
 
 	if(g_audio_enable == 0) {
@@ -289,12 +294,11 @@ sound_init_general()
 	}
 
 	size = SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE;
-
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__)	/* Workaround - gcc in cygwin wasn't defining _WIN32 */
+/* Workaround - gcc in cygwin wasn't defining _WIN32 */
+#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__)	&& !defined(HAVE_SDL)
 	shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0777);
 	if(shmid < 0) {
-		printf("sound_init: shmget ret: %d, errno: %d\n", shmid,
-			errno);
+		printf("sound_init: shmget ret: %d, errno: %d\n", shmid, errno);
 		exit(2);
 	}
 
@@ -312,16 +316,16 @@ sound_init_general()
 		exit(4);
 	}
 #else
-/* windows and mac */
-	shmaddr = (word32*)malloc(size);
+  // windows and mac and sdl
+	shmaddr = (word32*)malloc(size);   //size = 131072
 	memset(shmaddr, 0, size);
 #endif
 
 	g_sound_shm_addr = shmaddr;
 
 	fflush(stdout);
-
-#if !defined(MAC) && !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(__OS2__)	/* Workaround - gcc in cygwin wasn't defining _WIN32 */
+/* Workaround - gcc in cygwin wasn't defining _WIN32 */
+#if !defined(MAC) && !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(__OS2__) && !defined(HAVE_SDL)
 	/* prepare pipe so parent can signal child each other */
 	/*  pipe[0] = read side, pipe[1] = write end */
 	ret = pipe(&g_pipe_fd[0]);
@@ -371,14 +375,15 @@ sound_init_general()
 
 	parent_sound_get_sample_rate(g_pipe2_fd[0]);
 #else
-# ifdef MAC
-	macsnd_init(shmaddr);
-# elif defined (WIN_SOUND)	/* Workaround - gcc in cygwin wasn't defining _WIN32 */
-/* windows */
+# if defined (HAVE_SDL)
+	sdlsnd_init(shmaddr);
+# elif defined (WIN_SOUND)
 	win32snd_init(shmaddr);
+# elif defined (MAC) && !defined(HAVE_SDL)
+  macsnd_init(shmaddr);
 # elif defined (__OS2__)
 # endif
-#endif /* WIN_SOUND */
+#endif
 
 }
 
@@ -449,19 +454,22 @@ sound_shutdown()
 #ifdef WIN_SOUND	/* Workaround - gcc in cygwin wasn't defining _WIN32 */
 	win32snd_shutdown();
 #elif defined(__OS2__)
+#elif defined(HAVE_SDL)
+  if((g_audio_enable != 0)) {
+    sdlsnd_shutdown();
+  }
 #else
 	if((g_audio_enable != 0) && g_pipe_fd[1] != 0) {
 		close(g_pipe_fd[1]);
 	}
 #endif
-	
+
 	// OG Free up allocated memory
 	if (g_sound_shm_addr)
 	{
 		free(g_sound_shm_addr);
 		g_sound_shm_addr = NULL;
 	}
-	
 }
 
 
@@ -640,7 +648,8 @@ send_sound(int real_samps, int size)
 	DOC_LOG("send_sound", -1, g_last_sound_play_dsamp,
 						(real_samps << 30) + size);
 
-#if defined(MAC) || defined(WIN_SOUND)	/* Workaround - gcc in cygwin wasn't defining _WIN32 */
+// Workaround - gcc in cygwin wasn't defining _WIN32
+#if defined(MAC) || defined(WIN_SOUND) || defined(HAVE_SDL)
 	ret = 0;
 	child_sound_playit(tmp);
 #elif defined(__OS2__)
@@ -917,7 +926,7 @@ sound_play(double dsamps)
 
 			done = 0;
 			ctl = rptr->ctl;
-	
+
 			samp_offset = 0;
 			if(complete_dsamp > last_dsamp) {
 				samp_offset = (int)(complete_dsamp- last_dsamp);
@@ -931,10 +940,10 @@ sound_play(double dsamps)
 				/* other channel */
 				outptr += 1;
 			}
-	
+
 			imul = (rptr->vol * g_doc_vol);
 			off = imul * 128;
-	
+
 			samps_to_do = MIN(samps_left, num_samps - samp_offset);
 			if(imul == 0 || samps_to_do == 0) {
 				/* produce no sound */
@@ -958,13 +967,13 @@ sound_play(double dsamps)
 				rptr->last_samp_val = val;
 				continue;
 			}
-	
+
 			if(snd_buf_init == 0) {
 				memset(outptr_start, 0,
 					2*sizeof(outptr_start[0])*num_samps);
 				snd_buf_init++;
 			}
-	
+
 			val = 0;
 			rptr->complete_dsamp = dsamp_now;
 			cur_pos = rptr->cur_start + (cur_acc & cur_mask);
@@ -973,7 +982,7 @@ sound_play(double dsamps)
 				cur_pos += cur_inc;
 				cur_acc += cur_inc;
 				val = doc_ram[pos];
-	
+
 				val2 = (val * imul - off) >> 4;
 				if((val == 0) || (cur_pos >= cur_end)) {
 					cur_dsamp = last_dsamp +
@@ -988,14 +997,14 @@ sound_play(double dsamps)
 					val = 0;
 					break;
 				}
-	
+
 				val2 = outptr[0] + val2;
-	
+
 				samps_left--;
 				*outptr = val2;
 				outptr += 2;
 			}
-	
+
 			rptr->last_samp_val = val;
 
 			if(val != 0) {
@@ -1003,7 +1012,7 @@ sound_play(double dsamps)
 				rptr->samps_left = samps_left;
 				rptr->complete_dsamp = dsamp_now;
 			}
-	
+
 			samps_played += samps_to_do;
 			DOC_LOG("splayed", osc, dsamp_now,
 				(samps_to_do << 16) + (pos & 0xffff));
@@ -1031,7 +1040,7 @@ sound_play(double dsamps)
 
 		if(snd_buf_init) {
 			/* convert sound buf */
-	
+
 			for(i = 0; i < num_samps; i++) {
 				val0 = outptr[0];
 				val1 = outptr[1];
@@ -1042,7 +1051,7 @@ sound_play(double dsamps)
 				if(val0 < -32768) {
 					val = -32768;
 				}
-	
+
 				val0 = val;
 				val = val1;
 				if(val1 > 32767) {
@@ -1051,8 +1060,8 @@ sound_play(double dsamps)
 				if(val1 < -32768) {
 					val = -32768;
 				}
-	
-	
+
+
 				outptr += 2;
 
 #if defined(__linux__) || defined(OSS)
@@ -1078,18 +1087,18 @@ sound_play(double dsamps)
 					pos = 0;
 				}
 			}
-	
+
 			if(g_queued_nonsamps) {
 				/* force out old 0 samps */
 				send_sound(0, g_queued_nonsamps);
 				g_queued_nonsamps = 0;
 			}
-	
+
 			if(g_send_sound_to_file) {
 				send_sound_to_file(g_sound_shm_addr,
 						g_sound_shm_pos, num_samps);
 			}
-	
+
 			g_queued_samps += num_samps;
 		} else {
 			/* move pos */
@@ -1097,18 +1106,18 @@ sound_play(double dsamps)
 			while(pos >= SOUND_SHM_SAMP_SIZE) {
 				pos -= SOUND_SHM_SAMP_SIZE;
 			}
-	
+
 			if(g_send_sound_to_file) {
 				send_sound_to_file(zero_buf, g_sound_shm_pos,
 					num_samps);
 			}
-	
+
 			if(g_queued_samps) {
 				/* force out old non-0 samps */
 				send_sound(1, g_queued_samps);
 				g_queued_samps = 0;
 			}
-	
+
 			g_queued_nonsamps += num_samps;
 		}
 
@@ -1586,7 +1595,7 @@ doc_write_ctl_reg(int osc, int val, double dsamps)
 			/* start sound */
 			DOC_LOG("ctl_sound_play", osc, eff_dsamps, val);
 
-			//  OG  If the sound_play is executed, it may restart a oscillo we thought was stopped at time, 
+			//  OG  If the sound_play is executed, it may restart a oscillo we thought was stopped at time,
 			//	hence  crashing the start_sound function 	(cf. game Arrgh!)
 			//sound_play(eff_dsamps);
 			g_doc_regs[osc].ctl = val;
@@ -1821,7 +1830,7 @@ doc_write_c03d(int val, double dcycs)
 		/* DOC */
 		osc = g_c03ef_doc_ptr & 0x1f;
 		type = (g_c03ef_doc_ptr >> 5) & 0x7;
-		
+
 		rptr = &(g_doc_regs[osc]);
 		ctl = rptr->ctl;
 #if 0
@@ -1941,7 +1950,7 @@ doc_write_c03d(int val, double dcycs)
 				UPDATE_G_DCYCS_PER_DOC_UPDATE(tmp);
 
 				// OG Update any oscs that were running to take care of the new numbers of oscillo
-				for(i = 0; i<g_doc_num_osc_en; i++) 
+				for(i = 0; i<g_doc_num_osc_en; i++)
 					doc_recalc_sound_parms(i,0.0,0.0);
 
 				/* Stop any oscs that were running but now */
