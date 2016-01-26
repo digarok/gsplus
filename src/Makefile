@@ -60,12 +60,17 @@ gsportmac: $(OBJECTS) compile_time.o
 	cp ../GSport.html ../GSportDmg/GSport/GSport.html
 	arch/mac/makedmg.sh .. GSportDmg GSport GSport 7
 
-# Linux for X builds:
+# OSX builds
+gsportosx: $(OBJECTS) compile_time.o
+	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(XLIBS) $(EXTRA_LIBS) -lX11
+	echo $(OBJECTS)
+	mv gsportosx ..
+
+# Linux/OSX XWindows builds
 gsportx: $(OBJECTS) compile_time.o
 	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(XLIBS) $(EXTRA_LIBS) -lX11
 	echo $(OBJECTS)
 	mv gsportx ..
-	cp -f ../config.template ../config.txt 
 
 # Linux framebuffer builds:
 gsportfb: $(OBJECTS) compile_time.o

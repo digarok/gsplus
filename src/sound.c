@@ -64,7 +64,7 @@ word32 doc_reg_e0 = 0xff;
 
 /* local function prototypes */
 void doc_write_ctl_reg(int osc, int val, double dsamps);
-
+void sound_write_sdl(int real_samps, int size);
 
 int	g_audio_rate = 0;
 double	g_daudio_rate = 0.0;
@@ -456,7 +456,8 @@ sound_shutdown()
 #elif defined(__OS2__)
 #elif defined(HAVE_SDL)
   if((g_audio_enable != 0)) {
-    sdlsnd_shutdown();
+    //sdlsnd_shutdown();
+		sound_shutdown_sdl();
   }
 #else
 	if((g_audio_enable != 0) && g_pipe_fd[1] != 0) {
@@ -629,9 +630,12 @@ send_sound_to_file(word32 *addr, int shm_pos, int num_samps)
 
 }
 
+
+// is called with real_samps = 1 to output sound
 void
 send_sound(int real_samps, int size)
 {
+	// real_samps = 1, size = 1602
 	word32	tmp;
 	int	ret;
 
@@ -639,7 +643,9 @@ send_sound(int real_samps, int size)
 		printf("Entered send_sound but audio off!\n");
 		exit(2);
 	}
-
+	// really does add this crazy high value.  i guess it gets taken off / checked later
+	// so if size = 1602 (0x0642)  it becomes 0xa2000642
+	// wtf?
 	if(real_samps) {
 		tmp = size + 0xa2000000;
 	} else {
@@ -647,11 +653,13 @@ send_sound(int real_samps, int size)
 	}
 	DOC_LOG("send_sound", -1, g_last_sound_play_dsamp,
 						(real_samps << 30) + size);
-
 // Workaround - gcc in cygwin wasn't defining _WIN32
-#if defined(MAC) || defined(WIN_SOUND) || defined(HAVE_SDL)
+#if defined(WIN_SOUND) || defined(MAC) && !defined(HAVE_SDL)
 	ret = 0;
 	child_sound_playit(tmp);
+#elif defined(HAVE_SDL)
+	sound_write_sdl( real_samps,  size);
+	//sdl_send_audio(&g_sound_shm_addr[g_sound_shm_pos], size, real_samps);
 #elif defined(__OS2__)
 
 #else
@@ -1041,6 +1049,7 @@ sound_play(double dsamps)
 		if(snd_buf_init) {
 			/* convert sound buf */
 
+
 			for(i = 0; i < num_samps; i++) {
 				val0 = outptr[0];
 				val1 = outptr[1];
@@ -1082,6 +1091,7 @@ sound_play(double dsamps)
 				sndptr[pos] = (val0 << 16) + (val & 0xffff);
 # endif
 #endif
+			//	printf("%08x ", sndptr[pos]);
 				pos++;
 				if(pos >= SOUND_SHM_SAMP_SIZE) {
 					pos = 0;

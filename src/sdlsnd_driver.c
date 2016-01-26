@@ -19,9 +19,11 @@
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
+#include <assert.h>
 #include "defc.h"
 #include "sound.h"
 #include "SDL.h"
+
 
 extern int Verbose;
 
@@ -39,10 +41,33 @@ extern int g_audio_enable;
 extern word32 *g_sound_shm_addr;
 extern int g_preferred_rate;
 
-int	g_win32snd_buflen = 0x1000;
+int	g_sdlsnd_buflen = 0x1000;
+word32 *bptr = NULL;
+int g_sdlsnd_write_idx;
+int g_sdlsnd_read_idx;
 
+// just to makeit stand out
+#ifdef HAVE_SDL
+static Uint8 *audio_chunk;
+static Uint8 *audio_pos;
+static Uint32 audio_len;
+
+static byte *sdlsnd_buf = 0;
 SDL_AudioSpec want, have;
 SDL_AudioDeviceID dev;
+
+static byte *playbuf = 0;
+static int g_playbuf_buffered = 0;
+static SDL_AudioSpec spec;
+static int snd_buf;
+static int snd_write;           /* write position into playbuf */
+static /* volatile */ int snd_read = 0;
+
+static void _snd_callback(void*, Uint8 *stream, int len);
+static void sound_write_sdl(int real_samps, int size);
+
+
+#endif
 
 void sdlsnd_init(word32 *shmaddr)
 {
@@ -51,9 +76,13 @@ void sdlsnd_init(word32 *shmaddr)
 		printf("Cannot initialize SDL audio\n");
 		g_audio_enable = 0;
 	}
+
   child_sound_loop(-1, -1, shmaddr);
   return;
 }
+
+
+
 
 void
 win32snd_init(word32 *shmaddr)
@@ -65,76 +94,67 @@ win32snd_init(word32 *shmaddr)
 }
 
 
-// OG Added global to free the dedicated win32 sound memory
-byte	*bptr = NULL;
+void sdl_send_audio(word32	*ptr, int size, int real_samps) {
 
-// OG shut win32 sound resources
-void
-win32snd_shutdown()
-{
-/*
-	//if (g_wave_handle)  //////
-  if (false)
-	{
-		MMRESULT	res = waveOutReset(g_wave_handle);
-		if (res!=MMSYSERR_NOERROR )
-			printf("waveOutReset Failed");
-
-		res = waveOutClose(g_wave_handle);
-		if (res!=MMSYSERR_NOERROR )
-			printf("waveOutClose Failed");
-		g_wave_handle=NULL;
-}
-	// OG Free dedicated sound memory
-	if (bptr)
-	{
-		free(bptr);
-		bptr = NULL;
-	}
-*/
-}
-
-/*
-void CALLBACK
-handle_wav_snd(HWAVEOUT hwo, UINT uMsg, DWORD dwInstance, DWORD dwParam1,
-		DWORD dwParam2)
-{
-	LPWAVEHDR	lpwavehdr;
-
-	// Only service "buffer done playing messages
-	if(uMsg == WOM_DONE) {
-		lpwavehdr = (LPWAVEHDR)dwParam1;
-		if(lpwavehdr->dwFlags == (WHDR_DONE | WHDR_PREPARED)) {
-			lpwavehdr->dwUser = FALSE;
-		}
-	}
-
-	return;
-}
-*/
-void
-check_wave_error(int res, char *str)
-{
-  /*
-	TCHAR	buf[256];
-
-	if(res == MMSYSERR_NOERROR) {
-		return;
-	}
-
-	waveOutGetErrorText(res, &buf[0], sizeof(buf));
-	printf("%s: %s\n", str, buf);
-  */
-	exit(1);
-}
-void handle_sdl_snd(/* arguments */) {
   /* code */
+  //printf(" sdl_s_a %d\t 0x%08x ",size, &ptr);
+  int i;
+  for (i=0; i<size; i++) {
+    if (real_samps) {
+      bptr[g_sdlsnd_write_idx++] = ptr[i];
+    } else {
+      bptr[g_sdlsnd_write_idx++] = 0;
+    }
+    if (g_sdlsnd_write_idx>g_sdlsnd_buflen) {
+      g_sdlsnd_write_idx=0;
+    }
+  }
+  g_playbuf_buffered += size;
+
 }
-void
-sdlsnd_shutdown() {
-  //SDL_Delay(5000);  // let the audio callback play some sound for 5 seconds.
-  SDL_CloseAudioDevice(dev);
-  printf("sdlsnd_shutdown");
+
+void handle_sdl_snd(void *userdata, Uint8 *stream, int len) {
+  /* Only play if we have data left */
+/*  if ( g_playbuf_buffered == 0) {
+    return;
+  }
+*/
+  for(int i = 0; i < len; ++i) {
+    if(g_playbuf_buffered <= 0) {
+        stream[i] = 0;
+    } else {
+        stream[i] = bptr[g_sdlsnd_read_idx++];
+        if(g_sdlsnd_read_idx == g_sdlsnd_buflen)
+            g_sdlsnd_read_idx = 0;
+        g_playbuf_buffered--;
+    }
+  }
+  return;
+
+
+  /* Mix as much data as possible */
+  len = ( len > g_playbuf_buffered ? g_playbuf_buffered : len );
+  //len = ( g_sdlsnd_read_idx+len < g_sdlsnd_buflen ? len : g_sdlsnd_read_idx+len);
+  SDL_memset(stream, 0, len);
+  if (g_sdlsnd_read_idx+len < g_sdlsnd_buflen) {
+    SDL_memcpy (stream, &bptr[g_sdlsnd_read_idx], len);
+    g_sdlsnd_read_idx += len;
+    g_playbuf_buffered -= len;
+  } else {
+    /*
+    int top_len = 0;
+    top_len = g_sdlsnd_buflen - g_sdlsnd_read_idx;
+    SDL_memcpy (stream, &bptr[g_sdlsnd_read_idx], top_len);
+    g_sdlsnd_read_idx = 0;
+    g_playbuf_buffered -= top_len;
+  //  SDL_memcpy (stream+top_len, bptr[g_sdlsnd_read_idx], len-top_len);
+    g_sdlsnd_read_idx += len-top_len;
+    g_playbuf_buffered -= len-top_len;
+    */
+  }
+
+  //SDL_MixAudio(stream, pointer, len, SDL_MIX_MAXVOLUME);
+
 }
 
 
@@ -144,10 +164,10 @@ child_sound_init_sdl()
   printf("child_sound_init_sdl");
 
   SDL_memset(&want, 0, sizeof(want)); // or SDL_zero(want)
-  want.freq = 48000;
-  want.format = AUDIO_F32;
-  want.channels = 2;
-  want.samples = 4096;
+  want.freq = g_preferred_rate;       // 48000 ?
+  want.format = AUDIO_S16SYS;         // AUDIO_F32
+  want.channels = NUM_CHANNELS;       //2
+  want.samples = 512;                 //4096
   want.callback = handle_sdl_snd;  // you wrote this function elsewhere.
 
   dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
@@ -157,153 +177,39 @@ child_sound_init_sdl()
       if (have.format != want.format) { // we let this one thing change.
           printf("We didn't get Float32 audio format.\n");
       }
-      SDL_PauseAudioDevice(dev, 0); // start audio playing.
+
   }
 
-  // UNKNOWN?
+  // super experimental unknown
+
+  g_playbuf_buffered = 0;  // init buffered state
+
+  int blen;
+  blen = (SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE * 2);  // *2 unnecessary?
+  g_sdlsnd_buflen = blen;
+  bptr = (byte*)malloc(blen);
+  if(bptr == NULL) {
+    printf("Unabled to allocate sound buffer\n");
+    exit(1);
+  }
+  memset(bptr, 0, SOUND_SHM_SAMP_SIZE*SAMPLE_CHAN_SIZE *2);  // zero out the buffer
+
+  g_sdlsnd_write_idx = 0; // initialize
+  g_sdlsnd_read_idx = 0;
+
+  SDL_PauseAudioDevice(dev, 0);   // start audio playing.
+
 	g_audio_rate = have.freq;
   printf("g_audio_rate: %d\n", g_audio_rate);
-	set_audio_rate(g_audio_rate);
+	set_audio_rate(g_audio_rate);   // let kegs simulator know the rate
 }
+
 
 
 
 void
-child_sound_init_win32()
-{
-  /*
-	WAVEFORMATEX wavefmt;
-	WAVEOUTCAPS caps;
-
-// OG Moved as global variable (to rename)
-//	byte	*bptr;
-	int	bits_per_sample, channels, block_align;
-	int	blen;
-	int	res;
-	int	i;
-
-	memset(&wavefmt, 0, sizeof(WAVEFORMATEX));
-
-	wavefmt.wFormatTag = WAVE_FORMAT_PCM;
-#ifndef UNDER_CE
-	bits_per_sample = 16;
-	wavefmt.nSamplesPerSec = g_audio_rate;
-#else
-	bits_per_sample = 16;
-	wavefmt.nSamplesPerSec = 12000;
-#endif
-
-	channels = 2;
-	wavefmt.wBitsPerSample = bits_per_sample;
-	wavefmt.nChannels = channels;
-	block_align = channels * (bits_per_sample / 8);
-	wavefmt.nBlockAlign = block_align;
-	wavefmt.nAvgBytesPerSec = block_align * g_audio_rate;
-
-	res = waveOutOpen(&g_wave_handle, WAVE_MAPPER, &wavefmt, 0, 0,
-				WAVE_FORMAT_QUERY);
-
-	if(res != MMSYSERR_NOERROR) {
-		printf("Cannot open audio device\n");
-		g_audio_enable = 0;
-		return;
-	}
-
-	res = waveOutOpen(&g_wave_handle, WAVE_MAPPER, &wavefmt,
-		(DWORD)handle_wav_snd, 0, CALLBACK_FUNCTION | WAVE_ALLOWSYNC);
-
-	if(res != MMSYSERR_NOERROR) {
-		printf("Cannot register audio\n");
-		g_audio_enable = 0;
-		return;
-	}
-
-	g_audio_rate = wavefmt.nSamplesPerSec;
-
-	blen = (SOUND_SHM_SAMP_SIZE * 4 * 2) / NUM_WAVE_HEADERS;
-	g_win32snd_buflen = blen;
-	bptr = (byte*)malloc(blen * NUM_WAVE_HEADERS); // OG Added cast
-	if(bptr == NULL) {
-		printf("Unabled to allocate sound buffer\n");
-		exit(1);
-	}
-
-	for(i = 0; i < NUM_WAVE_HEADERS; i++) {
-		memset(&g_wavehdr[i], 0, sizeof(WAVEHDR));
-		g_wavehdr[i].dwUser = FALSE;
-		g_wavehdr[i].lpData = (LPSTR)&(bptr[i*blen]);	// OG Added cast
-		g_wavehdr[i].dwBufferLength = blen;
-		g_wavehdr[i].dwFlags = 0;
-		g_wavehdr[i].dwLoops = 0;
-		res = waveOutPrepareHeader(g_wave_handle, &g_wavehdr[i],
-						sizeof(WAVEHDR));
-		check_wave_error(res, "waveOutPrepareHeader");
-	}
-
-	res = waveOutGetDevCaps((UINT)g_wave_handle, &caps, sizeof(caps));
-	check_wave_error(res, "waveOutGetDevCaps");
-	printf("Using %s\n", caps.szPname);
-	printf(" Bits per Sample = %d.  Channels = %d\n",
-		wavefmt.wBitsPerSample, wavefmt.nChannels);
-	printf(" Sampling rate = %d, avg_bytes_per_sec = %d\n",
-		(int)wavefmt.nSamplesPerSec, (int)wavefmt.nAvgBytesPerSec);
-
-	set_audio_rate(g_audio_rate);
-*/
-}
-
-void sdl_send_audio(byte *ptr, int size) {
-  /* code */
-  printf("  sdl_send_audio  ");
-}
-
-void
-win32_send_audio2(byte *ptr, int size)
-{
-  /*
-	int	found;
-	int	res;
-	int	i;
-
-	found = 0;
-	for(i = 0; i < NUM_WAVE_HEADERS; i++) {
-		if(g_wavehdr[i].dwUser == FALSE) {
-			found = 1;
-			break;
-		}
-	}
-
-	if(!found) {
-		//  all audio buffers busy, just get out
-		return;
-	}
-
-	memcpy(g_wavehdr[i].lpData, ptr, size);
-	g_wavehdr[i].dwBufferLength = size;
-	g_wavehdr[i].dwUser = TRUE;
-
-	res = waveOutWrite(g_wave_handle, &g_wavehdr[i], sizeof(g_wavehdr));
-	check_wave_error(res, "waveOutWrite");
-  */
-	return;
-}
-
-int
-win32_send_audio(byte *ptr, int in_size)
-{
-	int	size;
-	int	tmpsize;
-
-	size = in_size;
-	while(size > 0) {
-		tmpsize = size;
-		if(size > g_win32snd_buflen) {
-			tmpsize = g_win32snd_buflen;
-		}
-		win32_send_audio2(ptr, tmpsize);
-		ptr += tmpsize;
-		size = size - tmpsize;
-	}
-
-	return in_size;
+sdlsnd_shutdown() {
+  //SDL_Delay(5000);  // let the audio callback play some sound for 5 seconds.
+  SDL_CloseAudioDevice(dev);
+  printf("sdlsnd_shutdown");
 }

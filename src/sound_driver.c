@@ -27,6 +27,7 @@
 #endif
 #ifdef HAVE_SDL
 # include "SDL.h"
+long sound_init_device_sdl();
 #endif
 
 #if defined(__linux__) || defined(OSS)
@@ -69,19 +70,18 @@ void child_sound_init_hpdev();
 void child_sound_initWIN_SOUND();
 void child_sound_init_mac();
 void child_sound_init_sdl();
+long sound_init_device_sdl();
 
 void
 reliable_buf_write(word32 *shm_addr, int pos, int size)
 {
-  printf("bbbbbb");
 	byte	*ptr;
 	int	ret;
 
 	if(size < 1 || pos < 0 || pos > SOUND_SHM_SAMP_SIZE ||
 				size > SOUND_SHM_SAMP_SIZE ||
 				(pos + size) > SOUND_SHM_SAMP_SIZE) {
-		printf("reliable_buf_write: pos: %04x, size: %04x\n",
-			pos, size);
+		printf("reliable_buf_write: pos: %04x, size: %04x\n", pos, size);
 		exit(1);
 	}
 
@@ -90,7 +90,8 @@ reliable_buf_write(word32 *shm_addr, int pos, int size)
 
 	while(size > 0) {
 #if defined(HAVE_SDL)
-    ret = sdl_send_audio();
+    //ret = sdl_send_audio(ptr, size);
+
 #elif defined(WIN_SOUND)
 		ret = win32_send_audio(ptr, size);
 #elif defined(MAC) && !defined(HAVE_SDL)
@@ -126,14 +127,8 @@ reliable_zero_write(int amt)
 void
 child_sound_loop(int read_fd, int write_fd, word32 *shm_addr)
 {
-  printf("child_sound_loop\n" );
-#ifdef HPUX
-	long	status_return;
-#endif
 	word32	tmp;
 	int	ret;
-
-	doc_printf("Child pipe fd: %d\n", read_fd);
 
 	g_audio_rate = g_preferred_rate;
 
@@ -146,7 +141,8 @@ child_sound_loop(int read_fd, int write_fd, word32 *shm_addr)
 	g_childsnd_shm_addr = shm_addr;
 
 #if defined(HAVE_SDL)
-  child_sound_init_sdl();
+  //child_sound_init_sdl();
+	long rate = sound_init_device_sdl();
   return;
 #elif defined(__linux__) || defined(OSS)
 	child_sound_init_linux();
@@ -159,6 +155,8 @@ child_sound_loop(int read_fd, int write_fd, word32 *shm_addr)
 	child_sound_init_mac();
 	return;
 #endif
+
+	doc_printf("Child pipe fd: %d\n", read_fd);
 
 	tmp = g_audio_rate;
 	ret = write(write_fd, &tmp, 4);
@@ -191,16 +189,14 @@ child_sound_loop(int read_fd, int write_fd, word32 *shm_addr)
 	exit(0);
 }
 
+// called by sound.c:send_sound()
 void
 child_sound_playit(word32 tmp)
 {
-  printf("playit ");
 	int	size;
 
 	size = tmp & 0xffffff;
-
-	printf("child_sound_playit: %08x\n", tmp);
-
+	printf("SIze: %d ",size);
 	if((tmp >> 24) == 0xa2) {
 		/* play sound here */
 
@@ -219,6 +215,7 @@ child_sound_playit(word32 tmp)
 		g_zeroes_buffered = 0;
 		g_zeroes_seen = 0;
 
+		// only write up to end of buffer
 		if((size + g_childsnd_pos) > SOUND_SHM_SAMP_SIZE) {
 			reliable_buf_write(g_childsnd_shm_addr, g_childsnd_pos,
 					SOUND_SHM_SAMP_SIZE - g_childsnd_pos);
@@ -262,15 +259,6 @@ child_sound_playit(word32 tmp)
 	g_childsnd_vbl++;
 	if(g_childsnd_vbl >= 60) {
 		g_childsnd_vbl = 0;
-#if 0
-		printf("sound bytes written: %06x\n", g_bytes_written);
-		printf("Sample samples[0]: %08x %08x %08x %08x\n",
-			g_childsnd_shm_addr[0], g_childsnd_shm_addr[1],
-			g_childsnd_shm_addr[2], g_childsnd_shm_addr[3]);
-		printf("Sample samples[100]: %08x %08x %08x %08x\n",
-			g_childsnd_shm_addr[100], g_childsnd_shm_addr[101],
-			g_childsnd_shm_addr[102], g_childsnd_shm_addr[103]);
-#endif
 		g_bytes_written = 0;
 	}
 }

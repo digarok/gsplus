@@ -19,8 +19,12 @@
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
+
+// @todo: force refresh after screen mode change
 #include "SDL.h"
 #include <stdbool.h>
+
+
 
 # if !defined(__CYGWIN__) && !defined(__POWERPC__)
 /* No shared memory on Cygwin */
@@ -40,13 +44,24 @@
 # include <X11/extensions/XShm.h>
 #endif
 
-int XShmQueryExtension(Display *display);
 
 #include "defc.h"
 #include "protos_xdriver.h"
 
+int XShmQueryExtension(Display *display);
 #define FONT_NAME_STATUS	"8x13"
 
+#ifdef X_SHARED_MEM
+int g_use_shmem = 1;
+#else
+int g_use_shmem = 0;
+#endif
+
+Cursor	g_cursor;
+Pixmap	g_cursor_shape;
+Pixmap	g_cursor_mask;
+XColor	g_xcolor_black = { 0, 0x0000, 0x0000, 0x0000, DoRed|DoGreen|DoBlue, 0 };
+XColor	g_xcolor_white = { 0, 0xffff, 0xffff, 0xffff, DoRed|DoGreen|DoBlue, 0 };
 Display *g_display = 0;
 Visual	*g_vis = 0;
 Window g_a2_win;
@@ -66,13 +81,7 @@ int	g_has_focus = 0;
 int	g_auto_repeat_on = -1;
 int	g_x_shift_control_state = 0;
 int kb_shift_control_state = 0;
-
-
-#ifdef X_SHARED_MEM
-int g_use_shmem = 1;
-#else
-int g_use_shmem = 0;
-#endif
+int g_depth_attempt_list[] = { 16, 24, 15, 8 };
 
 
 
@@ -109,16 +118,6 @@ extern word32 g_palette_8to1624[256];
 extern word32 g_a2palette_8to1624[256];
 
 
-Cursor	g_cursor;
-Pixmap	g_cursor_shape;
-Pixmap	g_cursor_mask;
-
-XColor	g_xcolor_black = { 0, 0x0000, 0x0000, 0x0000, DoRed|DoGreen|DoBlue, 0 };
-XColor	g_xcolor_white = { 0, 0xffff, 0xffff, 0xffff, DoRed|DoGreen|DoBlue, 0 };
-
-int g_depth_attempt_list[] = { 16, 24, 15, 8 };
-
-void DoSdlIcon();
 
 #define X_EVENT_LIST_ALL_WIN						\
 	(ExposureMask | ButtonPressMask | ButtonReleaseMask |		\
@@ -373,6 +372,18 @@ SDL_Renderer *renderer;
 SDL_Texture *texture;
 
 
+
+void set_refresh_needed() {
+	g_a2_screen_buffer_changed = -1;
+	g_full_refresh_needed = -1;
+
+	g_border_sides_refresh_needed = 1;
+	g_border_special_refresh_needed = 1;
+	g_status_refresh_needed = 1;
+}
+
+
+
 /// Queries the Screen to see if it's set to Fullscreen or Not
 /// @return SDL_FALSE if windowed, SDL_TRUE if fullscreen
 SDL_bool IsFullScreen(SDL_Window *win)
@@ -494,8 +505,6 @@ sdl_keysym_to_a2code(int keysym, int is_up)
 
 	return -1;
 }
-
-
 
 
 
@@ -1272,11 +1281,9 @@ x_redraw_status_lines()
 // 	int	aux_info;
 // };
 
-
 void sdl_push_kimage(Kimage *kimage_ptr,
 	int destx, int desty, int srcx, int srcy, int width, int height)
 {
-
 	byte *src_ptr;
 	int pixel_size = 4;
 	src_ptr = kimage_ptr->data_ptr + (srcy * kimage_ptr->width_act + srcx) * pixel_size;
@@ -1326,7 +1333,7 @@ bool send_event);
 	if(g_use_shmem) {
 		XShmPutImage(g_display, g_a2_win, g_a2_winGC, xim,
 			srcx, srcy, destx, desty, width, height, False);
-		printf("w/h: %d, %d\tsrcx/y: %d, %d\tdestx/y: %d %d\n", width, height, srcx, srcy, destx, desty);
+	//	printf("w/h: %d, %d\tsrcx/y: %d, %d\tdestx/y: %d %d\n", width, height, srcx, srcy, destx, desty);
 	//	int c= getchar();
 	}
 #endif
