@@ -24,8 +24,6 @@
 #include "SDL.h"
 #include <stdbool.h>
 
-
-
 # if !defined(__CYGWIN__) && !defined(__POWERPC__)
 /* No shared memory on Cygwin */
 # define X_SHARED_MEM
@@ -1298,6 +1296,8 @@ void sdl_push_kimage(Kimage *kimage_ptr,
 	int pitch = 640;
 	if (width < 560) {
 		pitch = EFF_BORDER_WIDTH;
+		pitch = BORDER_WIDTH+72;
+		//printf("EFF_BORDER_WIDTH : %d" ,EFF_BORDER_WIDTH);
 	}
 	//SDL_UpdateTexture(texture, NULL, src_ptr, 640 * sizeof (Uint32));
 	SDL_UpdateTexture(texture, &dstrect, src_ptr, pitch*4 );
@@ -1308,8 +1308,7 @@ void sdl_push_kimage(Kimage *kimage_ptr,
 }
 
 void
-x_push_kimage(Kimage *kimage_ptr, int destx, int desty, int srcx, int srcy,
-	int width, int height)
+x_push_kimage(Kimage *kimage_ptr, int destx, int desty, int srcx, int srcy, int width, int height)
 {
 	sdl_push_kimage(kimage_ptr, destx, desty, srcx, srcy, width, height);
 	XImage	*xim;
@@ -1554,8 +1553,6 @@ check_input_events()
 		g_border_special_refresh_needed = 1;
 		g_status_refresh_needed = 1;
 
-		/* x_refresh_ximage(); */
-		/* redraw_border(); */
 	}
 }
 
