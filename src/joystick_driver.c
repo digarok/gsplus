@@ -1,21 +1,21 @@
 /*
  GSport - an Apple //gs Emulator
  Copyright (C) 2010 - 2013 by GSport contributors
- 
+
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -32,9 +32,16 @@
 # include <time.h>
 #endif
 
+#ifdef HAVE_SDL
+# include "SDL.h"
+static SDL_Joystick *joy0, *joy1;
+SDL_Joystick *gGameController = NULL;
+#endif
+
 extern int g_joystick_native_type1;		/* in paddles.c */
 extern int g_joystick_native_type2;		/* in paddles.c */
 extern int g_joystick_native_type;		/* in paddles.c */
+extern int g_joystick_type;
 extern int g_paddle_buttons;
 extern int g_paddle_val[];
 
@@ -247,6 +254,74 @@ joystick_update_buttons()
 	}
 }
 #endif
+
+
+#ifdef HAVE_SDL
+# define JOYSTICK_DEFINED
+void
+joystick_init()
+{
+  int i;
+  if( SDL_Init( SDL_INIT_JOYSTICK ) < 0 ) {
+      printf( "SDL could not initialize joystick! SDL Error: %s\n", SDL_GetError() );
+  } else {
+    printf( "SDL initialize joystick successfully.\n");
+  }
+  if (SDL_NumJoysticks()<1) {
+    printf ("No joysticks detected\n");
+    SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+  }
+  gGameController = SDL_JoystickOpen( 0 );
+  if( gGameController == NULL ) {
+    printf( "Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError() );
+  }
+  g_joystick_native_type = 2;
+  g_joystick_native_type1 = 2;
+	g_joystick_native_type2 = -1;
+  for(i = 0; i < 4; i++) {
+    g_paddle_val[i] = 180;
+  }
+  g_paddle_buttons = 1;
+  g_joystick_type = JOYSTICK_TYPE_NATIVE_1;
+  SDL_JoystickUpdate();
+  joystick_update(0.0);
+}
+
+void
+joystick_update(double dcycs)
+{
+  if (gGameController) {
+    SDL_JoystickUpdate();
+    g_paddle_val[0] = (int)SDL_JoystickGetAxis(gGameController, 0);
+    g_paddle_val[1] = (int)SDL_JoystickGetAxis(gGameController, 1);
+    if (SDL_JoystickGetButton(gGameController, 0)) {
+			g_paddle_buttons = g_paddle_buttons | 1;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~1);
+		}
+    if (SDL_JoystickGetButton(gGameController, 1)) {
+			g_paddle_buttons = g_paddle_buttons | 2;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~2);
+		}
+    paddle_update_trigger_dcycs(dcycs);
+  }
+
+}
+
+void
+joystick_update_buttons()
+{
+}
+
+void joystick_shut() {
+  SDL_JoystickClose( gGameController );
+  gGameController = NULL;
+}
+#endif
+
+
+
 
 #ifndef JOYSTICK_DEFINED
 /* stubs for the routines */

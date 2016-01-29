@@ -19,6 +19,10 @@
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
+// This is an experimental video driver for the KEGS/GSport emulator.
+// It requires SDL2 libraries to build.  I've tested on Mac, but should
+// be easy to port to other platforms. -DagenBrock
+
 // @todo: mouse clip bugs.. great western shootout.
 // @todo: force refresh after screen mode change
 
@@ -293,8 +297,7 @@ void sdl_push_kimage(Kimage *kimage_ptr,
 	int pixel_size = 4;
 	src_ptr = kimage_ptr->data_ptr + (srcy * kimage_ptr->width_act + srcx) * pixel_size;
   //src_ptr = kimage_ptr->data_ptr;
-  //src_ptr = kimage_ptr->data_ptr;
-	//src_ptr = xim->data;
+
 	SDL_Rect dstrect;
 	dstrect.x = destx;
 	dstrect.y = desty;
@@ -303,6 +306,7 @@ void sdl_push_kimage(Kimage *kimage_ptr,
 	int pitch = 640;
 	if (width < 560) {
 		pitch = EFF_BORDER_WIDTH;
+		// This is another bad hack.  Possibly not cross platform.
 		pitch = BORDER_WIDTH+72;
 		//printf("EFF_BORDER_WIDTH : %d" ,EFF_BORDER_WIDTH);
 	}
@@ -340,11 +344,13 @@ x_get_kimage(Kimage *kimage_ptr) {
 			kimage_ptr->data_ptr = data;
 }
 
+
 void
 check_input_events()
 {
   check_input_events_sdl();
 }
+
 
 void
 check_input_events_sdl()
@@ -377,7 +383,6 @@ check_input_events_sdl()
 		}
   }
 }
-
 
 
 int
@@ -421,7 +426,6 @@ sdl_keysym_to_a2code(int keysym, int is_up)
 
 	return -1;
 }
-
 
 
 void
@@ -516,6 +520,7 @@ x_push_kimage(Kimage *kimage_ptr, int destx, int desty, int srcx, int srcy, int 
 {
 	sdl_push_kimage(kimage_ptr, destx, desty, srcx, srcy, width, height);
 }
+
 
 // called by src/sim65816.c
 void
