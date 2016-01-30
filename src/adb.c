@@ -1,21 +1,21 @@
 /*
  GSport - an Apple //gs Emulator
  Copyright (C) 2010 - 2013 by GSport contributors
- 
+
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -808,7 +808,7 @@ adb_write_c026(int val)
 				printf("ACS Demo2 (3: Colum& Music scroll) : discarding unknown controller command\n");
 			else
 				halt_printf("ADB ucontroller cmd %02x unknown!\n", val);
-			
+
 			break;
 		}
 		break;
@@ -1114,7 +1114,7 @@ adb_get_keypad_xy(int get_y)
 	for(i = 0; i < 3; i++) {
 		for(j = 0; j < 3; j++) {
 			if(g_keypad_key_is_down[key]) {
-				num_keys++;	
+				num_keys++;
 				x = x + (j - 1)*32768;
 				y = y + (1 - i)*32768;
 			}
@@ -1232,7 +1232,8 @@ update_mouse(int x, int y, int button_states, int buttons_valid)
 	if((button_states & 2) && !(g_mouse_fifo[0].buttons & 2) &&
 							(buttons_valid & 2)) {
 		/* middle button pressed */
-		halt2_printf("Middle button pressed\n");
+    adb_increment_speed();
+		//halt2_printf("Middle button pressed\n");
 	}
 
 	pos = g_mouse_fifo_pos;
