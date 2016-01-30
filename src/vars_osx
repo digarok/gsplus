@@ -1,0 +1,22 @@
+TARGET = gsplus
+OBJECTS = $(OBJECTS1) $(TFEOBJ) $(ATOBJ) $(PCAPOBJ) osxdriver.o sdlsnd_driver2.o
+CC = clang
+#CCOPTS = -O2 -Wall -fomit-frame-pointer -std=gnu99 -arch=i686 -DHAVE_SDL -DHAVE_TFE -DHAVE_ATBRIDGE -DTOGGLE_STATUS -I/usr/include/SDL -I/usr/include/freetype2
+#CPPOPTS = -O2 -DHAVE_TFE -DHAVE_SDL -DTOGGLE_STATUS -DHAVE_ATBRIDGE -I/usr/include/freetype2 -I/usr/include/SDL2
+
+## LOOK OUT FOR OPTIMIZATION FLAGS.  I'VE BEEN DISABLING -O2 to debug (-O0 for debug)
+CCOPTS = -O2 -Wall -fomit-frame-pointer -std=gnu99 -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/SDL2 -I/usr/local/include/freetype2 -g
+CPPOPTS = -O2 -DHAVE_TFE -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/freetype2 -I/usr/local/include/SDL2
+OPTS = -DGSPORT_LITTLE_ENDIAN
+SUFFIX =
+NAME = gsplus
+LDFLAGS =
+LDOPTS =
+LD = g++
+EXTRA_LIBS = -lfreetype -lSDL2 -lpcap 
+EXTRA_SPECIALS =
+
+AS = cc
+PERL = perl
+
+XOPTS = -I/usr/X11/include
