@@ -61,10 +61,10 @@ gsportmac: $(OBJECTS) compile_time.o
 	arch/mac/makedmg.sh .. GSportDmg GSport GSport 7
 
 # OSX builds
-gsportosx: $(OBJECTS) compile_time.o
+gsplus: $(OBJECTS) compile_time.o
 	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(XLIBS) $(EXTRA_LIBS) -lX11
 	echo $(OBJECTS)
-	mv gsportosx ..
+	mv gsplus ..
 
 # Linux/OSX XWindows builds
 gsportx: $(OBJECTS) compile_time.o
