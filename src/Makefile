@@ -1,4 +1,5 @@
 # GSport central makefile - you need a 'vars' file linked/copied from a 'vars_xxx' template to build.
+#@todo: check for vars file and do something useful if missing :P
 
 OBJECTS1 = adb.o clock.o config.o dis.o engine_c.o scc.o iwm.o \
 	joystick_driver.o moremem.o paddles.o parallel.o printer.o \
@@ -62,7 +63,7 @@ gsportmac: $(OBJECTS) compile_time.o
 
 # OSX builds
 gsplus: $(OBJECTS) compile_time.o
-	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(XLIBS) $(EXTRA_LIBS) 
+	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) 
 	echo $(OBJECTS)
 	cp gsplus ..
 	cp gsplus ../bin/osx
