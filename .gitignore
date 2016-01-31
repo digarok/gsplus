@@ -1,3 +1,7 @@
 .DS_Store
 *.o
 src/vars
+ROM
+ROM1
+ROM3
+
