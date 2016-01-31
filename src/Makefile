@@ -62,9 +62,10 @@ gsportmac: $(OBJECTS) compile_time.o
 
 # OSX builds
 gsplus: $(OBJECTS) compile_time.o
-	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(XLIBS) $(EXTRA_LIBS) -lX11
+	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(XLIBS) $(EXTRA_LIBS) 
 	echo $(OBJECTS)
-	mv gsplus ..
+	cp gsplus ..
+	cp gsplus ../bin/osx
 
 # Linux/OSX XWindows builds
 gsportx: $(OBJECTS) compile_time.o
