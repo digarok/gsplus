@@ -17,6 +17,10 @@ other platforms available in a few weeks.
 
 
 Some notes:
+You need to provide the ROM file and disk images and a config file.  I'd 
+recommend you just drop it in your current GSport or KEGS folder and run it
+from there. 
+
 I took out the "middle-click to enter debug" because it's stupid.  No one wants
 to use their mouse wheel to enter a debugger.  *smacks forehead*
 If you want to enter debug, it's shift-F6.  F6 is speed up, same as right and
