@@ -777,7 +777,8 @@ void fixed_memory_ptrs_shut()
 	g_slow_memory_ptr=g_slow_memory_ptr_allocated= NULL;
 	g_dummy_memory1_ptr = g_dummy_memory1_ptr_allocated = NULL;
 	g_rom_fc_ff_ptr = g_rom_fc_ff_ptr_allocated = NULL;
-	g_rom_cards_ptr = g_rom_cards_ptr = NULL;
+	//  g_rom_cards_ptr = g_rom_cards_ptr = NULL;   // a mistake?
+	g_rom_cards_ptr =  NULL;
 }
 
 
