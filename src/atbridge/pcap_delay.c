@@ -49,6 +49,7 @@ bool pcapdelay_is_loaded()
 #elif __linux__
 	return module != 0;
 #endif
+  return 0;
 }
 
 void pcapdelay_unload()
