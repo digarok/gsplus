@@ -1,5 +1,5 @@
 /*
- GSport - an Apple //gs Emulator
+ GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2010 - 2014 by GSport contributors
  
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
@@ -924,7 +924,7 @@ scc_write_reg(int port, word32 val, double dcycs)
 			// Based on experimentation, checking for an active first RX interrupt is incorrect.
 			// System 5 fails to operate correctly with this check.  Anyway, skipping this check
 			// seems to correct operation, but more investigation is necessary.
-			if ((scc_ptr->sdlc_eof == 1) /*&& (scc_ptr->did_int_rx_first == 1)*/)
+			if (scc_ptr->sdlc_eof == 1) /*&& (scc_ptr->did_int_rx_first == 1)*/
 			{
 				// Remove and discard one byte (the one causing the current special condition) from the RX FIFO.
 				int depth = scc_ptr->rx_queue_depth;

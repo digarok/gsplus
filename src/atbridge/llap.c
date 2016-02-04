@@ -1,5 +1,5 @@
 /*
-GSport - an Apple //gs Emulator
+GSPLUS - Advanced Apple IIGS Emulator Environment
 Copyright (C) 2013-2014 by Peter Neubauer
 
 This program is free software; you can redistribute it and/or modify it

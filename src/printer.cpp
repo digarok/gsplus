@@ -1,21 +1,21 @@
 /*
- GSport - an Apple //gs Emulator
+ GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2010 - 2011 by GSport contributors
- 
+
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -45,14 +45,14 @@
 #include "support.h"
 //#include "png.h"
 //#pragma comment( lib, "libpng.lib" )
-//#pragma comment (lib, "zdll.lib" ) 
+//#pragma comment (lib, "zdll.lib" )
 
 static CPrinter* defaultPrinter = NULL;
 
-static FILE *textPrinterFile = NULL; 
+static FILE *textPrinterFile = NULL;
 #ifdef WIN32
 const char* const textPrinterFileName = ".\\printer.txt";
-#else 
+#else
 const char* const textPrinterFileName = "./printer.txt";
 #endif
 
@@ -90,7 +90,7 @@ void CPrinter::FillPalette(Bit8u redmax, Bit8u greenmax, Bit8u bluemax, Bit8u co
 }
 #endif // HAVE_SDL
 
-CPrinter::CPrinter(Bit16u dpi, Bit16u width, Bit16u height, char* output, bool multipageOutput) 
+CPrinter::CPrinter(Bit16u dpi, Bit16u width, Bit16u height, char* output, bool multipageOutput)
 {
 #ifdef HAVE_SDL
 	if (FT_Init_FreeType(&FTlib))
@@ -108,18 +108,18 @@ CPrinter::CPrinter(Bit16u dpi, Bit16u width, Bit16u height, char* output, bool m
 
 		// Create page
 		page = SDL_CreateRGBSurface(
-						SDL_SWSURFACE, 
-						(Bitu)(defaultPageWidth*dpi), 
-						(Bitu)(defaultPageHeight*dpi), 
-						8, 
-						0, 
-						0, 
-						0, 
+						SDL_SWSURFACE,
+						(Bitu)(defaultPageWidth*dpi),
+						(Bitu)(defaultPageHeight*dpi),
+						8,
+						0,
+						0,
+						0,
 						0);
 
 		// Set a grey palette
 		SDL_Palette* palette = page->format->palette;
-		
+
 		for (Bitu i=0; i<32; i++)
 		{
 			palette->colors[i].r =255;
@@ -148,9 +148,9 @@ CPrinter::CPrinter(Bit16u dpi, Bit16u width, Bit16u height, char* output, bool m
 		// correct resulting color.
 		// i.e. magenta on blank page yyy=001
 		// then yellow on magenta 001 | 100 = 101 = red
-		
+
 		color=COLOR_BLACK;
-		
+
 		curFont = NULL;
 		charRead = false;
 		autoFeed = false;
@@ -164,25 +164,25 @@ CPrinter::CPrinter(Bit16u dpi, Bit16u width, Bit16u height, char* output, bool m
 			// Show Print dialog to obtain a printer device context
 
 			PRINTDLG pd;
-			pd.lStructSize = sizeof(PRINTDLG); 
-			pd.hDevMode = (HANDLE) NULL; 
-			pd.hDevNames = (HANDLE) NULL; 
-			pd.Flags = PD_RETURNDC; 
-			pd.hwndOwner = NULL; 
-			pd.hDC = (HDC) NULL; 
-			pd.nFromPage = 1; 
-			pd.nToPage = 1; 
-			pd.nMinPage = 0; 
-			pd.nMaxPage = 0; 
-			pd.nCopies = 1; 
-			pd.hInstance = NULL; 
-			pd.lCustData = 0L; 
-			pd.lpfnPrintHook = (LPPRINTHOOKPROC) NULL; 
-			pd.lpfnSetupHook = (LPSETUPHOOKPROC) NULL; 
-			pd.lpPrintTemplateName = (LPCSTR) NULL; 
-			pd.lpSetupTemplateName = (LPCSTR)  NULL; 
-			pd.hPrintTemplate = (HANDLE) NULL; 
-			pd.hSetupTemplate = (HANDLE) NULL; 
+			pd.lStructSize = sizeof(PRINTDLG);
+			pd.hDevMode = (HANDLE) NULL;
+			pd.hDevNames = (HANDLE) NULL;
+			pd.Flags = PD_RETURNDC;
+			pd.hwndOwner = NULL;
+			pd.hDC = (HDC) NULL;
+			pd.nFromPage = 1;
+			pd.nToPage = 1;
+			pd.nMinPage = 0;
+			pd.nMaxPage = 0;
+			pd.nCopies = 1;
+			pd.hInstance = NULL;
+			pd.lCustData = 0L;
+			pd.lpfnPrintHook = (LPPRINTHOOKPROC) NULL;
+			pd.lpfnSetupHook = (LPSETUPHOOKPROC) NULL;
+			pd.lpPrintTemplateName = (LPCSTR) NULL;
+			pd.lpSetupTemplateName = (LPCSTR)  NULL;
+			pd.hPrintTemplate = (HANDLE) NULL;
+			pd.hSetupTemplate = (HANDLE) NULL;
 			PrintDlg(&pd);
 			// TODO: what if user presses cancel?
 			printerDC = pd.hDC;
@@ -363,11 +363,11 @@ void CPrinter::updateFont()
 	default:
 		fontName = g_printer_font_roman;
 	}
-	
+
 	if (FT_New_Face(FTlib, fontName, 0, &curFont))
 	{
-		
-		printf("Unable to load font %s\n");
+
+		printf("Unable to load font\n");
 		//LOG_MSG("Unable to load font %s", fontName);
 		curFont = NULL;
 	}
@@ -415,7 +415,7 @@ void CPrinter::updateFont()
 				actcpi = 20.0;
 				horizPoints *= 10.0/20.0;
 				vertPoints *= 10.0/12.0;
-			}	
+			}
 		} else if (style & STYLE_CONDENSED) horizPoints /= 2.0;
 
 
@@ -437,7 +437,7 @@ void CPrinter::updateFont()
 	}
 
 	FT_Set_Char_Size(curFont, (Bit16u)horizPoints*64, (Bit16u)vertPoints*64, dpi, dpi);
-	
+
 	if (style & STYLE_ITALICS || charTables[curCharTable] == 0)
 	{
 		FT_Matrix  matrix;
@@ -464,7 +464,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 		case 0x02: // Undocumented
 		case 0x0a: // Reverse line feed											(ESC LF)
 		case 0x0c: // Return to top of current page								(ESC FF)
-		case 0x0e: // Select double-width printing (one line)					(ESC SO)		
+		case 0x0e: // Select double-width printing (one line)					(ESC SO)
 		case 0x0f: // Select condensed printing									(ESC SI)
 		case 0x23: // Cancel MSB control										(ESC #)
 		case 0x30: // Select 1/8-inch line spacing								(ESC 0)
@@ -559,7 +559,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 		case 0x5b: // Select character height, width, line spacing
 			neededParam = 7;
 			break;
-		case 0x62: // Set vertical tabs in VFU channels							(ESC b) 
+		case 0x62: // Set vertical tabs in VFU channels							(ESC b)
 		case 0x42: // Set vertical tabs											(ESC B)
 			numVertTabs = 0;
 			return true;
@@ -576,7 +576,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 		default:
 			/*LOG_MSG("PRINTER: Unknown command %c (%02Xh) %c , unable to skip parameters.",
 				(ESCCmd & 0x800)?"FS":"ESC",ESCCmd, ESCCmd);*/
-			
+
 			neededParam = 0;
 			ESCCmd = 0;
 			return true;
@@ -641,7 +641,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 	}
 
 	// Collect horizontal tabs
-	if (ESCCmd == 0x44) 
+	if (ESCCmd == 0x44)
 	{
 		if (ch == 0 || (numHorizTabs>0 && horiztabs[numHorizTabs-1] > (Real64)ch*(1/(Real64)cpi))) // Done
 			ESCCmd = 0;
@@ -665,7 +665,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 		case 0x02: // Undocumented
 			// Ignore
 			break;
-		case 0x0e: // Select double-width printing (one line) (ESC SO)		
+		case 0x0e: // Select double-width printing (one line) (ESC SO)
 			if (!multipoint)
 			{
 				hmi = -1;
@@ -850,7 +850,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 			break;
 		case 0x4e: // Set bottom margin (ESC N)
 			topMargin = 0.0;
-			bottomMargin = (Real64)params[0] * lineSpacing; 
+			bottomMargin = (Real64)params[0] * lineSpacing;
 			break;
 		case 0x4f: // Cancel bottom (and top) margin
 			topMargin = 0.0;
@@ -925,7 +925,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 			if (multiPointSize == 0)
 				multiPointSize = (Real64)10.5;
 			if (PARAM16(1) > 0) // Set points
-				multiPointSize = ((Real64)PARAM16(1)) / 2;			
+				multiPointSize = ((Real64)PARAM16(1)) / 2;
 			updateFont();
 			break;
 		case 0x59: // Select 120-dpi, double-speed graphics (ESC Y)
@@ -970,7 +970,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 		case 0x6b: // Select typeface (ESC k)
 			paramc = params[0]-'0';
 			//if (params[0] <= 11 || params[0] == 30 || params[0] == 31)
-			if (paramc <= 11 || paramc == 30 || paramc == 31) 
+			if (paramc <= 11 || paramc == 30 || paramc == 31)
 			LQtypeFace = (Typeface)paramc;
 			updateFont();
 			break;
@@ -992,9 +992,9 @@ bool CPrinter::processCommandChar(Bit8u ch)
 			updateFont();
 			break;
 		case 0x72: // Select printing color (ESC r)
-			
+
 			if(params[0]==0 || params[0] > 6) color = COLOR_BLACK;
-			else color = params[0]<<5;       
+			else color = params[0]<<5;
 			break;
 		case 0x73: // Select low-speed mode (ESC s)
 			// Ignore
@@ -1048,7 +1048,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 					selectCodepage(charTables[curCharTable]);
 			}
 			break;
-		case 0x22d: // Select line/score (ESC (-) 
+		case 0x22d: // Select line/score (ESC (-)
 			style &= ~(STYLE_UNDERLINE | STYLE_STRIKETHROUGH | STYLE_OVERSCORE);
 			score = params[4];
 			if (score)
@@ -1119,7 +1119,7 @@ bool CPrinter::processCommandChar(Bit8u ch)
 					if (newPos > bottomMargin)
 						newPage(true,false);
 					else
-						curY = newPos;	
+						curY = newPos;
 				}
 			}
 			break;
@@ -1270,7 +1270,7 @@ void CPrinter::newPage(bool save, bool resetx)
 {
 	//PIC_RemoveEvents(PRINTER_EventHandler);
 	if(printer_timout) timeout_dirty=false;
-	
+
 #ifdef HAVE_SDL
 	if (save)
 		outputPage();
@@ -1333,11 +1333,11 @@ void CPrinter::printChar(Bit8u ch)
 	// Do not print if no font is available
 	if (!curFont) return;
 	if(ch==0x1) ch=0x20;
-	
+
 	// Find the glyph for the char to render
 	FT_UInt index = FT_Get_Char_Index(curFont, curMap[ch]);
-	
-	// Load the glyph 
+
+	// Load the glyph
 	FT_Load_Glyph(curFont, index, FT_LOAD_DEFAULT);
 
 	// Render a high-quality bitmap
@@ -1384,7 +1384,7 @@ void CPrinter::printChar(Bit8u ch)
     curX += x_advance;
 
 	// Draw lines if desired
-	if ((score != SCORE_NONE) && (style & 
+	if ((score != SCORE_NONE) && (style &
 		(STYLE_UNDERLINE|STYLE_STRIKETHROUGH|STYLE_OVERSCORE)))
 	{
 		// Find out where to put the line
@@ -1422,7 +1422,7 @@ void CPrinter::blitGlyph(FT_Bitmap bitmap, Bit16u destx, Bit16u desty, bool add)
 			if (source > 0 && (destx+x < page->w) && (desty+y < page->h) ) {
 				Bit8u* target = (Bit8u*)page->pixels + (x+destx) + (y+desty)*page->pitch;
 				source>>=3;
-				
+
 				if (add) {
 					if (((*target)&0x1f )+ source > 31) *target |= (color|0x1f);
 					else {
@@ -1592,7 +1592,7 @@ void CPrinter::printBitGraph(Bit8u ch)
 	SDL_LockSurface(page);
 
 	// When page dpi is greater than graphics dpi, the drawn pixels get "bigger"
-	Bitu pixsizeX=1; 
+	Bitu pixsizeX=1;
 	Bitu pixsizeY=1;
 	if(bitGraph.adjacent) {
 		pixsizeX = dpi/bitGraph.horizDens > 0? dpi/bitGraph.horizDens : 1;
@@ -1654,7 +1654,7 @@ static void findNextName(char* front, char* ext, char* fname)
 		printf(fname);
 #ifdef WIN32
 		const char* const pathstring = ".\\%s%d%s";
-#else 
+#else
 		const char* const pathstring = "./%s%d%s";
 #endif
 		sprintf(fname+strlen(fname), pathstring, front,i++,ext);
@@ -1665,10 +1665,10 @@ static void findNextName(char* front, char* ext, char* fname)
 	while (test != NULL );
 }
 
-void CPrinter::outputPage() 
+void CPrinter::outputPage()
 {
 /*	SDL_Surface *screen;
- 
+
 screen = SDL_SetVideoMode(1024, 768, 16, SDL_DOUBLEBUF | SDL_RESIZABLE);
 if (screen == NULL) {
 	printf("Unable to set video mode: %s\n", SDL_GetError());
@@ -1678,20 +1678,20 @@ SDL_LockSurface(page);
 image = SDL_DisplayFormat(page);
 SDL_UnlockSurface(page);
 SDL_Rect src, dest;
- 
+
 src.x = 0;
 src.y = 0;
 src.w = image->w;
 src.h = image->h;
- 
+
 dest.x = 100;
 dest.y = 100;
 dest.w = image->w;
 dest.h = image->h;
- 
+
 SDL_BlitSurface(image, &src, screen, &dest);
 SDL_Flip(screen);
- 
+
 SDL_Delay(2000);
 SDL_FreeSurface(image);*/
 
@@ -1706,15 +1706,15 @@ SDL_FreeSurface(image);*/
 
 		Real64 scaleW, scaleH;
 
-		if (page->w > physW) 
+		if (page->w > physW)
 	        scaleW = (Real64)page->w / (Real64)physW;
-	    else 
-			scaleW = (Real64)physW / (Real64)page->w; 
- 
-		if (page->h > physH) 
+	    else
+			scaleW = (Real64)physW / (Real64)page->w;
+
+		if (page->h > physH)
 	        scaleH = (Real64)page->h / (Real64)physH;
-	    else 
-			scaleH = (Real64)physH / (Real64)page->h; 
+	    else
+			scaleH = (Real64)physH / (Real64)page->h;
 
 		HDC memHDC = CreateCompatibleDC(printerDC);
 		BITMAPINFO *BitmapInfo;
@@ -1800,7 +1800,7 @@ SDL_FreeSurface(image);*/
 	{
 		// Find a page that does not exists
 		findNextName("page", ".png", &fname[0]);
-	
+
 		png_structp png_ptr;
 		png_infop info_ptr;
 		png_bytep * row_pointers;
@@ -1809,7 +1809,7 @@ SDL_FreeSurface(image);*/
 
 		/* Open the actual file */
 		FILE * fp=fopen(fname,"wb");
-		if (!fp) 
+		if (!fp)
 		{
 			//LOG(LOG_MISC,LOG_ERROR)("PRINTER: Can't open file %s for printer output", fname);
 			return;
@@ -1827,7 +1827,7 @@ SDL_FreeSurface(image);*/
 		/* Finalize the initing of png library */
 		png_init_io(png_ptr, fp);
 		png_set_compression_level(png_ptr,Z_BEST_COMPRESSION);
-		
+
 		/* set other zlib parameters */
 		png_set_compression_mem_level(png_ptr, 8);
 		png_set_compression_strategy(png_ptr,Z_DEFAULT_STRATEGY);
@@ -1835,11 +1835,11 @@ SDL_FreeSurface(image);*/
 		png_set_compression_method(png_ptr, 8);
 		png_set_compression_buffer_size(png_ptr, 8192);
 
-		
+
 		png_set_IHDR(png_ptr, info_ptr, page->w, page->h,
 			8, PNG_COLOR_TYPE_PALETTE, PNG_INTERLACE_NONE,
 			PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
-		for (i=0;i<256;i++) 
+		for (i=0;i<256;i++)
 		{
 			palette[i].red = page->format->palette->colors[i].r;
 			palette[i].green = page->format->palette->colors[i].g;
@@ -1851,12 +1851,12 @@ SDL_FreeSurface(image);*/
 
 		// Allocate an array of scanline pointers
 		row_pointers = (png_bytep*)malloc(page->h*sizeof(png_bytep));
-		for (i=0; i<page->h; i++) 
+		for (i=0; i<page->h; i++)
 			row_pointers[i] = ((Bit8u*)page->pixels+(i*page->pitch));
-	
+
 		// tell the png library what to encode.
 		png_set_rows(png_ptr, info_ptr, row_pointers);
-		
+
 		// Write image to file
 		png_write_png(png_ptr, info_ptr, 0, NULL);
 
@@ -1864,13 +1864,13 @@ SDL_FreeSurface(image);*/
 
 
 		SDL_UnlockSurface(page);
-		
+
 		/*close file*/
 		fclose(fp);
-	
+
 		/*Destroy PNG structs*/
 		png_destroy_write_struct(&png_ptr, &info_ptr);
-		
+
 		/*clean up dynamically allocated RAM.*/
 		free(row_pointers);
 	}
@@ -1878,7 +1878,7 @@ SDL_FreeSurface(image);*/
 	else if (strcasecmp(output, "ps") == 0)
 	{
 		FILE* psfile = NULL;
-		
+
 		// Continue postscript file?
 		if (outputHandle != NULL)
 			psfile = (FILE*)outputHandle;
@@ -1892,7 +1892,7 @@ SDL_FreeSurface(image);*/
 				findNextName("doc", ".ps", &fname[0]);
 
 			psfile = fopen(fname, "wb");
-			if (!psfile) 
+			if (!psfile)
 			{
 				printf("PRINTER: Can't open file %s for printer output", fname);
 				return;
@@ -1945,7 +1945,7 @@ SDL_FreeSurface(image);*/
 			{
 				// Find end of heterogenous area
 				Bit8u diffCount = 1;
-				while (diffCount < 128 && diffCount+pix < numpix && 
+				while (diffCount < 128 && diffCount+pix < numpix &&
 					(
 						   (diffCount+pix < numpix-2)
 						|| (getPixel(pix+diffCount) != getPixel(pix+diffCount+1))
@@ -1981,7 +1981,7 @@ SDL_FreeSurface(image);*/
 		}
 	}
 	else
-	{	
+	{
 		// Find a page that does not exists
 		findNextName("page", ".bmp", &fname[0]);
 		SDL_SaveBMP(page, fname);
@@ -2022,7 +2022,7 @@ void CPrinter::fprintASCII85(FILE* f, Bit16u b)
 				// Make sure a line never starts with a % (which may be mistaken as start of a comment)
 				if (ASCII85CurCol == 0 && buffer[0] == '%')
 					fprintf(f, " ");
-				
+
 				for (int i=0; i<((b != 257)?5:ASCII85BufferPos+1); i++)
 				{
 					fprintf(f, "%c", buffer[i]);

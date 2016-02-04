@@ -1,5 +1,5 @@
 /*
- GSport - an Apple //gs Emulator
+ GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2013 by GSport contributors
  
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey

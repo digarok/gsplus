@@ -1,5 +1,5 @@
 /*
- GSport - an Apple //gs Emulator
+ GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2013 - 2014 by GSport contributors
  Originally authored by Christopher Mason
 
@@ -130,7 +130,7 @@ void scc_imagewriter_empty_writebuf(int port, double dcycs)
 		//printf("Write Imagewriter ret: %d, bytes_written:%d, len:%d\n", ret,
 			//(int)bytes_written, len);
 		
-		if((bytes_written == 0)) {
+		if (bytes_written == 0) {
 			done = 1;
 			break;
 		} else {

@@ -1,5 +1,5 @@
 /*
- GSport - an Apple //gs Emulator
+ GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2010 - 2012 by GSport contributors
 
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
@@ -69,6 +69,7 @@ SDL_Texture *texture;
 void dev_video_init_sdl();
 void handle_sdl_key_event(SDL_Event event);
 void check_input_events_sdl();
+int handle_sdl_mouse_motion_event(SDL_Event event);
 
 int	g_num_a2_keycodes = 0;
 int a2_key_to_sdlkeycode[][3] = {
