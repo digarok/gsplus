@@ -82,4 +82,3 @@ extern int closedir(DIR *dirp);
 #endif
 
 #endif /* DIRPORT__H */
-

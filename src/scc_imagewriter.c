@@ -1,5 +1,7 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
+ Copyright (C) 2016 - Dagen Brock
+ 
  Copyright (C) 2013 - 2014 by GSport contributors
  Originally authored by Christopher Mason
 
