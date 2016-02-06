@@ -1,0 +1,10 @@
+before_script:
+  - apt-get update -qq && apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libxext-dev
+
+build:
+  script:
+    - cd src
+    - ln -s vars_x86linux_x11 vars
+    - make clean ; make
+
+
