@@ -2,7 +2,7 @@
 stages:
   - build
 
-build-ubuntu:
+build-ubuntu-x:
   tags:
     - ubuntu
   stage: build
@@ -10,6 +10,16 @@ build-ubuntu:
     - sudo apt-get update -qq && apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libxext-dev
     - cd src
     - ln -s vars_x86linux_x11 vars
+    - make clean ; make
+
+build-ubuntu-sdl:
+  tags:
+    - ubuntu
+  stage: build
+  script:
+    - sudo apt-get update -qq && apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev
+    - cd src
+    - ln -s vars_x86linux_sdl vars
     - make clean ; make
 
 
