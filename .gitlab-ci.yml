@@ -1,8 +1,14 @@
-before_script:
-  - sudo apt-get update -qq && apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libxext-dev
 
-build:
+stages:
+  - build
+
+
+build-ubuntu:
+  tags:
+    - ubuntu
+  stage: build
   script:
+    - sudo apt-get update -qq && apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libxext-dev
     - cd src
     - ln -s vars_x86linux_x11 vars
     - make clean ; make
