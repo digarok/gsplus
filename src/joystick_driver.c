@@ -55,7 +55,7 @@ int	g_joystick_num_axes = 0;
 int	g_joystick_num_buttons = 0;
 
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(JOYSTICK_DEFINED)
 # define JOYSTICK_DEFINED
 void
 joystick_init()
@@ -148,7 +148,7 @@ joystick_update_buttons()
 }
 #endif /* LINUX */
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(JOYSTICK_DEFINED)
 # define JOYSTICK_DEFINED
 void
 joystick_init()
@@ -257,7 +257,7 @@ joystick_update_buttons()
 #endif
 
 
-#ifdef HAVE_SDL
+#if defined(HAVE_SDL) && !defined(JOYSTICK_DEFINED)
 # define JOYSTICK_DEFINED
 void
 joystick_init()
