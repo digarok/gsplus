@@ -1,0 +1,27 @@
+# Mac OSX - SDL2 version
+# Install 'brew' if you don't already have it installed. 
+
+# system prep
+brew install sdl2
+brew install freetype
+
+# build
+git clone git@github.com:digarok/gsplus.git
+cd gsplus/src
+ln -s vars_osx_sdl2 vars
+make clean ; make
+
+#Note that installing freetype via brew will install the library, but I think
+# maybe you have to install the source and build it to link it in properly. 
+
+# You could use /usr/local/src instead of /tmp
+cd /tmp 
+curl --remote-name --location http://sourceforge.net/projects/freetype/files/freetype2/2.6.2/freetype-2.6.2.tar.gz
+tar -xzvf freetype-2.6.2.tar.gz
+cd freetype-2.6.2
+./configure --prefix=/usr/local/freetype-2.6.2
+make
+make install
+ln -s freetype-2.6.2 /usr/local/freetype
+
+

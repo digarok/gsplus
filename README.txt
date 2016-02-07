@@ -49,16 +49,7 @@ Dagen Brock
 Saturday, January 30, 2016   1:18PM
 --------------------------------------------------------------------------------
 
-Mac OSX Build Instructions
+Build Instructions
 ==========================
-Download the repo
-Install 'brew' if you don't already have it installed.  (Google it, it's easy.)
-Install SDL libraries if needed:
-  brew install sdl2
-Install FreeType if needed:
-  brew install freetype
-Create a symbolic link from the vars_osx file to 'vars':
-  cd src
-  ln -s vars_osx vars
-Build the binary:
-  make clean ; make
+See the /doc/ directory for "Developer-Quickstart" docs which cover building
+for the various platforms.  (as fast as I can write them :P )
