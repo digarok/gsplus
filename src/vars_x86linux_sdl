@@ -1,5 +1,5 @@
-TARGET = gsportx
-NAME = gsportx
+TARGET = gsplusx
+NAME = gsplusx
 PERL = perl
 CC = gcc
 LD = g++
