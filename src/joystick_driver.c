@@ -1,7 +1,7 @@
 /*
  GSport - an Apple //gs Emulator
  Copyright (C) 2016 - Dagen Brock
- 
+
  Copyright (C) 2010 - 2013 by GSport contributors
 
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
@@ -284,7 +284,6 @@ joystick_init()
   for(i = 0; i < 4; i++) {
     g_paddle_val[i] = 180;
   }
-  g_paddle_buttons = 1;
   g_joystick_type = JOYSTICK_TYPE_NATIVE_1;
   SDL_JoystickUpdate();
   joystick_update(0.0);
