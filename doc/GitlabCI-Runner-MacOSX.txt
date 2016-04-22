@@ -8,3 +8,11 @@ sudo chmod +x /usr/local/bin/gitlab-ci-multi-runner
 
 ## STEP 2 - Register it with your server
 sudo gitlab-ci-multi-runner register
+
+
+## or, example with all parameters for headless setup
+gitlab-ci-multi-runner register -n \
+  --url http://yourserv.gotgeeks.com/ci \
+  --registration-token 1234 \
+  --executor shell \
+  --description "Dagens-MBP"
