@@ -1,0 +1,43 @@
+## SOME NOTES ON SETTING UP GITLAB RUNNER TO BUILD ON LINUX/UBUNTU
+# Based on: https://gitlab.com/gitlab-org/gitlab-ci-multi-runner/blob/master/docs/install/linux-repository.md
+
+
+## STEP 1 - Install Gitlab Runner
+sudo apt-get install -y curl
+curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-ci-multi-runner/script.deb.sh | sudo bash
+sudo apt-get install -y gitlab-ci-multi-runner
+
+
+## STEP 2 - Register it with your server
+sudo gitlab-ci-multi-runner register
+# "Please enter the gitlab-ci coordinator URL (e.g. https://gitlab.com/ci )"
+#  https://centralserv.gotgeeks.com/ci
+#
+# "Please enter the gitlab-ci token for this runner"
+#  (get token from Project->CI Settings)
+#
+# "Please enter the gitlab-ci description for this runner"
+#  my-runner
+#
+# "Please enter tags for this runner"
+#  ubuntu
+#
+# "Please enter the executor: shell, docker, docker-ssh, ssh?"
+#  shell
+
+
+## STEP 3 - Make sure build user can sudo if needed for packages
+#   Note: You need to do this if you get this error in your builds:
+#     "sudo: no tty present and no askpass program specified"
+sudo visudo
+
+# Add build user to the end of the file, like:
+dbrock ALL=(ALL) NOPASSWD: ALL
+
+
+
+
+# I use two git repos.  Github for OSS hosting, and my personal Gitlab for CI.
+# If you need to add your remote gitlabci server for development.
+# git remote add gitlabci git@centralserv.gotgeeks.com:dbrock/gsplus.git
+# http://stackoverflow.com/questions/849308/pull-push-from-multiple-remote-locations
