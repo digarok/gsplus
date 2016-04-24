@@ -44,3 +44,12 @@ build-osx:
     - make clean ; make
 
 
+
+build-win32:
+  tags:
+    - windows
+  stage: build
+  script:
+    - cd src
+    - ln -s vars_win32 vars
+    - make clean ; make
