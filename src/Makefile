@@ -53,20 +53,18 @@ gsplusfb: $(OBJECTS) compile_time.o
 	mv gsplusfb ..
 	cp -f ../config.template ../config.txt 
 
-# NOT CURRENTLY SUPPORTED 
-# Mingw32 (native windows) builds:
-gsport.exe: $(OBJECTS) compile_time.o
+# Mingw32 (native windows) / Cygwin builds:
+gsplus.exe: $(OBJECTS) compile_time.o
 	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
-	mkdir -p ../GSport.app/lib
-	cp -f gsport.exe ../GSport.app/GSport.exe
-	cp -f ../config.template ../GSport.app/config.txt
-	cp -f ../lib/*.ttf ../GSport.app/lib
-	cp -f ../lib/arch/win32/*.dll ../GSport.app
-	cp -f ../lib/NoBoot.po ../GSport.app
-	cp -f GSport.bat ../GSport.app/GSport.bat
-	cp -f parallel.rom ../GSport.app
-	cp -f ../COPYING.txt ../GSport.app
-	cp -f ../GSport.html ../GSport.app
+	mkdir -p ../GSplus.app/lib
+	cp -f gsplus.exe ../GSplus.app/GSplus.exe
+	cp -f ../config.template ../GSplus.app/config.txt
+	cp -f ../lib/*.ttf ../GSplus.app/lib
+	cp -f ../lib/arch/win32/*.dll ../GSplus.app
+	cp -f ../lib/NoBoot.po ../GSplus.app
+	cp -f GSplus.bat ../GSplus.app/GSplus.bat
+	cp -f parallel.rom ../GSplus.app
+	cp -f ../COPYING.txt ../GSplus.app
 
 # NOT CURRENTLY SUPPORTED 
 # Mac build - old style (deprecated)
