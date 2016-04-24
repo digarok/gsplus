@@ -51,5 +51,5 @@ build-win32:
   stage: build
   script:
     - cd src
-    - cp vars_win32 vars
+    - copy vars_win32 vars
     - make clean ; make
