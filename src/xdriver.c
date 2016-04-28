@@ -258,14 +258,14 @@ int a2_key_to_xsym[][3] = {
 int
 main(int argc, char **argv)
 {
-        return gsportmain(argc, argv);
+        return gsplusmain(argc, argv);
 }
 
 void
 x_dialog_create_gsport_conf(const char *str)
 {
 	// Just write the config file already...
-	config_write_config_gsport_file();
+	config_write_config_gsplus_file();
 }
 
 int
@@ -905,7 +905,7 @@ get_ximage(Kimage *kimage_ptr)
 	xim = XCreateImage(g_display, g_vis, depth, ZPixmap, 0,
 		(char *)ptr, width, height, 8, 0);
 
-#if defined(GSPORT_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
+#if defined(GSPLUS_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
 	xim->byte_order = LSBFirst;
 #else
 	xim->byte_order = MSBFirst;

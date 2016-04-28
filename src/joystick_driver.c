@@ -1,5 +1,5 @@
 /*
- GSport - an Apple //gs Emulator
+ GSplus - an Apple //gs Emulator
  Copyright (C) 2016 - Dagen Brock
 
  Copyright (C) 2010 - 2013 by GSport contributors

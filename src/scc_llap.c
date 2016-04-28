@@ -37,7 +37,7 @@ int g_appletalk_network_hint = 0;
 
 extern Scc scc_stat[2];
 
-extern int g_config_gsport_update_needed;
+extern int g_config_gsplus_update_needed;
 static bool bridge_initialized = false;
 
 void scc_llap_init()
@@ -63,7 +63,7 @@ void scc_llap_update()
 		if (g_appletalk_network_hint != atbridge_get_net())
 		{
 			g_appletalk_network_hint = atbridge_get_net();
-			g_config_gsport_update_needed = 1;
+			g_config_gsplus_update_needed = 1;
 		}
 	}
 }

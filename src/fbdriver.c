@@ -442,7 +442,7 @@ void x_push_done(void)
 void x_dialog_create_gsport_conf(const char *str)
 {
     // Just write the config file already...
-    config_write_config_gsport_file();
+    config_write_config_gsplus_file();
 }
 int x_show_alert(int is_fatal, const char *str)
 {
@@ -553,7 +553,7 @@ int main(int argc,char *argv[])
 	exit(-1);
     if (signal(SIGHUP, sig_bye) == SIG_ERR)
 	exit(-1);
-    gsportmain(argc, argv);
+    gsplusmain(argc, argv);
     xdriver_end();
     return 0;
 }

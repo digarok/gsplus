@@ -10,9 +10,9 @@ sudo chmod +x /usr/local/bin/gitlab-ci-multi-runner
 sudo gitlab-ci-multi-runner register
 
 
-## or, example with all parameters for headless setup
+
 gitlab-ci-multi-runner register -n \
-  --url http://yourserv.gotgeeks.com/ci \
-  --registration-token 1234 \
+  --url http://yourserv.com/ci \
+  --registration-token a1f60647cf7fe3eb5c7fa87e59bf7 \
   --executor shell \
-  --description "Dagens-MBP"
+  --description "My-Mac"

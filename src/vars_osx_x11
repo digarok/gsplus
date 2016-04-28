@@ -9,7 +9,7 @@ AS = cc
 OBJECTS = $(OBJECTS1) $(TFEOBJ) $(ATOBJ) $(PCAPOBJ) xdriver.o
 CCOPTS = -O2 -Wall -fomit-frame-pointer -std=gnu99 -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/SDL2 -I/usr/local/include/freetype2 -L/usr/X11/lib
 CPPOPTS = -O2 -DHAVE_TFE -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/freetype2 -I/usr/local/include/SDL2
-OPTS = -DGSPORT_LITTLE_ENDIAN 
+OPTS = -DGSPLUS_LITTLE_ENDIAN 
 SUFFIX =
 LDFLAGS =
 LDOPTS =

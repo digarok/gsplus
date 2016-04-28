@@ -27,7 +27,7 @@
 #include "tfe/protos_tfe.h" 
 #endif
 
-extern char const g_gsport_version_str[];
+extern char const g_gsplus_version_str[];
 
 extern byte *g_memory_ptr;
 extern byte *g_dummy_memory1_ptr;
@@ -1384,8 +1384,8 @@ io_read(word32 loc, double *cyc_ptr)
 				return 'G';
 			case 2:
 				g_em_emubyte_cnt = 0;
-				tmp = g_gsport_version_str[0] - '0';
-				i = g_gsport_version_str[2] - '0';
+				tmp = g_gsplus_version_str[0] - '0';
+				i = g_gsplus_version_str[2] - '0';
 				return ((tmp & 0xf) << 4) + (i & 0xf);
 			default:
 				g_em_emubyte_cnt = 0;

@@ -644,7 +644,7 @@ do_write_c7(int unit_num, word32 buf, int blk)
 		val1 = get_memory16_c(buf + i, 0);
 		val2 = get_memory16_c(buf + i + 2, 0);
 		/* reorder the little-endian bytes to be big-endian */
-#if defined(GSPORT_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
+#if defined(GSPLUS_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
 		val = (val2 << 16) + val1;
 #else
 		val = (val1 << 24) + ((val1 << 8) & 0xff0000) +
@@ -763,7 +763,7 @@ extern byte g_bram[2][256];
 extern byte* g_bram_ptr;
 extern byte g_temp_boot_slot;
 extern byte g_orig_boot_slot;
-extern int g_config_gsport_update_needed;
+extern int g_config_gsplus_update_needed;
 void
 do_c700(word32 ret)
 {
@@ -773,7 +773,7 @@ do_c700(word32 ret)
 		g_temp_boot_slot = 254;
 		g_bram_ptr[40] = g_orig_boot_slot;
 		clk_calculate_bram_checksum();
-		g_config_gsport_update_needed = 1;
+		g_config_gsplus_update_needed = 1;
 	}
 	ret = do_read_c7(0, 0x800, 0);
 

@@ -32,7 +32,7 @@ sudo gitlab-ci-multi-runner register
 sudo visudo
 
 # Add build user to the end of the file, like:
-dbrock ALL=(ALL) NOPASSWD: ALL
+gitlab-runner ALL=(ALL) NOPASSWD: ALL
 
 
 

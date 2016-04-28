@@ -1,46 +1,46 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2016 - Dagen Brock
- 
+
  Copyright (C) 2010 - 2014 by GSport contributors
- 
+
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
 #include <math.h>
 
 #include "defc.h"
-#ifdef HAVE_TFE
-  #include "tfe/tfesupp.h" 
-  #include "tfe/protos_tfe.h" 
-#endif
-  #include "printer.h"
-  #include "imagewriter.h"
+#include "printer.h"
+#include "imagewriter.h"
 
 #ifdef UNDER_CE
-#define vsnprintf _vsnprintf
+  #define vsnprintf _vsnprintf
+#endif
+
+#ifdef HAVE_TFE
+  #include "tfe/tfesupp.h"
+  #include "tfe/protos_tfe.h"
 #endif
 
 #if defined (_WIN32) || defined(__CYGWIN__)
-#define WIN32_LEAN_AND_MEAN	/* Tell windows we want less header gunk */
-#define STRICT			/* Tell Windows we want compile type checks */
-#include <windows.h>		/* Need a definition for LPTSTR in CYGWIN */
-
-extern void get_cwd(LPTSTR buffer, int size);
+  #define WIN32_LEAN_AND_MEAN	/* Tell windows we want less header gunk */
+  #define STRICT			/* Tell Windows we want compile type checks */
+  #include <windows.h>		/* Need a definition for LPTSTR in CYGWIN */
+  extern void get_cwd(LPTSTR buffer, int size);
 #endif
 
 #define PC_LOG_LEN	(8*1024)
@@ -51,7 +51,7 @@ int	g_accept_events = 0; // OG To know if the emulator is ready to accept extern
 
 char g_argv0_path[256] = "./";
 
-const char *g_gsport_default_paths[] = { "", "./", "${HOME}/","${PWD}/",
+const char *g_gsplus_default_paths[] = { "", "./", "${HOME}/","${PWD}/",
 #ifdef MAC
 	"${0}/../",
 #endif
@@ -158,7 +158,7 @@ int g_imagewriter_paper = 0;
 int g_imagewriter_banner = 0;
 
 int	g_config_iwm_vbl_count = 0;
-extern const char g_gsport_version_str[] = "0.31";
+extern const char g_gsplus_version_str[] = "0.10a";
 int g_pause=0;	// OG Added pause
 
 #define START_DCYCS	(0.0)
@@ -259,7 +259,7 @@ void sim65816_initglobals()
 
 	g_config_iwm_vbl_count = 0;
 
-	g_pause=0;	
+	g_pause=0;
 
 	g_last_vbl_dcycs = START_DCYCS;
 	g_cur_dcycs = START_DCYCS;
@@ -696,7 +696,7 @@ show_regs_act(Engine_reg *eptr)
 	int	kpc;
 	int	direct_page, dbank;
 	int	stack;
-	
+
 	kpc = eptr->kpc;
 	tmp_acc = eptr->acc;
 	direct_page = eptr->direct;
@@ -724,7 +724,7 @@ show_regs()
 
 void quitEmulator()
 {
-	printf("set_halt(HALT_WANTTOQUIT)\n");	
+	printf("set_halt(HALT_WANTTOQUIT)\n");
 	set_halt(HALT_WANTTOQUIT);
 }
 
@@ -788,7 +788,7 @@ do_reset()
 
 	g_stepping = 0;
 
-	if (g_irq_pending) 
+	if (g_irq_pending)
 		halt_printf("*** irq remainings...\n");
 
 }
@@ -853,7 +853,7 @@ memalloc_align(int size, int skip_amt, void **alloc_ptr)
 	word32	offset;
 
 	skip_amt = MAX(256, skip_amt);
-	bptr = (byte*)calloc(size + skip_amt + 256, 1);	// OG Added cast 
+	bptr = (byte*)calloc(size + skip_amt + 256, 1);	// OG Added cast
 	if(alloc_ptr) {
 		/* Save allocation address */
 		*alloc_ptr = bptr;
@@ -897,7 +897,7 @@ memory_ptr_init()
 void
 memory_ptr_shut()
 {
-	if(g_memory_alloc_ptr) 
+	if(g_memory_alloc_ptr)
 	{
 		free(g_memory_alloc_ptr);
 		g_memory_alloc_ptr = 0;
@@ -917,7 +917,7 @@ int	g_screen_depth = 8;
 
 
 int
-gsportmain(int argc, char **argv)
+gsplusmain(int argc, char **argv)
 {
 	int	diff;
 	int	skip_amt;
@@ -1139,7 +1139,7 @@ gsportmain(int argc, char **argv)
 	// OG Notify emulator has been initialized and ready to accept external events
 	g_initialized = 1;
 	g_accept_events = 1;
-	
+
 	do_go();
 
 	/* If we get here, we hit a breakpoint, call debug intfc */
@@ -1150,7 +1150,7 @@ gsportmain(int argc, char **argv)
 
 	sound_shutdown();
 
-	
+
 	// OG Cleaning up
 	adb_shut();
 	iwm_shut();
@@ -1267,7 +1267,7 @@ gsport_expand_path(char *out_ptr, const char *in_ptr, int maxlen)
 }
 
 void
-setup_gsport_file(char *outname, int maxlen, int ok_if_missing,
+setup_gsplus_file(char *outname, int maxlen, int ok_if_missing,
 		int can_create_file, const char **name_ptr)
 {
 	char	local_path[256];
@@ -1278,7 +1278,7 @@ setup_gsport_file(char *outname, int maxlen, int ok_if_missing,
 
 	outname[0] = 0;
 
-	path_ptr = &g_gsport_default_paths[0];
+	path_ptr = &g_gsplus_default_paths[0];
 
 	save_path_ptr = path_ptr;
 	while(*path_ptr) {
@@ -1328,7 +1328,7 @@ setup_gsport_file(char *outname, int maxlen, int ok_if_missing,
 
 		// But clear out the fatal_printfs first
 		clear_fatal_logs();
-		setup_gsport_file(outname, maxlen, ok_if_missing,
+		setup_gsplus_file(outname, maxlen, ok_if_missing,
 						can_create_file, name_ptr);
 		// It's one-level of recursion--it cannot loop since we
 		//  clear can_create_file.
@@ -1714,7 +1714,7 @@ run_prog()
 			((zip_speed_0tof != 0) || (limit_speed == 3) ||
 							(g_zipgs_unlock >= 4) );
 
-		// OG unlimited speed should not be affected by zip.	
+		// OG unlimited speed should not be affected by zip.
 		// unl_speed = faster_than_28 && !zip_speed;
 		unl_speed = (limit_speed == 0) && faster_than_28;
 
@@ -2128,7 +2128,7 @@ update_60hz(double dcycs, double dtime_now)
 		}
 
 // OG Pass speed info to the control (ActiveX specific)
-#ifdef ACTIVEGS	
+#ifdef ACTIVEGS
 		{
 			extern void updateInfo(const char* target,const char *speed);
 			updateInfo(sp_str,total_mhz_ptr);
@@ -2203,9 +2203,9 @@ update_60hz(double dcycs, double dtime_now)
 
 		draw_iwm_status(5, status_buf);
 
-		sprintf(status_buf, "GSport v%-6s       "
+		sprintf(status_buf, "GSplus v%-6s       "
 			"Press F4 for Config Menu    %s",
-			g_gsport_version_str, code_str2);
+			g_gsplus_version_str, code_str2);
 		video_update_status_line(6, status_buf);
 
 		g_status_refresh_needed = 1;
@@ -2456,7 +2456,7 @@ check_scan_line_int(double dcycs, int cur_video_line)
 			cur_video_line);
 		start = 0;
 	}
-	
+
 	for(line = start; line < 200; line++) {
 		i = line;
 
@@ -2481,7 +2481,7 @@ void
 check_for_new_scan_int(double dcycs)
 {
 	int	cur_video_line;
-	
+
 	cur_video_line = get_lines_since_vbl(dcycs) >> 8;
 
 	check_scan_line_int(dcycs, cur_video_line);
@@ -2736,7 +2736,7 @@ clear_fatal_logs()
 }
 
 char *
-gsport_malloc_str(char *in_str)
+gsplus_malloc_str(char *in_str)
 {
 	char	*str;
 	int	len;

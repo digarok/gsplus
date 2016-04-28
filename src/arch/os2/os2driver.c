@@ -162,8 +162,8 @@ SIZEL	sizel;
 	g_hdc_memory = DevOpenDC(g_hab, OD_MEMORY, "*", 4, (PDEVOPENDATA)&pszData, NULL);
 	g_hps_memory = GpiCreatePS(g_hab,g_hdc_memory, &sizel, PU_ARBITRARY | GPIT_MICRO | GPIA_ASSOC);
 
-	// Call gsportmain
-	return gsportmain(argc, argv);
+	// Call gsplusmain
+	return gsplusmain(argc, argv);
 
 }
 

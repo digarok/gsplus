@@ -21,12 +21,7 @@
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-// This is an experimental video driver for the KEGS/GSport emulator.
-// It requires SDL2 libraries to build.  I've tested on Mac, but should
-// be easy to port to other platforms. -DagenBrock
-
-// @todo: mouse clip bugs.. great western shootout.
-// @todo: force refresh after screen mode change
+// @todo: mouse clip bugs.. great western shootout. Paint 8/16
 
 #include "SDL.h"
 #include <stdbool.h>
@@ -63,6 +58,7 @@ extern word32 g_full_refresh_needed;
 extern word32 g_palette_8to1624[256];
 extern word32 g_a2palette_8to1624[256];
 extern Kimage g_mainwin_kimage;
+extern const char g_gsplus_version_str[];	// version string for title bar
 
 SDL_Window *window;                    // Declare a pointer
 SDL_Renderer *renderer;
@@ -75,7 +71,6 @@ int handle_sdl_mouse_motion_event(SDL_Event event);
 
 int	g_num_a2_keycodes = 0;
 int a2_key_to_sdlkeycode[][3] = {
-	{ 0x12, SDLK_1, 0},
 	{ 0x35,	SDLK_ESCAPE,0 },
 	{ 0x7a,	SDLK_F1,	0 },
 	{ 0x78,	SDLK_F2,	0 },
@@ -131,9 +126,9 @@ int a2_key_to_sdlkeycode[][3] = {
 	{ 0x75,	SDLK_DELETE, 0 },
 	{ 0x77,	SDLK_END, 0 },
 	{ 0x79,	SDLK_PAGEDOWN, 0 },
-	{ 0x59,	SDLK_KP_7, 0 },
-	{ 0x5b,	SDLK_KP_8, 0 },
-	{ 0x5c,	SDLK_KP_9, 0 },
+	{ 0x59,	SDLK_KP_7, SDLK_HOME },
+	{ 0x5b,	SDLK_KP_8, SDLK_UP },
+	{ 0x5c,	SDLK_KP_9, SDLK_PAGEUP },
 	{ 0x4e,	SDLK_KP_MINUS, 0 },
 	{ 0x39,	SDLK_CAPSLOCK, 0 },
 	{ 0x00,	'a', 'A' },
@@ -166,7 +161,7 @@ int a2_key_to_sdlkeycode[][3] = {
 	{ 0x3e,	SDLK_UP, 0 },
 	{ 0x53,	SDLK_KP_1, 0 },
 	{ 0x54,	SDLK_KP_2, SDLK_DOWN },
-	{ 0x55,	SDLK_KP_3, 0 },
+	{ 0x55,	SDLK_KP_3, SDLK_PAGEDOWN },
 	{ 0x36,	SDLK_RCTRL, SDLK_LCTRL },
 	{ 0x3a,	SDLK_LALT, SDLK_RALT },		/* Option */
 	{ 0x37,	SDLK_LGUI, SDLK_RGUI },		/* Command */
@@ -183,10 +178,22 @@ int a2_key_to_sdlkeycode[][3] = {
 int
 main(int argc, char **argv)
 {
-        return gsportmain(argc, argv);
+        return gsplusmain(argc, argv);
 }
 
+const char *byte_to_binary(int x)
+{
+    static char b[9];
+    b[0] = '\0';
 
+    int z;
+    for (z = 128; z > 0; z >>= 1)
+    {
+        strcat(b, ((x & z) == z) ? "1" : "0");
+    }
+
+    return b;
+}
 
 /// Queries the Screen to see if it's set to Fullscreen or Not
 /// @return SDL_FALSE if windowed, SDL_TRUE if fullscreen
@@ -209,10 +216,7 @@ dev_video_init()
 	g_num_a2_keycodes = 0;
 	int	i;
 	int	keycode;
-	int	tmp_array[0x80];
-	for(i = 0; i <= 0x7f; i++) {
-		tmp_array[i] = 0;
-	}
+
 	for(i = 0; i < 0x7f; i++) {
 		keycode = a2_key_to_sdlkeycode[i][0];
 		if(keycode < 0) {
@@ -221,12 +225,6 @@ dev_video_init()
 		} else if(keycode > 0x7f) {
 			printf("a2_key_to_xsym[%d] = %02x!\n", i, keycode);
 				exit(2);
-		} else {
-			if(tmp_array[keycode]) {
-				printf("a2_key_to_x[%d] = %02x used by %d\n",
-					i, keycode, tmp_array[keycode] - 1);
-			}
-			tmp_array[keycode] = i + 1;
 		}
 	}
 
@@ -257,8 +255,10 @@ dev_video_init_sdl()
     SDL_Init(SDL_INIT_VIDEO);              // Initialize SDL2
 
     // Create an application window with the following settings:
+		char window_title[50];								 // @todo - unsafe assumption?
+		sprintf(window_title, "GSplus v%-6s", g_gsplus_version_str),
     window = SDL_CreateWindow(
-        "GSPLUS V.0",                  // window title
+				window_title,											 // window title (GSport vX.X)
         SDL_WINDOWPOS_UNDEFINED,           // initial x position
         SDL_WINDOWPOS_UNDEFINED,           // initial y position
         BASE_WINDOW_WIDTH,                               // width, in pixels
@@ -278,7 +278,7 @@ dev_video_init_sdl()
 		renderer = SDL_CreateRenderer(window, -1, 0);
 
 		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  // make the scaled rendering look smoother.
-	//			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");  // make the scaled rendering look smoother.
+		// SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");  // make the scaled rendering look smoother.
 		SDL_RenderSetLogicalSize(renderer, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
 
 		texture = SDL_CreateTexture(renderer,
@@ -478,7 +478,6 @@ handle_sdl_key_event(SDL_Event event)
 
 	kb_shift_control_state = state;
 
-
 	is_up = 0;
 	int a2code;
 	if (event.type == SDL_KEYUP) {
@@ -533,7 +532,7 @@ void
 x_dialog_create_gsport_conf(const char *str)
 {
 	// Just write the config file already...
-	config_write_config_gsport_file();
+	config_write_config_gsplus_file();
 }
 
 

@@ -340,7 +340,7 @@ extern byte g_bram[2][256];
 extern byte* g_bram_ptr;
 extern byte g_temp_boot_slot;
 extern byte g_orig_boot_slot;
-extern int g_config_gsport_update_needed;
+extern int g_config_gsplus_update_needed;
 void
 iwm_vbl_update(int doit_3_persec)
 {
@@ -359,7 +359,7 @@ iwm_vbl_update(int doit_3_persec)
 				g_temp_boot_slot = 254;
 				g_bram_ptr[40] = g_orig_boot_slot;
 				clk_calculate_bram_checksum();
-				g_config_gsport_update_needed = 1;
+				g_config_gsplus_update_needed = 1;
 			}
 		}
 	}
@@ -376,7 +376,7 @@ iwm_vbl_update(int doit_3_persec)
 			g_temp_boot_slot = 254;
 			g_bram_ptr[40] = g_orig_boot_slot;
 			clk_calculate_bram_checksum();
-			g_config_gsport_update_needed = 1;
+			g_config_gsplus_update_needed = 1;
 		}
 
 	}
@@ -1879,7 +1879,7 @@ iwm_nibblize_track_525(Disk *dsk, Trk *trk, byte *track_buf, int qtr_track)
 
 
 	word_ptr = (word32 *)&(trk->nib_area[0]);
-#if defined(GSPORT_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
+#if defined(GSPLUS_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
 	val = 0xff08ff08;
 #else
 	val = 0x08ff08ff;
@@ -1984,7 +1984,7 @@ iwm_nibblize_track_35(Disk *dsk, Trk *trk, byte *track_buf, int qtr_track)
 	int	i;
 
 	word_ptr = (word32 *)&(trk->nib_area[0]);
-#if defined(GSPORT_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__)
+#if defined(GSPLUS_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__)
 	val = 0xff08ff08;
 #else
 	val = 0x08ff08ff;

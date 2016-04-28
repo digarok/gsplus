@@ -170,10 +170,10 @@ void config_vbl_update(int doit_3_persec);
 void config_parse_option(char *buf, int pos, int len, int line);
 void config_parse_bram(char *buf, int pos, int len);
 void config_load_roms(void);
-void config_parse_config_gsport_file(void);
+void config_parse_config_gsplus_file(void);
 Disk *cfg_get_dsk_from_slot_drive(int slot, int drive);
-void config_generate_config_gsport_name(char *outstr, int maxlen, Disk *dsk, int with_extras);
-void config_write_config_gsport_file(void);
+void config_generate_config_gsplus_name(char *outstr, int maxlen, Disk *dsk, int with_extras);
+void config_write_config_gsplus_file(void);
 void insert_disk(int slot, int drive, const char *name, int ejected, int force_size, const char *partition_name, int part_num);
 void eject_named_disk(Disk *dsk, const char *name, const char *partition_name);
 void eject_disk_by_num(int slot, int drive);
@@ -409,11 +409,11 @@ void check_engine_asm_defines(void);
 byte *memalloc_align(int size, int skip_amt, void **alloc_ptr);
 void memory_ptr_init(void);
 void memory_ptr_shut(void);	// OG Added shut
-int gsportmain(int argc, char **argv);
+int gsplusmain(int argc, char **argv);
 void load_roms_init_memory(void);
 void load_roms_shut_memory(void);	// OG Added shut
 void gsport_expand_path(char *out_ptr, const char *in_ptr, int maxlen);
-void setup_gsport_file(char *outname, int maxlen, int ok_if_missing, int can_create_file, const char **name_ptr);
+void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_create_file, const char **name_ptr);
 void initialize_events(void);
 void check_for_one_event_type(int type);
 void add_event_entry(double dcycs, int type);
@@ -450,7 +450,7 @@ int fatal_printf(const char *fmt, ...);
 int gsport_vprintf(const char *fmt, va_list ap);
 void must_write(int fd, char *bufptr, int len);
 void clear_fatal_logs(void);
-char *gsport_malloc_str(char *in_str);
+char *gsplus_malloc_str(char *in_str);
 
 
 /* smartport.c */

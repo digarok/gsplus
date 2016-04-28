@@ -52,7 +52,7 @@ char	*g_mac_argv[MAX_MAC_ARGS];
 
 extern char g_argv0_path[];
 extern char *g_status_ptrs[MAX_STATUS_LINES];
-extern const char g_gsport_version_str[];
+extern const char g_gsplus_version_str[];
 
 extern int g_warp_pointer;
 
@@ -150,7 +150,7 @@ x_show_alert(int is_fatal, const char *str)
 	}
 	okstrref = CFSTR("Click OK to continue");
 	if(is_fatal) {
-		okstrref = CFSTR("Click OK to exit GSport");
+		okstrref = CFSTR("Click OK to exit GSplus");
 	}
 	CreateStandardAlert(kAlertStopAlert, cfstrref, okstrref,
 						&alert_param, &alert);
@@ -183,13 +183,13 @@ show_simple_alert(char *str1, char *str2, char *str3, int num)
 {
 	char		buf[256];
 
-	g_fatal_log_strs[0] = gsport_malloc_str(str1);
-	g_fatal_log_strs[1] = gsport_malloc_str(str2);
-	g_fatal_log_strs[2] = gsport_malloc_str(str3);
+	g_fatal_log_strs[0] = gsplus_malloc_str(str1);
+	g_fatal_log_strs[1] = gsplus_malloc_str(str2);
+	g_fatal_log_strs[2] = gsplus_malloc_str(str3);
 	g_fatal_log = 3;
 	if(num != 0) {
 		snprintf(buf, 250, ": %d", num);
-		g_fatal_log_strs[g_fatal_log++] = gsport_malloc_str(buf);
+		g_fatal_log_strs[g_fatal_log++] = gsplus_malloc_str(buf);
 	}
 	x_show_alert(0, 0);
 }
@@ -203,7 +203,7 @@ x_dialog_create_gsport_conf(const char *str)
 
 	ret = x_show_alert(1, str);
 	if(ret) {
-		config_write_config_gsport_file();
+		config_write_config_gsplus_file();
 	}
 }
 
@@ -227,7 +227,7 @@ my_cmd_handler( EventHandlerCallRef handlerRef, EventRef event, void *userdata)
 			osresult = noErr;
 			break;
 		case 'abou':
-		show_simple_alert("GSport v", (char *)g_gsport_version_str,
+		show_simple_alert("GSport v", (char *)g_gsplus_version_str,
 			"\nCopyright 2010 - 2011 GSport Contributors\n"
 			"Latest version at http://gsport.sourceforge.net/\n", 0);
 		osresult = noErr;
@@ -295,16 +295,16 @@ dummy_event_handler(EventHandlerCallRef call_ref, EventRef in_event,
 	OSStatus	err;
 	EventHandlerRef	installed_handler;
 	EventTypeSpec	event_spec = { kEventClassApplication, kEventAppQuit };
-	
+
 	// From http://developer.apple.com/qa/qa2001/qa1061.html
 	// Trick to move main event queue to use ReceiveNextEvent in an event
 	//  handler called by RunApplicationEventLoop
-	
+
 	err = InstallApplicationEventHandler(g_quit_handler_UPP, 1, &event_spec,
 										 NULL, &installed_handler);
-	
-	gsportmain(g_mac_argc, g_mac_argv);
-	
+
+	gsplusmain(g_mac_argc, g_mac_argv);
+
 	return noErr;
 }
 

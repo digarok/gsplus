@@ -9,12 +9,12 @@ OBJECTS = $(OBJECTS1) $(TFEOBJ) $(ATOBJ) $(PCAPOBJ) sdl2_driver.o sdl2snd_driver
 ARCHS = ppc, i386, ppc64, x86_64
 
 # OPTIONS FOR COMPILING C SOURCE
-CCOPTS = -O2 -Wall -fomit-frame-pointer -std=gnu99 -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/SDL2 
+CCOPTS = -O2 -Wall -fomit-frame-pointer -std=gnu99 -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/SDL2
 # OPTIONS FOR COMPILING C++ SOURCE
 CPPOPTS = -O2 -DHAVE_TFE -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/freetype2 -I/usr/local/include/SDL2
 
 EXTRA_LIBS =  -lSDL2  -lfreetype
-OPTS = -DGSPORT_LITTLE_ENDIAN
+OPTS = -DGSPLUS_LITTLE_ENDIAN
 SUFFIX =
 LDFLAGS = `sdl2-config --static-libs` -L/usr/local/lib
 LDOPTS = -I.

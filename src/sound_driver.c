@@ -395,7 +395,7 @@ child_sound_init_linux()
 		exit(1);
 	}
 
-#if defined(GSPORT_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
+#if defined(GSPLUS_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
 	fmt = AFMT_S16_LE;
 #else
 	fmt = AFMT_S16_BE;

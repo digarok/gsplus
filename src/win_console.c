@@ -73,7 +73,7 @@ void
 x_dialog_create_gsport_conf(const char *str)
 {
 	// Just write the config file already...
-	config_write_config_gsport_file();
+	config_write_config_gsplus_file();
 }
 
 int
@@ -181,7 +181,7 @@ main(int argc, char **argv)
 
 
 	gsportinit(hwnd);
-	int ret =  gsportmain(argc, argv);
+	int ret =  gsplusmain(argc, argv);
 	
 	UnregisterClass(wndclass.lpszClassName,GetModuleHandle(NULL));
 

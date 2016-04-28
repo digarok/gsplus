@@ -33,7 +33,7 @@
 extern int Verbose;
 extern word32 g_vbl_count;	// OG change int to word32
 extern int g_rom_version;
-extern int g_config_gsport_update_needed;
+extern int g_config_gsplus_update_needed;
 
 #define CLK_IDLE		1
 #define CLK_TIME		2
@@ -185,7 +185,7 @@ clk_calculate_bram_checksum(void) {
 		}
 		checksum &= 0xFFFF;
 		checksum += ((checksum ^ 0xAAAA) << 16);
-#if defined(GSPORT_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
+#if defined(GSPLUS_LITTLE_ENDIAN) || defined (__LITTLE_ENDIAN__) // OSX needs to calculate endianness mid-compilation, can't be passed on compile command
 		g_bram_ptr[252] = (checksum & 0xFF);
 		g_bram_ptr[253] = (checksum >> 8);
 		g_bram_ptr[254] = (checksum >> 16);
@@ -385,7 +385,7 @@ do_clock_data()
 				}
 				clk_printf("Writing BRAM loc %02x with %02x\n",
 					g_clk_reg1, g_c033_data);
-				g_config_gsport_update_needed = 1;
+				g_config_gsplus_update_needed = 1;
 			}
 		}
 		g_clk_mode = CLK_IDLE;
