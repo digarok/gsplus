@@ -1,7 +1,7 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2016 - Dagen Brock
- 
+
  Copyright (C) 2010 - 2012 by GSport contributors
 
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
@@ -29,6 +29,9 @@
 #include <stdlib.h>
 #include <signal.h>
 #include "defc.h"
+#ifdef HAVE_ICON    // Currently a flag because not supported outside of SDL builds.  Looking at full solution.
+  #include "icongs.h"
+#endif
 
 // BITMASKS
 #define ShiftMask  	1
@@ -243,8 +246,24 @@ dev_video_init()
 		video_update_color_raw(i, lores_col);
 		g_a2palette_8to1624[i] = g_palette_8to1624[i];
 	}
+
 }
 
+
+
+void do_icon() {
+#ifdef HAVE_ICON
+	//surface = SDL_CreateRGBSurfaceFrom(pixels,w,h,depth,pitch,rmask,gmask,bmask,amask);
+	int size = 128;           // icon size
+	SDL_Surface *surface;     // declare an SDL_Surface to be filled in with pixel data from an image file
+	surface = SDL_CreateRGBSurfaceFrom(icon_pixels,size,size,32,size*4,0xff000000,0x00ff0000,0x0000ff00,0x000000ff);
+
+	// The icon is attached to the window pointer
+	SDL_SetWindowIcon(window, surface);
+	// ...and the surface containing the icon pixel data is no longer required.
+	SDL_FreeSurface(surface);
+#endif
+}
 
 
 // Initialize our SDL window and texture
@@ -274,6 +293,9 @@ dev_video_init_sdl()
     } else {
         printf("SDL Window has been created\n");
     }
+
+		// SET WINDOW ICON
+		do_icon();
 
 		renderer = SDL_CreateRenderer(window, -1, 0);
 
@@ -537,12 +559,10 @@ x_dialog_create_gsport_conf(const char *str)
 
 
 
-
 // Old driver cruft
 
 // called by src/sim65816.c
 int x_show_alert(int is_fatal, const char *str) { return 0; }
-
 void get_ximage(Kimage *kimage_ptr) { }
 void x_toggle_status_lines() { }
 void x_redraw_status_lines() { }
