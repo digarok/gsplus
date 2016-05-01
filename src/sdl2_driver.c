@@ -557,6 +557,33 @@ x_dialog_create_gsport_conf(const char *str)
 	config_write_config_gsplus_file();
 }
 
+char *g_clipboard;
+size_t  g_clipboard_pos;
+
+void clipboard_paste(void) {
+  char *clipboard;
+  if (SDL_HasClipboardText()) {
+    clipboard = SDL_GetClipboardText();
+    if (g_clipboard) {
+      free(g_clipboard);
+      g_clipboard_pos = 0;
+    }
+    g_clipboard = strdup(clipboard);
+    free(clipboard);
+  }
+}
+
+int clipboard_get_char() {
+	if (!g_clipboard)
+		return 0;
+	if (g_clipboard[g_clipboard_pos] == '\n')
+		g_clipboard_pos++;
+	if (g_clipboard[g_clipboard_pos] == '\0')
+		return 0;
+	return g_clipboard[g_clipboard_pos++] | 0x80;
+}
+
+
 
 
 // Old driver cruft
@@ -574,9 +601,8 @@ void x_full_screen(int do_full) { }
 void x_release_kimage(Kimage* kimage_ptr) { }
 // OG Addding ratio
 int x_calc_ratio(float x,float y) { return 1; }
-// TODO: Add clipboard support
-void clipboard_paste(void) { }
-int clipboard_get_char(void) { return 0; }
+
+
 void x_set_mask_and_shift(word32 x_mask, word32 *mask_ptr, int *shift_left_ptr, int *shift_right_ptr) {	return; }
 void x_update_color(int col_num, int red, int green, int blue, word32 rgb) { }
 void x_update_physical_colormap() { }
