@@ -158,7 +158,7 @@ int g_imagewriter_paper = 0;
 int g_imagewriter_banner = 0;
 
 int	g_config_iwm_vbl_count = 0;
-extern const char g_gsplus_version_str[] = "0.10a";
+const char g_gsplus_version_str[] = "0.10a";
 int g_pause=0;	// OG Added pause
 
 #define START_DCYCS	(0.0)
@@ -1122,9 +1122,6 @@ gsplusmain(int argc, char **argv)
 
 	video_init();
 
-#ifndef _WIN32
-	//sleep(1);
-#endif
 	sound_init();
 	scc_init();
 	adb_init();
