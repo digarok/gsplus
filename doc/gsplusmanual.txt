@@ -1,0 +1,97 @@
+﻿gsplus
+ gsp_icon_128.png 
+ 
+Modern cross-platform Apple IIgs emulator and tools based on KEGS
+Manual Version: Initial Draft
+Date: 2016-05-01
+Overview & Purpose
+This is an early release of an experimental project to modernize the KEGS/GSport emulator platform and eventually extend it. 
+The first steps are represented here.  This release features a new SDL2 driver.  SDL or "Simple DirectMedia Layer" enables the writing of one cross-platform driver to handle input and output (video, mouse, keyboard, audio, joystick).  The hope is that I can leverage the multi-platform nature of SDL to provide first-class support for the major platforms supported by SDL, which includes Mac OSX, Windows and Linux.
+Currently, five builds are being supported:
+* OSX (SDL2 driver)
+* Ubuntu (SDL2 driver)
+* Ubuntu (SDL driver)
+* Ubuntu (X11 driver)
+* Window (Win32 driver)
+There are more platforms still in the codebase, and some, like Raspberry Pi will probably be added to official support.  But I may drop some of the older platforms like OS/2.
+________________
+
+
+Getting started
+1. Download the emulator and put it in a folder
+2. Download the Apple IIgs Firmware ROMs, for either a ROM01 or ROM03 machine.  (If you have a real IIgs, there are ways to save it from your machine as well.)
+3. Download some Apple IIgs software.  (I recommend the excellent Apple IIgs dedicated site, http://www.whatisthe2gs.apple2.org.za/ )
+(If you have a real IIgs, you can transfer your disks using ADTPro http://adtpro.sourceforge.net/ )
+4. Edit your config:
+   1. By hand… edit the config file (config.txt, config.gsplus, or .gsplus)
+   2. While the emulator is running… hit F4 to enter config menu. 
+   1. Boot the Apple IIgs by running the emulator
+   1. Windows:                gsplus.exe
+   2. Mac/Ubuntu:                ./gsplus
+Emulator Hot-Keys
+There are several keys used to interact with the emulator while it is running.  Here’s a quick list of the main hot-keys and what they do.
+F4         - Configuration menu
+F5         - Config menu
+F6         - Toggle System Speed  (1, 2.8, 8, ∞ MHz )
+F7         - Toggle Fast Disk Emulation
+F9         - Invert Paddles
+F10         - Toggle a2vid_palette (?)
+F11         - Toggle Fullscreen Mode
+F12         - RESET Key (i.e. - “Ctrl-F12” =  “Ctrl-Reset” on an Apple II)
+Other Input/Output
+   1. Mouse and keyboard should automatically work
+   2. Joystick with SDL2 driver is known to be working.  The axes and buttons are not yet configurable.  Better info forthcoming.
+   3. There are drivers for serial controller, ImageWriter (II?) printer, and networking.  I’m not currently familiar with the state of these drivers or their usage.  More info will be added as I take time to research more of the modules.
+Configuration Menu
+Enter the configuration menu at any time while running gsport by hitting <F4>.
+The configuration options are loaded from, and saved to, a configuration text file.  The file can be named one of the following: config.txt, config.gsplus, or .gsplus.
+If you are just starting out, it’s recommended to use the configuration menu versus editing the file yourself.
+ Screen Shot 2016-05-01 at 9.10.00 AM.png 
+
+Most important, you can use the Disk Configuration menu option to “mount” and “eject” disks.          
+Debugger Commands
+Enter from the debugger prompt (Shift-F6)
+GSport Debugger help (courtesy Fredric Devernay)
+General command syntax: [bank]/[address][command]  
+e.g. 'e1/0010B' to set a breakpoint at the interrupt jump pt
+Enter all addresses using lower-case.  As with the IIgs monitor, you can omit the bank number after having set it: 'e1/0010B' followed by '14B' will set breakpoints at e1/0010 and e1/0014
+
+
+g                                       Go
+[bank]/[addr]g             Go from [bank]/[address]
+s                                       Step one instruction
+[bank]/[addr]s               Step one instr at [bank]/[address]
+[bank]/[addr]B                   Set breakpoint at [bank]/[address]
+B                                      Show all breakpoints
+[bank]/[addr]D            Delete breakpoint at [bank]/[address]
+[bank]/[addr1].[addr2]         View memory
+[bank]/[addr]L              Disassemble memory
+P                                       Dump the trace to 'pc_log_out'
+Z                                       Dump SCC state
+I                                       Dump IWM state
+[drive].[track]I                Dump IWM state
+E                                       Dump Ensoniq state
+[osc]E                                 Dump oscillator [osc] state
+R                                       Dump dtime array and events
+T                                       Show toolbox log
+[bank]/[addr]T                  Dump tools using ptr [bank]/[addr] as 'tool_set_info'
+[mode]V                         XOR verbose with 1=DISK, 2=IRQ,4=CLK,8=SHADOW,10=IWM,20=DOC,
+                                40=ABD,80=SCC, 100=TEST, 200=VIDEO
+[mode]H                         XOR halt_on with 1=SCAN_INT,2=IRQ, 4=SHADOW_REG, 8=C70D_WRITES
+r                                       Reset
+[0/1]=m                         Changes m bit for l listings
+[0/1]=x                                Changes x bit for l listings
+[t]=z                                   Stops at absolute time t (obsolete)
+S                                       show_bankptr_bank0 & smartport errs
+P                                       show_pmhz
+A                                       show_a2_line_stuff show_adb_log
+Ctrl-e                                  Dump registers
+[bank]/[addr1].[addr2]us[file]          Save mem area to [file]
+[bank]/[addr1].[addr2]ul[file]          Load mem area from [file]
+v                        Show video information
+q                                       Exit Debugger (and GSport)
+________________
+Project Info
+Developers inquire within  :P
+Main page and full source code repository: https://github.com/digarok/gsplus
+This project has an ugly unmaintained homepaged at http://apple2.gs/plus/
