@@ -1,7 +1,7 @@
 /*
  GSport - an Apple //gs Emulator
  Copyright (C) 2016 - Dagen Brock
- 
+
  Copyright (C) 2010 - 2013 by GSport contributors
 
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
@@ -57,7 +57,7 @@ int	g_joystick_num_axes = 0;
 int	g_joystick_num_buttons = 0;
 
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(JOYSTICK_DEFINED)
 # define JOYSTICK_DEFINED
 void
 joystick_init()
@@ -150,7 +150,7 @@ joystick_update_buttons()
 }
 #endif /* LINUX */
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(JOYSTICK_DEFINED)
 # define JOYSTICK_DEFINED
 void
 joystick_init()
@@ -259,7 +259,7 @@ joystick_update_buttons()
 #endif
 
 
-#ifdef HAVE_SDL
+#if defined(HAVE_SDL) && !defined(JOYSTICK_DEFINED)
 # define JOYSTICK_DEFINED
 void
 joystick_init()
@@ -284,7 +284,6 @@ joystick_init()
   for(i = 0; i < 4; i++) {
     g_paddle_val[i] = 180;
   }
-  g_paddle_buttons = 1;
   g_joystick_type = JOYSTICK_TYPE_NATIVE_1;
   SDL_JoystickUpdate();
   joystick_update(0.0);

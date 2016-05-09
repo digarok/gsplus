@@ -358,11 +358,14 @@ check_input_events()
 void
 check_input_events_sdl()
 {
-	// @todo: make sure it's not queueing events / processing full queue each call
 	int	motion = 0;
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
+		/* Check all window events (mostly for Fullscreen) */
+		if (event.type == SDL_WINDOWEVENT) {
+			set_refresh_needed();
+		}
 		switch( event.type ){
 			case SDL_KEYDOWN:
 			case SDL_KEYUP:

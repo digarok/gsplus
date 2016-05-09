@@ -1,0 +1,55 @@
+
+stages:
+  - build
+
+build-ubuntu-x:
+  tags:
+    - ubuntu
+  stage: build
+  script:
+    - sudo apt-get update -qq && apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libxext-dev
+    - cd src
+    - ln -s vars_x86linux_x11 vars
+    - make clean ; make
+
+build-ubuntu-sdl:
+  tags:
+    - ubuntu
+  stage: build
+  script:
+    - sudo apt-get update -qq && apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev
+    - cd src
+    - ln -s vars_x86linux_sdl vars
+    - make clean ; make
+
+build-ubuntu-sdl2:
+  tags:
+    - ubuntu
+  stage: build
+  script:
+    - sudo apt-get update -qq && apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev
+    - cd src
+    - ln -s vars_x86linux_sdl2 vars
+    - make clean ; make
+
+
+
+build-osx:
+  tags:
+    - osx
+  stage: build
+  script:
+    - cd src
+    - ln -s vars_osx_sdl2 vars
+    - make clean ; make
+
+
+
+build-win32:
+  tags:
+    - windows
+  stage: build
+  script:
+    - cd src
+    - ln -s vars_win32 vars
+    - make clean ; make

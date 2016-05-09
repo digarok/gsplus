@@ -26,16 +26,48 @@ clean:
 	- rm -f compile_time.o
 	- rm -f 8inst_c.h
 	- rm -f 16inst_c.h
-	- rm -rf ../GSport.app
-	- rm -rf ../GSportDmg
 
 specials: 8inst_s 16inst_s 8size 16size 8inst_c 16inst_c size_c size_s
 
 specials_clean:
 	rm -f 8inst_s 16inst_s 8size 16size 8inst_c 16inst_c size_c size_s
 
+# Linux/OSX SDL builds
+gsplus: $(OBJECTS) compile_time.o
+	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) 
+	echo $(OBJECTS)
+	cp gsplus ..
+	cp gsplus ../bin/osx
 
-# Mac builds:
+# Linux/OSX XWindows builds
+gsplusx: $(OBJECTS) compile_time.o
+	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(XLIBS) $(EXTRA_LIBS) -lX11
+	echo $(OBJECTS)
+	mv gsplusx ..
+
+# NOT CURRENTLY SUPPORTED 
+# Linux framebuffer builds:
+gsplusfb: $(OBJECTS) compile_time.o
+	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)
+	echo $(OBJECTS)
+	mv gsplusfb ..
+	cp -f ../config.template ../config.txt 
+
+# Mingw32 (native windows) / Cygwin builds:
+gsplus.exe: $(OBJECTS) compile_time.o
+	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
+	mkdir -p ../GSplus.app/lib
+	cp -f gsplus.exe ../GSplus.app/GSplus.exe
+	cp -f ../config.template ../GSplus.app/config.txt
+	cp -f ../lib/*.ttf ../GSplus.app/lib
+	cp -f ../lib/arch/win32/*.dll ../GSplus.app
+	cp -f ../lib/NoBoot.po ../GSplus.app
+	cp -f GSplus.bat ../GSplus.app/GSplus.bat
+	cp -f parallel.rom ../GSplus.app
+	cp -f ../COPYING.txt ../GSplus.app
+
+# NOT CURRENTLY SUPPORTED 
+# Mac build - old style (deprecated)
 gsportmac: $(OBJECTS) compile_time.o
 	$(CC) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o gsport $(EXTRA_LIBS)
 	mkdir -p ../GSport.app/Contents/Resources/English.lproj/main.nib
@@ -60,40 +92,6 @@ gsportmac: $(OBJECTS) compile_time.o
 	cp -f ../config.template ../GSportDmg/GSport/config.txt
 	cp ../GSport.html ../GSportDmg/GSport/GSport.html
 	arch/mac/makedmg.sh .. GSportDmg GSport GSport 7
-
-# OSX builds
-gsplus: $(OBJECTS) compile_time.o
-	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) 
-	echo $(OBJECTS)
-	cp gsplus ..
-	cp gsplus ../bin/osx
-
-# Linux/OSX XWindows builds
-gsportx: $(OBJECTS) compile_time.o
-	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(XLIBS) $(EXTRA_LIBS) -lX11
-	echo $(OBJECTS)
-	mv gsportx ..
-
-# Linux framebuffer builds:
-gsportfb: $(OBJECTS) compile_time.o
-	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)
-	echo $(OBJECTS)
-	mv gsportfb ..
-	cp -f ../config.template ../config.txt 
-
-# Mingw32 (native windows) builds:
-gsport.exe: $(OBJECTS) compile_time.o
-	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
-	mkdir -p ../GSport.app/lib
-	cp -f gsport.exe ../GSport.app/GSport.exe
-	cp -f ../config.template ../GSport.app/config.txt
-	cp -f ../lib/*.ttf ../GSport.app/lib
-	cp -f ../lib/arch/win32/*.dll ../GSport.app
-	cp -f ../lib/NoBoot.po ../GSport.app
-	cp -f GSport.bat ../GSport.app/GSport.bat
-	cp -f parallel.rom ../GSport.app
-	cp -f ../COPYING.txt ../GSport.app
-	cp -f ../GSport.html ../GSport.app
 
 8inst_c.h: instable.h
 	$(PERL) make_inst c 8 instable.h > 8inst_c.h

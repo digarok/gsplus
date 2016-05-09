@@ -5,27 +5,17 @@ CC = clang
 LD = clang++
 AS = cc
 
-OBJECTS = $(OBJECTS1) $(TFEOBJ) $(ATOBJ) $(PCAPOBJ) osxdriver.o sdlsnd_driver2.o
+OBJECTS = $(OBJECTS1) $(TFEOBJ) $(ATOBJ) $(PCAPOBJ) sdl2_driver.o sdl2snd_driver.o
 ARCHS = ppc, i386, ppc64, x86_64
 
 # OPTIONS FOR COMPILING C SOURCE
-CCOPTS = $(MACSUX) -O2 -Wall -fomit-frame-pointer -std=gnu99 -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/SDL2
+CCOPTS = -O2 -Wall -fomit-frame-pointer -std=gnu99 -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/SDL2 
 # OPTIONS FOR COMPILING C++ SOURCE
-CPPOPTS = -O2 -DHAVE_TFE -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/freetype2 -I/usr/local/include/SDL2 $(MACSUX)
+CPPOPTS = -O2 -DHAVE_TFE -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/freetype2 -I/usr/local/include/SDL2
 
-#SDK = -isysroot /Developer/SDKs/MacOSX10.5.sdk -isysroot /Developer/SDKs/MacOSX10.6.sdk -isysroot /Developer/SDKs/MacOSX10.7.sdk -isysroot /Developer/SDKs/MacOSX10.9.sdk -isysroot /Developer/SDKs/MacOSX10.10.sdk -isysroot /Developer/SDKs/MacOSX10.11.sdk
-#INCLUDE = -I/Developer/SDKs/MacOSX10.5.sdk/usr/include -I/Developer/SDKs/MacOSX10.6.sdk/usr/include  -I/Developer/SDKs/MacOSX10.7.sdk/usr/include  -I/Developer/SDKs/MacOSX10.8.sdk/usr/include  -I/Developer/SDKs/MacOSX10.9.sdk/usr/include  -I/Developer/SDKs/MacOSX10.10.sdk/usr/include  -I/Developer/SDKs/MacOSX10.11.sdk/usr/include
-
-
-#SDK =  -isysroot /Developer/SDKs/MacOSX10.11.sdk
-#INCLUDE =   -I/Developer/SDKs/MacOSX10.11.sdk/usr/include
-
-
-
-MACSUX = $(SDK) $(INCLUDE) -mmacosx-version-min=10.11
 EXTRA_LIBS =  -lSDL2  -lfreetype
 OPTS = -DGSPORT_LITTLE_ENDIAN
 SUFFIX =
-LDFLAGS =
+LDFLAGS = `sdl2-config --static-libs` -L/usr/local/lib
 LDOPTS = -I.
 EXTRA_SPECIALS =
