@@ -49,6 +49,36 @@ If you are just starting out, it’s recommended to use the configuration menu v
  Screen Shot 2016-05-01 at 9.10.00 AM.png 
 
 Most important, you can use the Disk Configuration menu option to “mount” and “eject” disks.          
+Command-line Options
+This is from source, some are experimental and not all may be built on your system.
+-badrd                        Halt on bad reads
+-noignbadacc        Don’t ignore bad memory accesses
+-noignhalt                Don’t ignore code red halts
+-test                        Allow testing
+-hpdev                 Use /dev/audio (HP/UX?)
+-alib                         Use Aserver audio server
+-24                         Use 24-bit display depth
+-16                         Use 16-bit display depth
+-15                         Use 15-bit display depth
+-bw                        Force B/W modes
+-joystick                Ignore joystick option
+-noshm                Don’t use X shared memory
+-dhr140                Use simple double-hires color map
+-mem value                Set memory size to value
+-skip value                Set skip_amt to value
+-audio value                  Set audio enable to value
+-arate value                Set preferred audio rate to value
+-v value                 Set verbose flags to value
+-display value                Set X-Windows DISPLAY=value
+-enet value                Set ethernet to value
+-config value                Set config file to value
+Note: The final argument, if not a flag, will be tried as a mountable device.
+
+
+
+
+
+
 Debugger Commands
 Enter from the debugger prompt (Shift-F6)
 GSport Debugger help (courtesy Fredric Devernay)
