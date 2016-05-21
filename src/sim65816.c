@@ -27,6 +27,7 @@
 #include "printer.h"
 #include "imagewriter.h"
 
+extern const char *g_config_gsplus_name_list[];
 #ifdef UNDER_CE
   #define vsnprintf _vsnprintf
 #endif
@@ -1037,7 +1038,17 @@ gsplusmain(int argc, char **argv)
 			printf("Using %d as ethernet enable val\n", tmp1);
 			g_ethernet = tmp1;
 			i++;
-		} else {
+		} else if(!strcmp("-config", argv[i])) {   // Config file passed
+      if((i+1) >= argc) {
+        printf("Missing argument\n");
+        exit(1);
+      }
+      printf("Using %s as configuration file\n", argv[i+1]);
+      g_config_gsplus_name_list[0] = argv[i+1]; // super dangerous ?
+      g_config_gsplus_name_list[1] = 0; // terminate string array
+      i++;
+
+    } else {
 			if ((i == (argc - 1)) && (strncmp("-", argv[i], 1) != 0)) {
 				final_arg = argv[i];
 			} else {
