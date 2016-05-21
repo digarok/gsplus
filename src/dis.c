@@ -1,23 +1,23 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2016 - Dagen Brock
- 
+
  Copyright (C) 2010 by GSport contributors
 
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -107,51 +107,50 @@ get_num()
 void
 debugger_help()
 {
-	printf("GSport Debugger help (courtesy Fredric Devernay\n");
-	printf("General command syntax: [bank]/[address][command]\n");
-	printf("e.g. 'e1/0010B' to set a breakpoint at the interrupt jump pt\n");
-	printf("Enter all addresses using lower-case\n");
+	printf("GSplus Debugger Help (courtesy Fredric Devernay)\n\n");
+	printf("General command syntax:\n");
+	printf("                          [bank]/[address][command]\n\n");
+	printf("Example:    > e1/0010B    Set a Breakpoint at the interrupt jump pt\n\n");
+	printf("Enter all addresses using lower-case.\n");
 	printf("As with the IIgs monitor, you can omit the bank number after\n");
-	printf("having set it: 'e1/0010B' followed by '14B' will set\n");
-	printf("breakpoints at e1/0010 and e1/0014\n");
-	printf("\n");
-	printf("g                       Go\n");
-	printf("[bank]/[addr]g          Go from [bank]/[address]\n");
-	printf("s                       Step one instruction\n");
-	printf("[bank]/[addr]s          Step one instr at [bank]/[address]\n");
-	printf("[bank]/[addr]B          Set breakpoint at [bank]/[address]\n");
-	printf("B                       Show all breakpoints\n");
-	printf("[bank]/[addr]D          Delete breakpoint at [bank]/[address]\n");
-	printf("[bank]/[addr1].[addr2]  View memory\n");
-	printf("[bank]/[addr]L          Disassemble memory\n");
-
-	printf("P                       Dump the trace to 'pc_log_out'\n");
-	printf("Z                       Dump SCC state\n");
-	printf("I                       Dump IWM state\n");
-	printf("[drive].[track]I        Dump IWM state\n");
-	printf("E                       Dump Ensoniq state\n");
-	printf("[osc]E                  Dump oscillator [osc] state\n");
-	printf("R                       Dump dtime array and events\n");
-	printf("T                       Show toolbox log\n");
-	printf("[bank]/[addr]T          Dump tools using ptr [bank]/[addr]\n");
+	printf("having set it: 'e1/0010B' followed by '14B' will set breakpoints\n");
+	printf("at e1/0010 and e1/0014\n\n");
+	printf("               g          Go\n");
+	printf("  [bank]/[addr]g          Go from [bank]/[address]\n");
+	printf("               s          Step one instruction\n");
+	printf("  [bank]/[addr]s          Step one instr at [bank]/[address]\n");
+	printf("  [bank]/[addr]B          Set breakpoint at [bank]/[address]\n");
+	printf("               B          Show all breakpoints\n");
+	printf("  [bank]/[addr]D          Delete breakpoint at [bank]/[address]\n");
+	printf("  [bank]/[addr].[addr2]   View memory\n");
+	printf("  [bank]/[addr]L          Disassemble memory\n");
+	printf("               P          Dump the trace to 'pc_log_out'\n");
+	printf("               Z          Dump SCC state\n");
+	printf("               I          Dump IWM state\n");
+	printf("[drive].[track]I          Dump IWM state\n");
+	printf("               E          Dump Ensoniq state\n");
+	printf("          [osc]E          Dump oscillator [osc] state\n");
+	printf("               R          Dump dtime array and events\n");
+	printf("               T          Show toolbox log\n");
+	printf("  [bank]/[addr]T          Dump tools using ptr [bank]/[addr]\n");
 	printf("                            as 'tool_set_info'\n");
-	printf("[mode]V                 XOR verbose with 1=DISK, 2=IRQ,\n");
-	printf("                         4=CLK,8=SHADOW,10=IWM,20=DOC,\n");
-	printf("                         40=ABD,80=SCC, 100=TEST, 200=VIDEO\n");
-	printf("[mode]H                 XOR halt_on with 1=SCAN_INT,\n");
-	printf("                         2=IRQ, 4=SHADOW_REG, 8=C70D_WRITES\n");
-	printf("r                       Reset\n");
-	printf("[0/1]=m                 Changes m bit for l listings\n");
-	printf("[0/1]=x                 Changes x bit for l listings\n");
-	printf("[t]=z                   Stops at absolute time t (obsolete)\n");
-	printf("S                       show_bankptr_bank0 & smartport errs\n");
-	printf("P                       show_pmhz\n");
-	printf("A                       show_a2_line_stuff show_adb_log\n");
-	printf("Ctrl-e                  Dump registers\n");
+	printf("         [mode]V          XOR verbose with 1=DISK, 2=IRQ,\n");
+	printf("                          4=CLK,8=SHADOW,10=IWM,20=DOC,\n");
+	printf("                          40=ABD,80=SCC, 100=TEST, 200=VIDEO\n");
+	printf("         [mode]H          XOR halt_on with 1=SCAN_INT,\n");
+	printf("                          2=IRQ, 4=SHADOW_REG, 8=C70D_WRITES\n");
+	printf("               r          Reset\n");
+	printf("         [0/1]=m          Changes m bit for l listings\n");
+	printf("         [0/1]=x          Changes x bit for l listings\n");
+	printf("           [t]=z          Stops at absolute time t (obsolete)\n");
+	printf("               S          show_bankptr_bank0 & smartport errs\n");
+	printf("               P          show_pmhz\n");
+	printf("               A          show_a2_line_stuff show_adb_log\n");
+	printf("          Ctrl-e          Dump registers\n");
 	printf("[bank]/[addr1].[addr2]us[file]  Save mem area to [file]\n");
 	printf("[bank]/[addr1].[addr2]ul[file]  Load mem area from [file]\n");
-	printf("v			Show video information\n");
-	printf("q                       Exit Debugger (and GSport)\n");
+	printf("               v          Show video information\n");
+	printf("               q          Quit Debugger (and GSplus)\n");
 }
 
 void
@@ -747,7 +746,7 @@ do_debug_list()
 	}
 	printf("%d=m %d=x %d=LCBANK\n", (engine.psr >> 5)&1,
 		(engine.psr >> 4) & 1, (g_c068_statereg & 0x4) >> 2);
-	
+
 	size_mem_imm = 2;
 	if(engine.psr & 0x20) {
 		size_mem_imm = 1;
@@ -840,7 +839,7 @@ do_debug_unix()
 		}
 	}
 	localbuf[i] = 0;
-	
+
 
 	printf("About to open: %s,len: %d\n", localbuf, (int)strlen(localbuf));
 	if(load) {
