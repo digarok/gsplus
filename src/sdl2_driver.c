@@ -586,18 +586,17 @@ int clipboard_get_char(void) {
 	if (!g_clipboard)
 		return 0;
 
-	// skip utf-8 characters.
-	for (;;) {
+	/* skip utf-8 characters. */
+	do {
 		c = g_clipboard[g_clipboard_pos++];
-		if (c & 0x80) {
-			/* utf8 sequence */
-			continue;
-		}
-		if (c == '\n') {
-			continue;
-		}
-		break;
-	}
+	} while (c & 0x80);
+
+	/* windows -- skip the \n in \r\n. */  
+	if (c == '\r' && g_clipboard[g_clipboard_pos] == '\n')
+			g_clipboard_pos++;
+
+	/* everybody else -- convert \n to \r */
+	if (c == '\n') c = '\r';
 
 	if (c == 0) {
 		free(g_clipboard);
