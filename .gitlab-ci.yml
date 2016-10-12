@@ -52,4 +52,5 @@ build-win32:
   script:
     - cd src
     - ln -s vars_win32 vars
-    - make clean ; make
+    - make clean
+    - make
