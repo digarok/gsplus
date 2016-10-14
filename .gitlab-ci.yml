@@ -53,10 +53,11 @@ package-osx:
     - osx
   stage: package
   script:
-    - gzip < gsplus > gsplus-osx-latest.gz
+    - chmod +x make_dist_mac.sh
+    - ./make_dist_mac.sh
   artifacts:
     paths:
-      - gsplus-osx-latest.gz
+      - gsplus-osx.tar.gz
 
 
 
