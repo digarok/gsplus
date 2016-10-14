@@ -46,7 +46,7 @@ build-osx:
 
 package-osx:
   tags:
-    -osx
+    - osx
   stage: package
   script:
     - gzip < gsplus README.txt > gsplus-osx-latest.gz
