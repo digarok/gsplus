@@ -34,10 +34,9 @@ specials_clean:
 
 # Linux/OSX SDL builds
 gsplus: $(OBJECTS) compile_time.o
-	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) 
+	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)
 	echo $(OBJECTS)
 	cp gsplus ..
-	cp gsplus ../bin/osx
 
 # Linux/OSX XWindows builds
 gsplusx: $(OBJECTS) compile_time.o
@@ -45,13 +44,13 @@ gsplusx: $(OBJECTS) compile_time.o
 	echo $(OBJECTS)
 	mv gsplusx ..
 
-# NOT CURRENTLY SUPPORTED 
+# NOT CURRENTLY SUPPORTED
 # Linux framebuffer builds:
 gsplusfb: $(OBJECTS) compile_time.o
 	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)
 	echo $(OBJECTS)
 	mv gsplusfb ..
-	cp -f ../config.template ../config.txt 
+	cp -f ../config.template ../config.txt
 
 # Mingw32 (native windows) / Cygwin builds:
 gsplus.exe: $(OBJECTS) compile_time.o
@@ -66,7 +65,7 @@ gsplus.exe: $(OBJECTS) compile_time.o
 	cp -f parallel.rom ../GSplus.app
 	cp -f ../COPYING.txt ../GSplus.app
 
-# NOT CURRENTLY SUPPORTED 
+# NOT CURRENTLY SUPPORTED
 # Mac build - old style (deprecated)
 gsportmac: $(OBJECTS) compile_time.o
 	$(CC) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o gsport $(EXTRA_LIBS)
