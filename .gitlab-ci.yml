@@ -71,3 +71,15 @@ build-win32:
     - ln -s vars_win32 vars
     - make clean
     - make
+  artifacts:
+    paths:
+      - gsplus
+    expire_in: 5 minutes
+
+package-win32:
+  tags:
+    - windows
+  stage: package
+  artifacts:
+    paths:
+      - gsplus.exe
