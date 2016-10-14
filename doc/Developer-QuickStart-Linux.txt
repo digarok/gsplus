@@ -9,6 +9,11 @@ sudo apt-get -y install libpcap0.8-dev
 sudo apt-get -y install libx11-dev
 sudo apt-get -y install libxext-dev
 
+# sdl
+sudo apt-get -y install libsdl1.2-dev
+sudo apt-get -y install libsdl2-dev
+sudo apt-get -y install libfreetype6-dev
+
 # build
 git clone git@github.com:digarok/gsplus.git
 cd gsplus/src
