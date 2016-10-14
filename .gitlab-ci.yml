@@ -73,7 +73,7 @@ build-win32:
     - make
   artifacts:
     paths:
-      - gsplus
+      - gsplus.exe
     expire_in: 5 minutes
 
 package-win32:
