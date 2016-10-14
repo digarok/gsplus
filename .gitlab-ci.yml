@@ -1,6 +1,7 @@
 
 stages:
   - build
+  - package
 
 build-ubuntu-x:
   tags:
@@ -42,6 +43,17 @@ build-osx:
     - cd src
     - ln -s vars_osx_sdl2 vars
     - make clean ; make
+
+package-osx:
+  tags:
+    -osx
+  stage: package
+  script:
+    - gzip < gsplus README.txt > gsplus-osx-latest.gz
+  artifacts:
+    paths:
+      - gsplus-osx-latest.gz
+
 
 
 
