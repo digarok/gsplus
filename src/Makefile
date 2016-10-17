@@ -139,8 +139,8 @@ partls: partls.c
 to_pro: prodos.h prodos_protos.h to_pro.c
 	cc $(CCOPTS) $(XOPTS) $(OPTS) -o to_pro to_pro.c
 
-gsport32.o:   win32.rc winresource.h
-	windres win32.rc -o gsport32.o
+gsplus32.o:   win32.rc winresource.h
+	windres win32.rc -o gsplus32.o
 
 compile_time.o: $(OBJECTS)
 
@@ -183,7 +183,7 @@ macdriver.o: macdriver.c defc.h defcomm.h iwm.h protos.h protos_macdriver.h
 macdriver_console.o: macdriver_console.c defc.h defcomm.h iwm.h protos.h protos_macdriver.h
 macdriver_generic.o: macdriver_generic.c defc.h defcomm.h iwm.h protos.h protos_macdriver.h
 macsnd_driver.o: macsnd_driver.c defc.h defcomm.h iwm.h protos.h sound.h
-windriver.o: windriver.c defc.h defcomm.h iwm.h protos.h protos_windriver.h winresource.h gsport32.o
+windriver.o: windriver.c defc.h defcomm.h iwm.h protos.h protos_windriver.h winresource.h gsplus32.o
 win_console.o: win_console.c defc.h defcomm.h iwm.h protos.h protos_windriver.h winresource.h
 win_generic.o: win_generic.c defc.h defcomm.h iwm.h protos.h protos_windriver.h winresource.h
 win32snd_driver.o: win32snd_driver.c defc.h defcomm.h iwm.h protos.h sound.h
