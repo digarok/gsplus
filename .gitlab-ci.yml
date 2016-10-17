@@ -1,6 +1,7 @@
 
 stages:
   - build
+  - package
 
 build-ubuntu-x:
   tags:
@@ -42,6 +43,22 @@ build-osx:
     - cd src
     - ln -s vars_osx_sdl2 vars
     - make clean ; make
+  artifacts:
+    paths:
+      - gsplus
+    expire_in: 5 minutes
+
+package-osx:
+  tags:
+    - osx
+  stage: package
+  script:
+    - chmod +x make_dist_mac.sh
+    - ./make_dist_mac.sh
+  artifacts:
+    paths:
+      - gsplus-osx.tar.gz
+
 
 
 
@@ -54,3 +71,15 @@ build-win32:
     - ln -s vars_win32 vars
     - make clean
     - make
+  artifacts:
+    paths:
+      - gsplus.exe
+    expire_in: 5 minutes
+
+package-win32:
+  tags:
+    - windows
+  stage: package
+  artifacts:
+    paths:
+      - gsplus.exe
