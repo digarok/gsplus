@@ -5,14 +5,14 @@ CC = gcc
 LD = g++
 AS = cc
 
-OBJECTS = $(OBJECTS1) $(TFEOBJ) $(ATOBJ) $(PCAPOBJ) xdriver.o sdl2snd_driver.o
+OBJECTS = $(OBJECTS1) $(TFEOBJ) $(ATOBJ) $(PCAPOBJ) sdl2_driver.o sdl2snd_driver.o
 
 # C Compiler Options
 CCOPTS = -O2 -Wall -fomit-frame-pointer -std=gnu99 -DHAVE_SDL -DHAVE_TFE -DHAVE_ATBRIDGE -DTOGGLE_STATUS -I/usr/include/SDL2 -I/usr/include/freetype2
 # C++ Compiler Options
 CPPOPTS = -O2 -DHAVE_TFE -DHAVE_SDL -DTOGGLE_STATUS -DHAVE_ATBRIDGE -I/usr/include/freetype2 -I/usr/include/SDL2
 
-EXTRA_LIBS = -lXext -lfreetype -lSDL2 -ldl
+EXTRA_LIBS = -lfreetype -lSDL2 -ldl
 OPTS = -DGSPLUS_LITTLE_ENDIAN
 SUFFIX =
 LDFLAGS =
