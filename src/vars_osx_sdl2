@@ -13,8 +13,8 @@ CCOPTS = -O2 -Wall -fomit-frame-pointer -std=gnu99 -DHAVE_ICON -DHAVE_SDL -DTOGG
 # OPTIONS FOR COMPILING C++ SOURCE
 CPPOPTS = -O2 -DHAVE_TFE -DHAVE_SDL -DTOGGLE_STATUS -I/usr/local/include/freetype2 -I/usr/local/include/SDL2
 
-EXTRA_LIBS =  -lSDL2  -lfreetype
-OPTS = -DGSPLUS_LITTLE_ENDIAN
+EXTRA_LIBS =  -lSDL2 -lSDL2_image -lfreetype
+OPTS = -DGSPLUS_LITTLE_ENDIAN -g -O0
 SUFFIX =
 LDFLAGS = `sdl2-config --static-libs` -L/usr/local/lib
 LDOPTS = -I.

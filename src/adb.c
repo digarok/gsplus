@@ -40,9 +40,9 @@ extern int g_invert_paddles;
 extern int g_joystick_type;
 extern int g_a2vid_palette;
 extern int g_config_control_panel;
+extern int g_screenshot_requested;
 extern word32 g_cfg_vbl_count;
 extern double g_cur_dcycs;
-
 extern byte *g_slow_memory_ptr;
 extern byte *g_memory_ptr;
 extern word32 g_mem_size_total;
@@ -1717,7 +1717,7 @@ adb_physical_key_update(int a2code, int is_up)
 		case 0x0c: /* F12 - remap to reset */
 			a2code = 0x7f;
 			special = 0;
-                        break;
+      break;
 		default:
 			break;
 		}
@@ -1738,22 +1738,23 @@ adb_physical_key_update(int a2code, int is_up)
 
 	if(special && !is_up) {
 		switch(special) {
-// OG Disabled special keys (but warp)
-#ifndef ACTIVEGS
 		case 0x04: /* F4 - emulator config panel */
-                        if (CMD_DOWN)
-                        {
-                            printf("Quit!\n");
-                            iwm_shut();
-                            my_exit(1);
-                        }
-                        else
-                        {
-                            cfg_toggle_config_panel();
-                        }
+      if (CMD_DOWN) {
+          printf("Quit!\n");
+          iwm_shut();
+          my_exit(1);
+      }
+      else
+      {
+          cfg_toggle_config_panel();
+      }
 			break;
 		case 0x05: /* F5 - emulator clipboard paste */
-			clipboard_paste();
+			if (SHIFT_DOWN) {
+				g_screenshot_requested = 1;
+			} else {
+				clipboard_paste();
+			}
 			break;
 		case 0x06: /* F6 - emulator speed */
 			if(SHIFT_DOWN) {
@@ -1767,7 +1768,6 @@ adb_physical_key_update(int a2code, int is_up)
 			printf("g_fast_disk_emul is now %d\n",
 							g_fast_disk_emul);
 			break;
-#endif
 		case 0x08: /* F8 - warp pointer */
 			g_warp_pointer = !g_warp_pointer;
 			if(g_hide_pointer != g_warp_pointer) {
@@ -1775,7 +1775,6 @@ adb_physical_key_update(int a2code, int is_up)
 				x_hide_pointer(g_hide_pointer);
 			}
 			break;
-#ifndef ACTIVEGS
 		case 0x09: /* F9 - swap paddles */
 			if(SHIFT_DOWN) {
 				g_swap_paddles = !g_swap_paddles;
@@ -1793,18 +1792,17 @@ adb_physical_key_update(int a2code, int is_up)
 				extern void x_toggle_status_lines();
 				x_toggle_status_lines();
 #endif
-                        } else if (CMD_DOWN) {
-                            do_reset();
-                            return;
+      } else if (CMD_DOWN) {
+          do_reset();
+          return;
 			} else {
 				change_a2vid_palette((g_a2vid_palette + 1) & 0xf);
 			}
 			break;
 		case 0x0b: /* F11 - full screen */
-                        g_fullscreen = !g_fullscreen;
-                        x_full_screen(g_fullscreen);
+			g_fullscreen = !g_fullscreen;
+			x_full_screen(g_fullscreen);
 			break;
-#endif
 		}
 
 		return;

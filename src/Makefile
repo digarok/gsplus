@@ -1,7 +1,7 @@
 # GSport central makefile - you need a 'vars' file linked/copied from a 'vars_xxx' template to build.
 #@todo: check for vars file and do something useful if missing :P
 
-OBJECTS1 = adb.o clock.o config.o dis.o engine_c.o scc.o iwm.o \
+OBJECTS1 = adb.o clock.o config.o debug.o dis.o engine_c.o scc.o iwm.o \
 	joystick_driver.o moremem.o paddles.o parallel.o printer.o \
 	sim65816.o smartport.o sound.o sound_driver.o video.o \
 	scc_socket_driver.o imagewriter.o scc_imagewriter.o scc_llap.o

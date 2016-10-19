@@ -23,6 +23,8 @@
 
 // @todo: mouse clip bugs.. great western shootout. Paint 8/16.   still in win32
 #include "SDL.h"
+#include "SDL_image.h"
+
 #include <stdbool.h>
 #include <time.h>
 #include <stdlib.h>
@@ -45,6 +47,12 @@ int	g_win_status_debug = 0;			// Current visibility of status lines.
 int g_win_status_debug_request = 0;	// Desired visibility of status lines.
 int g_screen_mdepth = 0;
 int kb_shift_control_state = 0;
+
+void x_take_screenshot(); // screenshot stuff
+int g_screenshot_requested = 0; // DB to know if we want to save a screenshot
+extern char g_config_gsplus_name[];
+int screenshot_index = 0;  // allows us to save time by not scanning from 0 each time
+char screenshot_filename[256];
 
 extern int g_screen_depth;
 extern int g_quit_sim_now;
@@ -341,6 +349,12 @@ void sdl_push_kimage(Kimage *kimage_ptr,
 	SDL_RenderCopy(renderer, texture, NULL, NULL);
 	SDL_RenderPresent(renderer);
 
+  if (g_screenshot_requested) {
+    x_take_screenshot();
+    g_screenshot_requested = 0;
+  }
+
+
 }
 
 
@@ -583,6 +597,74 @@ int clipboard_get_char() {
 	return g_clipboard[g_clipboard_pos++] | 0x80;
 }
 
+void x_full_screen(int do_full) {
+  if (do_full) {
+    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+  } else {
+    SDL_SetWindowFullscreen(window, 0);
+    SDL_SetWindowSize(window, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
+  }
+}
+
+int file_exists(char *fname){
+  if( access( fname, F_OK ) != -1 ) {
+    return 1; // file exists
+  } else {
+    return 0; // file doesn't exist
+  }
+}
+
+void make_next_screenshot_filename()
+{
+  char filepart[256];
+  char filename[256];
+
+
+  int available_filename = 0;
+  while (!available_filename) {
+    // get location of '.'
+    char *dotptr = strchr(g_config_gsplus_name, '.');
+    int index = dotptr - g_config_gsplus_name;
+    strncpy(filepart, g_config_gsplus_name, index);
+    filepart[index] = '\0'; //terminator
+    sprintf(filename, "%s%04d.png",filepart,screenshot_index);
+
+    if (file_exists(filename)) {
+      //printf("Found existing %s\n", filename);
+      screenshot_index++;
+    } else {
+      //printf("Available filename: %s\n", filename);
+      available_filename = 1;
+    }
+  }
+  strcpy(screenshot_filename, filename);
+}
+
+// @todo: some error with writing data direct to png.  output is empty/transparent?
+// workaround is this horrible hack of saving the bmp -> load bmp -> save png
+void x_take_screenshot() {
+  make_next_screenshot_filename();
+
+  SDL_Surface *sshot = SDL_CreateRGBSurface(0, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
+  SDL_LockSurface(sshot);
+  int read = SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_ARGB8888, sshot->pixels, sshot->pitch);
+  if (read != 0) {
+    printf("READPXL FAIL!\n%s\n", SDL_GetError());
+  }
+  SDL_SaveBMP(sshot, "screenshot.bmp");
+  SDL_UnlockSurface(sshot);
+  SDL_FreeSurface(sshot);
+
+  SDL_Surface *s = SDL_CreateRGBSurface(0, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT,
+                        32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
+  if (s) {
+      SDL_Surface * image = SDL_LoadBMP("screenshot.bmp");
+      IMG_SavePNG(image, screenshot_filename);
+      SDL_FreeSurface(image);
+
+  }
+  SDL_FreeSurface(s);
+}
 
 
 
@@ -596,7 +678,6 @@ void x_redraw_status_lines() { }
 void x_hide_pointer(int do_hide) { }
 void x_auto_repeat_on(int must) { }
 void x_auto_repeat_off(int must) { }
-void x_full_screen(int do_full) { }
 // OG Adding release
 void x_release_kimage(Kimage* kimage_ptr) { }
 // OG Addding ratio

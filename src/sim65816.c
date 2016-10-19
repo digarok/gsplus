@@ -22,10 +22,10 @@
 */
 
 #include <math.h>
-
 #include "defc.h"
 #include "printer.h"
 #include "imagewriter.h"
+#include "debug.h"
 
 extern const char *g_config_gsplus_name_list[];
 #ifdef UNDER_CE
@@ -49,7 +49,6 @@ extern const char *g_config_gsplus_name_list[];
 int g_speed_fast ;	// OG Expose fast parameter
 int	g_initialized = 0;	// OG To know if the emulator has finalized its initialization
 int	g_accept_events = 0; // OG To know if the emulator is ready to accept external events
-
 char g_argv0_path[256] = "./";
 
 const char *g_gsplus_default_paths[] = { "", "./", "${HOME}/","${PWD}/",
@@ -74,6 +73,8 @@ const char *g_gsplus_default_paths[] = { "", "./", "${HOME}/","${PWD}/",
 #define EV_VID_UPD	7
 
 extern int g_stepping;
+extern int g_dbg_step;
+
 
 extern int g_c068_statereg;
 extern int g_cur_a2_stat;
@@ -114,6 +115,7 @@ extern int g_config_control_panel;
 
 extern int g_audio_enable;
 extern int g_preferred_rate;
+extern int g_dbg_enable_port;
 
 void U_STACK_TRACE();
 
@@ -159,7 +161,7 @@ int g_imagewriter_paper = 0;
 int g_imagewriter_banner = 0;
 
 int	g_config_iwm_vbl_count = 0;
-const char g_gsplus_version_str[] = "0.10a";
+const char g_gsplus_version_str[] = "0.12s";	// 12 socket debug
 int g_pause=0;	// OG Added pause
 
 #define START_DCYCS	(0.0)
@@ -242,64 +244,63 @@ Data_log *g_log_data_end_ptr = &(g_data_log_array[PC_LOG_LEN]);
 // OG Added sim65816_initglobals()
 void sim65816_initglobals()
 {
+  g_fcycles_stop = 0.0;
+  halt_sim = 0;
+  enter_debug = 0;
+  g_rom_version = -1;
+  g_user_halt_bad = 0;
+  g_halt_on_bad_read = 0;
+  g_ignore_bad_acc = 1;
+  g_ignore_halts = 1;
+  g_code_red = 0;
+  g_code_yellow = 0;
+  g_use_alib = 0;
+  g_iw2_emul = 0;
+  g_serial_out_masking = 0;
+  //g_serial_modem[2] = { 0, 1 };
 
-	g_fcycles_stop = 0.0;
-	halt_sim = 0;
-	enter_debug = 0;
-	g_rom_version = -1;
-	g_user_halt_bad = 0;
-	g_halt_on_bad_read = 0;
-	g_ignore_bad_acc = 1;
-	g_ignore_halts = 1;
-	g_code_red = 0;
-	g_code_yellow = 0;
-	g_use_alib = 0;
-	g_iw2_emul = 0;
-	g_serial_out_masking = 0;
-	//g_serial_modem[2] = { 0, 1 };
+  g_config_iwm_vbl_count = 0;
 
-	g_config_iwm_vbl_count = 0;
+  g_pause=0;
 
-	g_pause=0;
+  g_last_vbl_dcycs = START_DCYCS;
+  g_cur_dcycs = START_DCYCS;
 
-	g_last_vbl_dcycs = START_DCYCS;
-	g_cur_dcycs = START_DCYCS;
-
-	g_last_vbl_dadjcycs = 0.0;
-	g_dadjcycs = 0.0;
+  g_last_vbl_dadjcycs = 0.0;
+  g_dadjcycs = 0.0;
 
 
-	g_wait_pending = 0;
-	g_stp_pending = 0;
+  g_wait_pending = 0;
+  g_stp_pending = 0;
 
-	g_num_irq = 0;
-	g_num_brk = 0;
-	g_num_cop = 0;
-	g_num_enter_engine = 0;
-	g_io_amt = 0;
-	g_engine_action = 0;
-	g_engine_halt_event = 0;
-	g_engine_scan_int = 0;
-	g_engine_doc_int = 0;
+  g_num_irq = 0;
+  g_num_brk = 0;
+  g_num_cop = 0;
+  g_num_enter_engine = 0;
+  g_io_amt = 0;
+  g_engine_action = 0;
+  g_engine_halt_event = 0;
+  g_engine_scan_int = 0;
+  g_engine_doc_int = 0;
 
-	g_testing = 0;
-	g_testing_enabled = 0;
+  g_testing = 0;
+  g_testing_enabled = 0;
 
-	g_debug_file_fd = -1;
-	g_fatal_log = -1;
+  g_debug_file_fd = -1;
+  g_fatal_log = -1;
 
-	 g_25sec_cntr = 0;
-	g_1sec_cntr = 0;
+  g_25sec_cntr = 0;
+  g_1sec_cntr = 0;
 
-	 g_dnatcycs_1sec = 0.0;
-	g_natcycs_lastvbl = 0;
+  g_dnatcycs_1sec = 0.0;
+  g_natcycs_lastvbl = 0;
 
-	 Verbose = 0;
-	 Halt_on = 0;
+  Verbose = 0;
+  Halt_on = 0;
 
-	 g_mem_size_base = 256*1024;	/* size of motherboard memory */
-	 g_mem_size_exp = 8*1024*1024;	/* size of expansion RAM card */
-	 g_mem_size_total = 256*1024;	/* Total contiguous RAM from 0 */
+  g_mem_size_base = 256*1024;	/* size of motherboard memory */
+  g_mem_size_exp = 8*1024*1024;	/* size of expansion RAM card */
+  g_mem_size_total = 256*1024;	/* Total contiguous RAM from 0 */
 }
 
 void
@@ -788,6 +789,7 @@ do_reset()
 	engine.kpc = get_memory16_c(0x00fffc, 0);
 
 	g_stepping = 0;
+  g_dbg_step = 0;
 
 	if (g_irq_pending)
 		halt_printf("*** irq remainings...\n");
@@ -1047,7 +1049,14 @@ gsplusmain(int argc, char **argv)
       g_config_gsplus_name_list[0] = argv[i+1]; // super dangerous ?
       g_config_gsplus_name_list[1] = 0; // terminate string array
       i++;
-
+    } else if(!strcmp("-debugport", argv[i])) {     // Debug port passed
+        if((i+1) >= argc) {
+          printf("Missing argument\n");
+          exit(1);
+        }
+        g_dbg_enable_port = strtol(argv[i+1], 0, 0);
+        printf("Debug port: %d\n", g_dbg_enable_port);
+        i++;
     } else {
 			if ((i == (argc - 1)) && (strncmp("-", argv[i], 1) != 0)) {
 				final_arg = argv[i];
@@ -1088,6 +1097,7 @@ gsplusmain(int argc, char **argv)
 	}
 
 	iwm_init();
+  debug_init();   // enable socket debugger if configured
 	config_init();
 	// If the final argument was not a switch, then treat it like a disk image filename to insert
 	if (final_arg) {
@@ -1129,6 +1139,7 @@ gsplusmain(int argc, char **argv)
 	init_reg();
 	clear_halt();
 
+
 	initialize_events();
 
 	video_init();
@@ -1143,15 +1154,20 @@ gsplusmain(int argc, char **argv)
 
 	do_reset();
 	g_stepping = 0;
+  g_dbg_step = 0;
 
 	// OG Notify emulator has been initialized and ready to accept external events
 	g_initialized = 1;
 	g_accept_events = 1;
 
-	do_go();
-
-	/* If we get here, we hit a breakpoint, call debug intfc */
-	do_debug_intfc();
+  // Call one of two main run_prog() routines
+  if (g_dbg_enable_port) {
+    do_go_debug();
+  } else {
+	  do_go();
+    /* If we get here, we hit a breakpoint, call debug intfc */
+  	do_debug_intfc();
+  }
 
 	// OG Notify emulator is being closed, and cannot accept events anymore
 	g_accept_events = 0;
@@ -1750,7 +1766,7 @@ run_prog()
 		engine.fcycles = prerun_fcycles;
 		fcycles_stop = (g_event_start.next->dcycs - g_last_vbl_dcycs) +
 							0.001;
-		if(g_stepping) {
+		if(g_stepping || g_dbg_step < 0) {
 			fcycles_stop = prerun_fcycles;
 		}
 		g_fcycles_stop = fcycles_stop;
@@ -1809,6 +1825,13 @@ run_prog()
 
 		this_event = g_event_start.next;
 		while(dcycs >= this_event->dcycs) {
+      if(halt_sim != 0 && halt_sim != HALT_EVENT) {
+  			break;
+  		}
+  		if(g_stepping || g_dbg_step != 0) {
+        printf("HIT STEPPING BREAK!\n");
+  			break;
+      }
 			/* Pop this guy off of the queue */
 			g_event_start.next = this_event->next;
 
@@ -1818,6 +1841,10 @@ run_prog()
 			switch(type & 0xff) {
 			case EV_60HZ:
 				update_60hz(dcycs, now_dtime);
+        debug_server_poll();
+        if (debug_events_waiting() > 0) {
+          debug_handle_event();
+        }
 				break;
 			case EV_STOP:
 				printf("type: EV_STOP\n");
@@ -1871,7 +1898,7 @@ run_prog()
 		if(halt_sim != 0 && halt_sim != HALT_EVENT) {
 			break;
 		}
-		if(g_stepping) {
+		if(g_stepping || g_dbg_step != 0) {
 			break;
 		}
 	}
@@ -2326,7 +2353,6 @@ update_60hz(double dcycs, double dtime_now)
 	g_dtime_exp_array[prev_vbl_index] = g_dtime_expected;
 	g_dtime_pmhz_array[prev_vbl_index] = predicted_pmhz;
 	g_dtime_eff_pmhz_array[prev_vbl_index] = eff_pmhz;
-
 
 	if(g_c041_val & C041_EN_VBL_INTS) {
 		add_event_vbl();
