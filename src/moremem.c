@@ -1179,6 +1179,41 @@ show_bankptrs(int bnk)
 	}
 }
 
+
+// function to get the pointer to memory where a gs page is located - db
+unsigned char * get_page_ptr_rd(int addr) {
+	Pg_info rd;
+	byte *ptr_rd;
+
+	int bank = ( addr & 0xFF0000 ) >> 16;	// unnecessary conversion that we throw away below w/ "*0x100"
+	int page = ( addr & 0x00FF00 ) >> 8;
+  rd = GET_PAGE_INFO_RD(bank*0x100 + page);
+	ptr_rd = (byte *)rd;
+	//printf("ADDR %06x at pageptr %p\n",addr, ptr_rd);	// seems to be correct.
+	/* code */
+	return rd;
+}
+
+// function to get a byte from a 24bit address - db
+int get_byte_at_address(int addr)
+{
+	unsigned char *page_ptr_rd = get_page_ptr_rd(addr);
+	int offset = addr & 0xff;
+	int mem_byte = page_ptr_rd[offset] & 0xff;
+	//printf("0x%06X = $%02X  \t(dec) %d\n", addr, (int) mem_byte, (int) mem_byte);
+  return (int) mem_byte;
+}
+
+// function to set a byte from a 24bit address - db
+void set_byte_at_address(int addr, int value)
+{
+	unsigned char *page_ptr_rd = get_page_ptr_rd(addr);
+	int offset = addr & 0xff;
+	page_ptr_rd[offset] = value;
+
+}
+
+
 void
 show_addr(byte *ptr)
 {
