@@ -21,8 +21,7 @@
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-// @todo: mouse clip bugs.. great western shootout. Paint 8/16
-
+// @todo: mouse clip bugs.. great western shootout. Paint 8/16.   still in win32
 #include "SDL.h"
 #include <stdbool.h>
 #include <time.h>
@@ -178,6 +177,7 @@ int a2_key_to_sdlkeycode[][3] = {
 	{ -1, -1, -1 }
 
 };
+
 int
 main(int argc, char **argv)
 {

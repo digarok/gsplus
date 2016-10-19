@@ -73,7 +73,7 @@ build-win32:
     - make
   artifacts:
     paths:
-      - gsplus.exe
+      - gsplus32.exe
     expire_in: 5 minutes
 
 package-win32:
@@ -82,4 +82,35 @@ package-win32:
   stage: package
   artifacts:
     paths:
+      - gsplus32.exe
+
+
+
+
+
+
+build-win-sdl:
+  tags:
+    - windows
+  stage: build
+  script:
+    - cd src
+    - ln -s vars_win32_sdl vars
+    - make clean
+    - make
+  artifacts:
+    paths:
       - gsplus.exe
+    expire_in: 5 minutes
+
+package-win-sdl:
+  tags:
+    - windows
+  stage: package
+  artifacts:
+    paths:
+      - gsplus.exe
+
+
+
+

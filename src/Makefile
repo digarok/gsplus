@@ -52,9 +52,24 @@ gsplusfb: $(OBJECTS) compile_time.o
 	mv gsplusfb ..
 	cp -f ../config.template ../config.txt
 
-# Mingw32 (native windows) / Cygwin builds:
-gsplus.exe: $(OBJECTS) compile_time.o
+# Mingw32 / Cygwin builds:  The Win32 API version
+gsplus32.exe: $(OBJECTS) compile_time.o
 	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
+	#mkdir -p ../GSplus.app/lib
+	#cp -f gsplus.exe ../GSplus.app/GSplus.exe
+	#cp -f ../config.template ../GSplus.app/config.txt
+	#cp -f ../lib/*.ttf ../GSplus.app/lib
+	#cp -f ../lib/arch/win32/*.dll ../GSplus.app
+	#cp -f ../lib/NoBoot.po ../GSplus.app
+	#cp -f GSplus.bat ../GSplus.app/GSplus.bat
+	#cp -f parallel.rom ../GSplus.app
+	#cp -f ../COPYING.txt ../GSplus.app
+	cp gsplus32.exe ..
+
+# Mingw32 / Cygwin builds:  The SDL version (builds, but non-functioning)
+gsplus.exe: $(OBJECTS) compile_time.o
+	#g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
+	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)  -lSDLmain -mwindows
 	#mkdir -p ../GSplus.app/lib
 	#cp -f gsplus.exe ../GSplus.app/GSplus.exe
 	#cp -f ../config.template ../GSplus.app/config.txt

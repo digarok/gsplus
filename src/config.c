@@ -110,7 +110,7 @@ extern char* g_imagewriter_prop_font;
 extern int g_imagewriter_paper;
 extern int g_imagewriter_banner;
 
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32) || defined(__CYGWIN__) && !defined(WIN_SDL)
 extern int g_win_show_console_request;
 extern int g_win_status_debug_request;
 #endif
@@ -348,7 +348,7 @@ Cfg_menu g_cfg_imagewriter_menu[] = {
 
 Cfg_menu g_cfg_devel_menu[] = {
 { "Developer Options", g_cfg_devel_menu, 0, 0, CFGTYPE_MENU },
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32) || defined(__CYGWIN__) && !defined(WIN_SDL)
 { "Status lines,0,Hide,1,Show", KNMP(g_win_status_debug_request), CFGTYPE_INT },
 { "Console,0,Hide,1,Show", KNMP(g_win_show_console_request), CFGTYPE_INT },
 #endif
