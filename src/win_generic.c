@@ -54,6 +54,7 @@ int g_screen_mdepth = 0;
 int g_num_a2_keycodes = 0;
 int g_win_button_states = 0;
 int	g_use_shmem = 1;
+int g_screenshot_requested = 0; // DB to know if we want to save a screenshot
 
 HDC	g_main_cdc;
 HWND	g_hwnd_main;

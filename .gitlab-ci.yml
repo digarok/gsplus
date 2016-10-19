@@ -18,7 +18,7 @@ build-ubuntu-sdl:
     - ubuntu
   stage: build
   script:
-    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev
+    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev libsdl2-image-dev
     - cd src
     - ln -s vars_x86linux_sdl vars
     - make clean ; make
@@ -28,7 +28,7 @@ build-ubuntu-sdl2:
     - ubuntu
   stage: build
   script:
-    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev
+    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev libsdl2-image-dev
     - cd src
     - ln -s vars_x86linux_sdl2 vars
     - make clean ; make

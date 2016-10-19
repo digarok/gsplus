@@ -63,6 +63,7 @@ int	g_has_focus = 0;
 int	g_auto_repeat_on = -1;
 int	g_x_shift_control_state = 0;
 
+int g_screenshot_requested = 0; // DB to know if we want to save a screenshot
 
 Display *g_display = 0;
 Visual	*g_vis = 0;
