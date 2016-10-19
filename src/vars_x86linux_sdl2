@@ -13,7 +13,7 @@ CCOPTS = -O2 -Wall -fomit-frame-pointer -std=gnu99 -DHAVE_SDL -DHAVE_TFE -DHAVE_
 CPPOPTS = -O2 -DHAVE_TFE -DHAVE_SDL -DTOGGLE_STATUS -DHAVE_ATBRIDGE -I/usr/include/freetype2 -I/usr/include/SDL2
 
 
-EXTRA_LIBS = -lfreetype -lSDL2 -ldl -lm -lstdc++
+EXTRA_LIBS = -lfreetype -lSDL2 -lSDL2_image -ldl -lm -lstdc++ 
 OPTS = -DGSPLUS_LITTLE_ENDIAN
 SUFFIX =
 LDFLAGS =
