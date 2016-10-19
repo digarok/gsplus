@@ -7,19 +7,37 @@
 ## STEP 2 - Register it with your server
 # First open Administrator CMD prompt then run the following commands.
 
-# REGISTER: Enter your Gitlab CI details
+# REGISTER: Enter your Gitlab CI details - (Token is in Gitlab->Admin-Runners)
 gitlab-ci-multi-runner-windows-386.exe register
+# enter gitlab url
+# enter gitlab runner token
+# enter tag of "windows"
+gitlab-ci-multi-runner register -n \
+  --url http://yourgitlab.com/ci \
+  --registration-token 5b2f60647cf7fe3eb5c7fa87e59bf7 \
+  --executor shell \
+  --description "WinDork10" \
+  --tag-list "windows,win32"
+
+gitlab-ci-multi-runner-windows-386.exe -n   --url http://centralserv.gotgeeks.com/ci   --registration-token 5a1f60647cf7fe3eb5c7fa87e59bf7   --executor shell   --description "WinDork10" --tag-list "windows,win32"
 
 ## STEP 3 - Install Service
 # Note the use of ".\IEUser" to indicate local account!
 gitlab-ci-multi-runner-windows-386.exe install --user .\IEUser --password Passw0rd!
+gitlab-ci-multi-runner-windows-386.exe install --user .\Builder --password Bu1ld3r!
 
 ## STEP 4 - Start service
 gitlab-ci-multi-runner-windows-386.exe start
 
-# If you have any problems with the service not starting due to:
-# "Failed to start gitlab-runner: The service did not start due to a 
-#  logon failure."
+## STEP 4.5 - if you get a "failed due to logon" message above, you may need to grant "logon as a service" privs
+#To add the "Log on as a service" right to an account on your local computer
+#To open Local Security Policy, click Start, point to Control Panel, point to Administrative Tools, and then double-click Local Security Policy.
+#In the console tree, double-click Local Policies, and then click User Rights Assignment.
+#In the details pane, double-click Log on as a service.
+#Click Add User or Group, and then add the appropriate account to the list of accounts that possess the Log on as a service right.
+
+# If you have any other problems with the service not starting due to:
+# "Failed to start gitlab-runner: The service did not start due to a logon failure."
 # Try going to Services and edit the properties of the gitlab-runner service.
 # Go to the "Log On" tab and re-enter the password/credentials and see if 
 # that helps.
@@ -40,11 +58,23 @@ gitlab-ci-multi-runner-windows-386.exe start
 
 
 
-## PREREQUISITE 
+## PREREQUISITE AKA SETTING UP A FRESH VM OR DEV COMPUTER
+#
+# don't forget guest additions in your VM
+#
+# add user (make it an admin, give it service privs) 
+# Local Security Policy -> Local Policies -> User Rights Assignment -> Log on as a service
+#
+# install Cygwin
+# add cygwin bin dir to env path
+#
+# install git for windows w/ git bash  http://git-scm.com/download/win
+git config --global user.name "Dagen Brock"
+git config --global user.email "dagenbrock@gmail.com"
+# (set up your key(s))
+# Add your ~/.ssh/id_rsa using git bash (or cygwin) so that 
+# gitlab runner can check out your project
+# 
 # The project is currently being build in Cygwin.
 # I install Cygwin with all "Devel" and "Perl" packages.
 # I also search for and add any SDL2 or FreeType libs just in case.
-# You'll also need git installed for cmdline usage on Windows.
-# Add your ~/.ssh/id_rsa using git bash (or cygwin) so that 
-# gitlab runner can check out your project
-

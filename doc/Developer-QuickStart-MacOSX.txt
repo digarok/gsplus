@@ -1,7 +1,10 @@
 # Mac OSX - SDL2 version
-# Install 'brew' if you don't already have it installed. 
+#
+# might need to install cli tools if you haven't already.
+xcode-select --install
 
-# system prep
+# Install 'brew' if you don't already have it installed. 
+# then install dependencies
 brew install sdl2
 brew install freetype
 

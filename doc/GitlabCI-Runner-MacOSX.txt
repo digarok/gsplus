@@ -16,3 +16,21 @@ gitlab-ci-multi-runner register -n \
   --registration-token a1f60647cf7fe3eb5c7fa87e59bf7 \
   --executor shell \
   --description "My-Mac"
+
+# this one is better - adds tags simultaneously
+gitlab-ci-multi-runner register -n \
+  --url http://yourgitlab.com/ci \
+  --registration-token 5b2f60647cf7fe3eb5c7fa87e59bf7 \
+  --executor shell \
+  --description "MBP" \
+  --tag-list "osx"
+
+# maybe also needs 
+gitlab-ci-multi-runner install 
+# to run correctly
+
+# you can always check with
+gitlab-ci-multi-runner status
+
+
+
