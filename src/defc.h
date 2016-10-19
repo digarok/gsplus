@@ -60,6 +60,7 @@ void U_STACK_TRACE();
 #define DRECIP_DCYCS_IN_16MS	(1.0 / (DCYCS_IN_16MS))
 
 #ifdef GSPLUS_LITTLE_ENDIAN
+// @todo: look at using <byteswap.h> for fastest platform implementations
 # define BIGEND(a)    ((((a) >> 24) & 0xff) +			\
 			(((a) >> 8) & 0xff00) + 		\
 			(((a) << 8) & 0xff0000) + 		\

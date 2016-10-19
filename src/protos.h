@@ -221,6 +221,7 @@ void show_bp(void);
 void delete_bp(word32 addr);
 void do_blank(void);
 void do_go(void);
+void do_go_debug(void);  // socket debug ver
 void do_step(void);
 void xam_mem(int count);
 void show_hex_mem(int startbank, word32 start, int endbank, word32 end, int count);

@@ -33,6 +33,8 @@ extern byte *g_memory_ptr;
 extern byte *g_slow_memory_ptr;
 extern int halt_sim;
 extern int enter_debug;
+extern int g_dbg_step;	//debug.c
+extern int timeout;			//debug.c
 extern int g_c068_statereg;
 extern word32 stop_run_at;
 extern int Verbose;
@@ -595,14 +597,13 @@ do_blank()
 	}
 }
 
+
+/* also called by do_step */
 void
 do_go()
 {
-	/* also called by do_step */
-
 	g_config_control_panel = 0;
 	clear_halt();
-
 	run_prog();
 	show_regs();
 	g_config_control_panel = 1;
@@ -614,16 +615,20 @@ do_step()
 	int size;
 	int size_mem_imm, size_x_imm;
 
+	// run an instruction
 	do_go();
 
+	// check accumulator size
 	size_mem_imm = 2;
 	if(engine.psr & 0x20) {
 		size_mem_imm = 1;
 	}
+	// check xy size
 	size_x_imm = 2;
 	if(engine.psr & 0x10) {
 		size_x_imm = 1;
 	}
+	// then disassemble
 	size = do_dis(stdout, engine.kpc, size_mem_imm, size_x_imm, 0, 0);
 }
 
@@ -701,7 +706,6 @@ read_line(char *buf, int len)
 #ifdef _WIN32
 		ret = win_nonblock_read_stdin(0, buf, 1);
 #elif defined(__OS2__)
-
 #else
 		/* Unix */
 		ret = read(0, buf, 1);
