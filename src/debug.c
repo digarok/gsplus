@@ -34,7 +34,7 @@ int step_count = 0;
 extern int g_limit_speed;
 extern int g_screenshot_requested;
 
-
+// all the message types
 typedef enum {
   G_DBG_COMMAND_TEST = 0,
   G_DBG_COMMAND_HELLO = 1,
@@ -55,7 +55,6 @@ typedef enum {
 
 
 // incoming commands - 1 char command + 256 char data
-
 #define DBG_CMD_QUEUE_MAXLEN 50
 int dbg_cmd_queue_len = 0;
 struct dbg_cmd
@@ -206,69 +205,54 @@ void debug_handle_event()
   while (debug_events_waiting() > 0) {
     switch (dbg_cmd_queue[0].command) {
       case G_DBG_COMMAND_TEST:   //0
-        printf(sprintf("event G_DBG_COMMAND_TEST (%d)", G_DBG_COMMAND_TEST));
         event_test_command(dbg_cmd_queue[0].cdata);
         break;
       case G_DBG_COMMAND_HELLO:   //1
-        printf("debug_handle_event(G_DBG_COMMAND_HELLO)  %d\n", G_DBG_COMMAND_HELLO);
         event_hello();
         break;
       case G_DBG_COMMAND_PAUSE:   //2
-        printf("debug_handle_event(G_DBG_COMMAND_PAUSE)  %d\n", G_DBG_COMMAND_PAUSE);
         event_pause();
         break;
       case G_DBG_COMMAND_STEP:    //3
-        printf("debug_handle_event(G_DBG_COMMAND_STEP)  %d\n", G_DBG_COMMAND_STEP);
         if (g_dbg_step == -1) {
           g_dbg_step = 1; // take a step
         } else {
           g_dbg_step = -1; // first one just halts
         }
-      break;
+        break;
       case G_DBG_COMMAND_CONTINUE:  //4
-        printf("debug_handle_event(G_DBG_COMMAND_CONTINUE)  %d\n", G_DBG_COMMAND_CONTINUE);
         g_dbg_step = 0;
         step_count = 0;
         break;
       case G_DBG_COMMAND_GET_MEM:  //6
-        printf("debug_handle_event(G_DBG_COMMAND_GET_MEM)  %d\n", G_DBG_COMMAND_GET_MEM);
         event_get_mem(dbg_cmd_queue[0].cdata);
         break;
       case G_DBG_COMMAND_SET_MEM:  //7
-        printf("debug_handle_event(G_DBG_COMMAND_SET_MEM)  %d\n", G_DBG_COMMAND_SET_MEM);
         event_set_mem(dbg_cmd_queue[0].cdata);
         break;
       case G_DBG_COMMAND_QUIT:
-        printf("debug_handle_event(G_DBG_COMMAND_QUIT)  %d\n", G_DBG_COMMAND_QUIT);
         exit(0);  // HALT!
         break;
       case G_DBG_COMMAND_DEBUGGER:
-        printf("debug_handle_event(G_DBG_COMMAND_DEBUGGER)  %d\n", G_DBG_COMMAND_DEBUGGER);
         do_debug_intfc();
         break;
       case G_DBG_COMMAND_SET_CPU:
-        printf("debug_handle_event(G_DBG_COMMAND_SET_CPU)  %d\n", G_DBG_COMMAND_SET_CPU);
         event_set_cpu(&dbg_cmd_queue[0].cdata);
         break;
       case G_DBG_COMMAND_GET_CPU:
-        printf("debug_handle_event(G_DBG_COMMAND_GET_CPU)  %d\n", G_DBG_COMMAND_GET_CPU);
         event_cpu_info();
         break;
       case G_DBG_COMMAND_ADD_BRK:
-        printf("debug_handle_event(G_DBG_COMMAND_ADD_BRK)  %d\n", G_DBG_COMMAND_ADD_BRK);
-        event_add_brk(&dbg_cmd_queue[0].cdata);
+        event_add_brk(dbg_cmd_queue[0].cdata);
         break;
       case G_DBG_COMMAND_DEL_BRK:
-        printf("debug_handle_event(G_DBG_COMMAND_DEL_BRK)  %d\n", G_DBG_COMMAND_DEL_BRK);
-        event_del_brk(&dbg_cmd_queue[0].cdata);
+        event_del_brk(dbg_cmd_queue[0].cdata);
         break;
       case G_DBG_COMMAND_GET_BRK:
-        printf("debug_handle_event(G_DBG_COMMAND_GET_BRK)  %d\n", G_DBG_COMMAND_GET_BRK);
-        event_get_brk(&dbg_cmd_queue[0].cdata);
+        event_get_brk(dbg_cmd_queue[0].cdata);
         break;
       case G_DBG_COMMAND_EMU_CMD:
-        printf("debug_handle_event(G_DBG_COMMAND_EMU_CMD)  %d\n", G_DBG_COMMAND_EMU_CMD);
-        event_emu_cmd(&dbg_cmd_queue[0].cdata);
+        event_emu_cmd(dbg_cmd_queue[0].cdata);
         break;
       default:
         break;
@@ -628,7 +612,7 @@ void handle_emu_cmd(char cmd_char, char *cmd_data)
 void event_emu_cmd(char *str)
 {
   // split our commands on spaces
-  char cmd_char = NULL;
+  char cmd_char = '\0';
   char *cmd_data = NULL;
 
   char * pch;
@@ -741,7 +725,7 @@ void handle_cpu_cmd(char cmd_char, char *cmd_data)
 void event_set_cpu(char *str)
 {
   // split our commands on spaces
-  char cmd_char = NULL;
+  char cmd_char = '\0';
   char *cmd_data = NULL;
 
   char * pch;
