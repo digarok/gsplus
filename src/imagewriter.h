@@ -1,23 +1,23 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2010 - 2011 by GSport contributors
- 
+
  Copyright (C) 2010 by GSport contributors
 
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -44,7 +44,7 @@
  Extensively rewritten to provide full emulation of the Apple ImageWriter II
  printer.
 
- Information used to write this emulator was provided by 
+ Information used to write this emulator was provided by
  Apple's "ImageWriter II Technical Reference Manual"
  ISBN# 0-201-17766-8
 
@@ -134,7 +134,7 @@ public:
 	// Hard Reset (like switching printer off and on)
 	void resetPrinterHard();
 
-	// Set Autofeed value 
+	// Set Autofeed value
 	void setAutofeed(bool feed);
 
 	// Get Autofeed value
@@ -143,7 +143,7 @@ public:
 	// True if printer is unable to process more data right now (do not use printChar)
 	bool isBusy();
 
-	// True if the last sent character was received 
+	// True if the last sent character was received
 	bool ack();
 
 	// Manual formfeed
@@ -165,7 +165,7 @@ private:
 	// Closes a multipage document
 	void finishMultipage();
 
-	// Output current page 
+	// Output current page
 	void outputPage();
 
 #ifdef HAVE_SDL
@@ -182,7 +182,7 @@ private:
 
 	// Reconfigures printer parameters after changing soft-switches with ESC Z and ESC D
 	void updateSwitch();
-	
+
 	// Overprints a slash over zero if softswitch B-1 is set
 	void slashzero(Bit16u penX, Bit16u penY);
 
@@ -300,7 +300,7 @@ private:
 
 //Interfaces to C code
 #ifdef __cplusplus
-extern "C" 
+extern "C"
 {
 #else
 #include <stdbool.h>

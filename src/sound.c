@@ -1,7 +1,7 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2016 - Dagen Brock
- 
+
  Copyright (C) 2010 - 2012 by GSport contributors
 
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
@@ -46,6 +46,7 @@ int	g_doc_saved_ctl = 0;
 int	g_queued_samps = 0;
 int	g_queued_nonsamps = 0;
 int	g_num_osc_interrupting = 0;
+int g_sound_play_depth = 0;
 
 /* Workaround - gcc in cygwin wasn't defining _WIN32, substituted WIN_SOUND instead */
 #if defined(HPUX) || defined(__linux__) || defined(WIN_SOUND) || defined(MAC) || defined(HAVE_SDL)
@@ -639,7 +640,6 @@ send_sound(int real_samps, int size)
 {
 	// real_samps = 1, size = 1602
 	word32	tmp;
-	int	ret;
 
 	if(g_audio_enable == 0) {
 		printf("Entered send_sound but audio off!\n");
@@ -657,16 +657,15 @@ send_sound(int real_samps, int size)
 						(real_samps << 30) + size);
 // Workaround - gcc in cygwin wasn't defining _WIN32
 #if defined(WIN_SOUND) || defined(MAC) && !defined(HAVE_SDL)
-	ret = 0;
 	child_sound_playit(tmp);
 #elif defined(HAVE_SDL)
 	sound_write_sdl( real_samps,  size);
-	//sdl_send_audio(&g_sound_shm_addr[g_sound_shm_pos], size, real_samps);
 #elif defined(__OS2__)
 
 #else
 	/* Although this looks like a big/little-endian issue, since the */
 	/*  child is also reading an int, it just works with no byte swap */
+	int	ret = 0;
 	ret = write(g_pipe_fd[1], &tmp, 4);
 	if(ret != 4) {
 		halt_printf("send_sound, wr ret: %d, errno: %d\n", ret, errno);
@@ -674,14 +673,12 @@ send_sound(int real_samps, int size)
 #endif
 }
 
-void
-show_c030_state()
+void show_c030_state()
 {
 	show_c030_samps(&(g_samp_buf[0]), 100);
 }
 
-void
-show_c030_samps(int *outptr, int num)
+void show_c030_samps(int *outptr, int num)
 {
 	int	i;
 
@@ -699,10 +696,7 @@ show_c030_samps(int *outptr, int num)
 	}
 }
 
-int g_sound_play_depth = 0;
-
-void
-sound_play(double dsamps)
+void sound_play(double dsamps)
 {
 	register word32 start_time1, start_time2, start_time3, start_time4;
 	register word32 end_time1, end_time2, end_time3;
@@ -1191,7 +1185,6 @@ doc_sound_end(int osc, int can_repeat, double eff_dsamps, double dsamps)
 	Doc_reg	*rptr, *orptr;
 	int	mode, omode;
 	int	other_osc;
-	int	one_shot_stop;
 	int	ctl;
 
 	/* handle osc stopping and maybe interrupting */

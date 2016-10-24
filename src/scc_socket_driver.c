@@ -1,23 +1,23 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2016 - Dagen Brock
- 
+
  Copyright (C) 2010 - 2012 by GSport contributors
- 
+
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -225,7 +225,7 @@ scc_socket_open_outgoing(int port, double dcycs)
 	/* ARO: inspect the ATDT command to see if there is a decimal port number declared & if so, use it */
 	/* Format: ATDT<host>,<port> */
 	/* Example ATDT192.168.1.21,4001 */
-	char *comma_ptr = strchr(&scc_ptr->modem_cmd_str[0], ',');
+	char *comma_ptr = strchr((const char *)&scc_ptr->modem_cmd_str[0], ',');
 	if (comma_ptr != NULL) {
 		long custom_port = strtol(comma_ptr + 1, NULL, 10);
 		*comma_ptr = '\0'; /* null terminate the hostname string at the position of the comma */
@@ -446,7 +446,7 @@ scc_socket_telnet_reqs(int port, double dcycs)
 	int	i, j;
 
 	scc_ptr = &(scc_stat[port]);
-	
+
 	for(i = 0; i < 64; i++) {
 		j = i >> 5;
 		mask = 1 << (i & 31);
@@ -1004,7 +1004,7 @@ scc_socket_do_cmd_str(int port, double dcycs)
 					}
 					pos++;
 				}
-				
+
 			}
 			scc_ptr->modem_dial_or_acc_mode = 1;
 			scc_socket_open_outgoing(port, dcycs);

@@ -1,7 +1,7 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2016 - Dagen Brock
- 
+
  Copyright (C) 2010 - 2012 by GSport contributors
 
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
@@ -78,7 +78,7 @@ void
 reliable_buf_write(word32 *shm_addr, int pos, int size)
 {
 	byte	*ptr;
-	int	ret;
+	int	ret = 0;
 
 	if(size < 1 || pos < 0 || pos > SOUND_SHM_SAMP_SIZE ||
 				size > SOUND_SHM_SAMP_SIZE ||
@@ -144,7 +144,7 @@ child_sound_loop(int read_fd, int write_fd, word32 *shm_addr)
 
 #if defined(HAVE_SDL)
   //child_sound_init_sdl();
-	long rate = sound_init_device_sdl();
+	sound_init_device_sdl();	// ignores long return value of sample rate
   return;
 #elif defined(__linux__) || defined(OSS)
 	child_sound_init_linux();

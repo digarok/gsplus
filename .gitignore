@@ -13,5 +13,6 @@ src/size_c.h
 gsplus
 gsportx
 gsport
+*.exe
 
 *.gsp

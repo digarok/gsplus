@@ -1651,7 +1651,7 @@ static void findNextName(char* front, char* ext, char* fname)
 	do
 	{
 		strcpy(fname, document_path);
-		printf(fname);
+		printf("%s",fname);
 #ifdef WIN32
 		const char* const pathstring = ".\\%s%d%s";
 #else
@@ -1887,9 +1887,9 @@ SDL_FreeSurface(image);*/
 		if (psfile == NULL)
 		{
 			if (!multipageOutput)
-				findNextName("page", ".ps", &fname[0]);
+				findNextName((char *)"page", (char *)".ps", &fname[0]);
 			else
-				findNextName("doc", ".ps", &fname[0]);
+				findNextName((char *)"doc", (char *)".ps", &fname[0]);
 
 			psfile = fopen(fname, "wb");
 			if (!psfile)
@@ -1983,7 +1983,7 @@ SDL_FreeSurface(image);*/
 	else
 	{
 		// Find a page that does not exists
-		findNextName("page", ".bmp", &fname[0]);
+		findNextName((char *)"page", (char *)".bmp", &fname[0]);
 		SDL_SaveBMP(page, fname);
 	}
 }

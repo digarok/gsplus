@@ -61,7 +61,9 @@ void win32snd_shutdown();
 void child_sound_init_win32();
 int win32_send_audio(byte *ptr, int size);
 
+/* prototypes for sdl(2)snd_driver.c functions */
 void sound_shutdown_sdl();
+void sdlsnd_init(word32 *shmaddr);
 
 
 /* Prototypes for macsnd_driver.c functions */
