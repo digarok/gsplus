@@ -1039,20 +1039,29 @@ config_parse_config_gsplus_file()
 	g_highest_smartport_unit = -1;
 
 	cfg_get_base_path(&g_cfg_cwd_str[0], g_config_gsplus_name, 0);
-#ifndef __OS2__
-	if(g_cfg_cwd_str[0] != 0) {
-		ret = chdir(&g_cfg_cwd_str[0]);
-		if(ret != 0) {
-			printf("chdir to %s, errno:%d\n", g_cfg_cwd_str, errno);
-		}
-	}
-	/* In any case, copy the directory path to g_cfg_cwd_str */
-	(void)getcwd(&g_cfg_cwd_str[0], CFG_PATH_MAX);
-#endif
+
+	// I think this code is wrong.  It breaks relative config paths on the "-config"
+	// option.  ie "./gsplus -config foo/bar.gsp"
+	// It's possible it was needed for some of the autodiscovery stuff, but I'm
+	// not really a fan of that either and think it should be take out.
+	// Especially now that you can pass a filename.
+
+// #ifndef __OS2__
+// 	if(g_cfg_cwd_str[0] != 0) {
+// 		ret = chdir(&g_cfg_cwd_str[0]);
+// 		if(ret != 0) {
+// 			printf("chdir to %s, errno:%d\n", g_cfg_cwd_str, errno);
+// 		}
+// 	}
+// 	/* In any case, copy the directory path to g_cfg_cwd_str */
+// 	(void)getcwd(&g_cfg_cwd_str[0], CFG_PATH_MAX);
+// #endif
+
 
 	fconf = fopen(g_config_gsplus_name, "r");
 	if(fconf == 0) {
-		fatal_printf("cannot open configuration file at %s!  Stopping!\n",
+		perror("ERROR");
+		fatal_printf("Cannot open configuration file at %s!  Stopping!\n",
 				g_config_gsplus_name);
 		my_exit(3);
 	}
