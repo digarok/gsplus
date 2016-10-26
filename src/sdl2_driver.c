@@ -29,6 +29,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <libgen.h>  // just for basename :P
 #include "defc.h"
 #ifdef HAVE_ICON    // Currently a flag because not supported outside of SDL builds.  Looking at full solution.
   #include "icongs.h"
@@ -51,6 +52,7 @@ int kb_shift_control_state = 0;
 void x_take_screenshot(); // screenshot stuff
 int g_screenshot_requested = 0; // DB to know if we want to save a screenshot
 extern char g_config_gsplus_name[];
+extern char *g_config_gsplus_screenshot_dir;
 int screenshot_index = 0;  // allows us to save time by not scanning from 0 each time
 char screenshot_filename[256];
 
@@ -622,18 +624,22 @@ void make_next_screenshot_filename()
 
   int available_filename = 0;
   while (!available_filename) {
+    char *bn = basename(g_config_gsplus_name);
     // get location of '.'
-    char *dotptr = strchr(g_config_gsplus_name, '.');
-    int index = dotptr - g_config_gsplus_name;
-    strncpy(filepart, g_config_gsplus_name, index);
+    char *dotptr = strchr(bn, '.');
+    int index = dotptr - bn;
+    strncpy(filepart, bn, index);
     filepart[index] = '\0'; //terminator
-    sprintf(filename, "%s%04d.png",filepart,screenshot_index);
-
-    if (file_exists(filename)) {
-      //printf("Found existing %s\n", filename);
-      screenshot_index++;
+    // handle trailing "/" vs no "/"
+    char tchar = g_config_gsplus_screenshot_dir[strlen(g_config_gsplus_screenshot_dir) - 1];
+    if (tchar == '/') {
+      sprintf(filename, "%s%s%04d.png",g_config_gsplus_screenshot_dir,filepart,screenshot_index);
     } else {
-      //printf("Available filename: %s\n", filename);
+      sprintf(filename, "%s/%s%04d.png",g_config_gsplus_screenshot_dir,filepart,screenshot_index);
+    }
+
+    screenshot_index++;
+    if (!file_exists(filename)) {
       available_filename = 1;
     }
   }
@@ -644,7 +650,7 @@ void make_next_screenshot_filename()
 // workaround is this horrible hack of saving the bmp -> load bmp -> save png
 void x_take_screenshot() {
   make_next_screenshot_filename();
-
+  printf("Screenshot! --->  %s\n", screenshot_filename);
   SDL_Surface *sshot = SDL_CreateRGBSurface(0, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
   SDL_LockSurface(sshot);
   int read = SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_ARGB8888, sshot->pixels, sshot->pitch);

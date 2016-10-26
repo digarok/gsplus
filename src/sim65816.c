@@ -28,6 +28,7 @@
 #include "debug.h"
 
 extern const char *g_config_gsplus_name_list[];
+extern char *g_config_gsplus_screenshot_dir;
 #ifdef UNDER_CE
   #define vsnprintf _vsnprintf
 #endif
@@ -1048,6 +1049,15 @@ gsplusmain(int argc, char **argv)
       printf("Using %s as configuration file\n", argv[i+1]);
       g_config_gsplus_name_list[0] = argv[i+1]; // super dangerous ?
       g_config_gsplus_name_list[1] = 0; // terminate string array
+      i++;
+    } else if (!strcmp("-ssdir", argv[i])) {  // screenshot directory passed
+      g_config_gsplus_screenshot_dir = argv[i+1];
+      struct stat path_stat;
+      int ret = stat(g_config_gsplus_screenshot_dir, &path_stat); // (weakly) validate path
+      if (!S_ISDIR(path_stat.st_mode)) {
+        strcpy(g_config_gsplus_screenshot_dir, "./");
+      }
+      printf("USING SCREEN PATH: %s\n", g_config_gsplus_screenshot_dir);
       i++;
     } else if(!strcmp("-debugport", argv[i])) {     // Debug port passed
         if((i+1) >= argc) {

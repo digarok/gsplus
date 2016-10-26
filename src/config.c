@@ -129,6 +129,7 @@ extern int g_key_down;
 extern const char g_gsplus_version_str[];
 int g_config_control_panel = 0;
 char g_config_gsplus_name[1024];
+char g_config_gsplus_screenshot_dir[1024];
 char g_cfg_cwd_str[CFG_PATH_MAX] = { 0 };
 
 int g_config_gsplus_auto_update = 1;
