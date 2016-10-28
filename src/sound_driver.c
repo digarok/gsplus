@@ -23,6 +23,7 @@
 
 #include "defc.h"
 #include "sound.h"
+#include "glog.h"
 
 #ifdef HPUX
 # include <sys/audio.h>
@@ -228,7 +229,7 @@ child_sound_playit(word32 tmp)
 		reliable_buf_write(g_childsnd_shm_addr, g_childsnd_pos, size);
 
 		if(g_sound_paused) {
-			printf("Unpausing sound, zb: %d\n", g_zeroes_buffered);
+			gloghead(); printf("Unpausing sound, zb: %d\n", g_zeroes_buffered);
 			g_sound_paused = 0;
 		}
 
@@ -244,7 +245,7 @@ child_sound_playit(word32 tmp)
 			reliable_zero_write(size);
 
 			if(g_zeroes_seen >= ZERO_PAUSE_NUM_SAMPS) {
-				printf("Pausing sound\n");
+				glog("Pausing sound");
 				g_sound_paused = 1;
 			}
 		}

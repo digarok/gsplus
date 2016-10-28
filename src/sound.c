@@ -266,7 +266,7 @@ sound_init()
 void
 sound_init_general()
 {
-  printf("SOUND INIT GENERAL\n");
+
 /* Workaround - gcc in cygwin wasn't defining _WIN32 */
 #if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__) && !defined(HAVE_SDL)
 	int	pid;

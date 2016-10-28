@@ -266,18 +266,21 @@ joystick_init()
 {
   int i;
   if( SDL_Init( SDL_INIT_JOYSTICK ) < 0 ) {
-      printf( "SDL could not initialize joystick! SDL Error: %s\n", SDL_GetError() );
+      gloghead(); printf( "SDL could not initialize joystick! SDL Error: %s\n", SDL_GetError() );
   } else {
-    printf( "SDL initialize joystick successfully.\n");
+    glog("SDL2 joystick initialized");
   }
   if (SDL_NumJoysticks()<1) {
-    printf ("No joysticks detected\n");
+    glog("No joysticks detected");
     SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-  }
-  gGameController = SDL_JoystickOpen( 0 );
-  if( gGameController == NULL ) {
-    printf( "Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError() );
-  }
+  } else {
+		// @todo: make controller configurable
+		// @todo: add multiple controller support
+	  gGameController = SDL_JoystickOpen( 0 );
+	  if( gGameController == NULL ) {
+	    gloghead(); printf( "Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError() );
+	  }
+	}
   g_joystick_native_type = 2;
   g_joystick_native_type1 = 2;
 	g_joystick_native_type2 = -1;

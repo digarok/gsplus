@@ -298,10 +298,10 @@ dev_video_init_sdl()
     // Check that the window was successfully created
     if (window == NULL) {
         // In the case that the window could not be made...
-        printf("Could not create window: %s\n", SDL_GetError());
+        gloghead(); printf("Could not create window: %s\n", SDL_GetError());
 				//@todo die, i guess
     } else {
-        printf("SDL Window has been created\n");
+        glog("SDL2 graphics initialized");
     }
 
 		// SET WINDOW ICON
@@ -320,7 +320,6 @@ dev_video_init_sdl()
     // The window is open: could enter program loop here (see SDL_PollEvent())
 
 		SDL_ShowCursor(SDL_DISABLE);
-
 }
 
 

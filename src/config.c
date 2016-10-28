@@ -872,7 +872,7 @@ config_load_roms()
 		return;
 	}
 
-	printf("Read: %d bytes of ROM\n", ret);
+	gloghead(); printf("Read: %d bytes of ROM\n", ret);
 	if(ret != len) {
 		fatal_printf("errno: %d\n", errno);
 		g_config_control_panel = 1;
@@ -1033,7 +1033,7 @@ config_parse_config_gsplus_file()
 	int	ret;
 	int	i;
 
-	printf("Parsing configuration file\n");
+	glog("Parsing configuration file");
 
 	clk_bram_zero();
 

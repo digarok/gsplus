@@ -26,6 +26,7 @@
 #include "printer.h"
 #include "imagewriter.h"
 #include "debug.h"
+#include "glog.h"
 
 extern const char *g_config_gsplus_name_list[];
 extern char *g_config_gsplus_screenshot_dir;
@@ -893,7 +894,7 @@ memory_ptr_init()
 	*/
 	g_memory_ptr = memalloc_align(mem_size, 256, &g_memory_alloc_ptr);
 
-	printf("RAM size is 0 - %06x (%.2fMB)\n", mem_size,
+	gloghead(); printf("RAM size is 0 - %06x (%.2fMB)\n", mem_size,
 		(double)mem_size/(1024.0*1024.0));
 }
 
@@ -919,6 +920,16 @@ char g_display_env[512];
 int	g_force_depth = -1;
 int	g_screen_depth = 8;
 
+void banner() {
+
+  printf("\x1b[32m  _______  _______    _ \x1b[0m  \n");
+  printf("\x1b[32m |   ____||  _____| _| |_ \x1b[0m  \n");
+  printf("\x1b[33m |  |  __ | |_____ |_   _| \x1b[0m  \n");
+  printf("\x1b[31m |  | |  ||_____  |  |_|\x1b[0m  \n");
+  printf("\x1b[35m |  |__| | _____| | \x1b[0m  \n");
+  printf("\x1b[34m |_______||_______| \x1b[0m  \n\n");
+  printf("\x1b[37m    GSplus v0.12s \x1b[0m  \n\n");
+}
 
 int
 gsplusmain(int argc, char **argv)
@@ -929,12 +940,11 @@ gsplusmain(int argc, char **argv)
 	int	i;
 	char	*final_arg = 0;
 
+  // just for fun
+  banner();
 	// OG Restoring globals
 	sim65816_initglobals();
 	moremem_init();
-
-//OG Disabling argument parsing
-#ifndef ACTIVEGS
 
 	/* parse args */
 	for(i = 1; i < argc; i++) {
@@ -1009,7 +1019,6 @@ gsplusmain(int argc, char **argv)
 			printf("Setting Verbose = 0x%03x\n", tmp1);
 			Verbose = tmp1;
 			i++;
-#ifndef __NeXT__
 		} else if(!strcmp("-display", argv[i])) {
 			if((i+1) >= argc) {
 				printf("Missing argument\n");
@@ -1019,7 +1028,6 @@ gsplusmain(int argc, char **argv)
 			sprintf(g_display_env, "DISPLAY=%s", argv[i+1]);
 			putenv(&g_display_env[0]);
 			i++;
-#endif
 		} else if(!strcmp("-noshm", argv[i])) {
 			printf("Not using X shared memory\n");
 			g_use_shmem = 0;
@@ -1076,7 +1084,7 @@ gsplusmain(int argc, char **argv)
 			}
 		}
 	}
-#endif
+
 	check_engine_asm_defines();
 	fixed_memory_ptrs_init();
 
@@ -1322,7 +1330,7 @@ setup_gsplus_file(char *outname, int maxlen, int ok_if_missing,
 			strcpy(outname, &(local_path[0]));
 			strncat(outname, *cur_name_ptr, 255-strlen(outname));
 			if(!ok_if_missing) {
-				printf("Trying '%s'\n", outname);
+				gloghead(); printf("Trying '%s'\n", outname);
 			}
 			ret = stat(outname, &stat_buf);
 			if(ret == 0) {
@@ -1341,7 +1349,7 @@ setup_gsplus_file(char *outname, int maxlen, int ok_if_missing,
 
 	/* couldn't find it, print out all the attempts */
 	path_ptr = save_path_ptr;
-	fatal_printf("Could not find required file \"%s\" in any of these "
+	gloghead(); fatal_printf("Could not find required file \"%s\" in any of these "
 						"directories:\n", *name_ptr);
 	while(*path_ptr) {
 		fatal_printf("  %s\n", *path_ptr++);
@@ -2714,14 +2722,14 @@ fatal_printf(const char *fmt, ...)
 	if(g_fatal_log < 0) {
 		g_fatal_log = 0;
 	}
-	ret = gsport_vprintf(fmt, ap);
+	ret = gsplus_vprintf(fmt, ap);
 	va_end(ap);
 
 	return ret;
 }
 
 int
-gsport_vprintf(const char *fmt, va_list ap)
+gsplus_vprintf(const char *fmt, va_list ap)
 {
 	char	*bufptr, *buf2ptr;
 	int	len;

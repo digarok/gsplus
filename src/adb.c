@@ -1653,19 +1653,19 @@ adb_increment_speed()
 	str = "";
 	switch(g_limit_speed) {
 	case 0:
-		str = "...as fast as possible!";
+		str = "...  as fast as possible!";
 		break;
 	case 1:
-		str = "...1.024MHz!";
+		str = "...  1.024MHz";
 		break;
 	case 2:
-		str = "...2.8MHz!";
+		str = "...  2.8MHz";
 		break;
 	case 3:
-		str = "...8.0MHz!";
+		str = "...  8.0MHz";
 		break;
 	}
-	printf("Toggling g_limit_speed to %d%s\n", g_limit_speed, str);
+	gloghead(); printf("Setting g_limit_speed = %d  %s\n", g_limit_speed, str);
 }
 
 void
@@ -1731,7 +1731,7 @@ adb_physical_key_update(int a2code, int is_up)
 	/* Only process reset requests here */
 	if(is_up == 0 && a2code == 0x7f && CTRL_DOWN) {
 		/* Reset pressed! */
-		printf("Reset pressed since CTRL_DOWN: %d\n", CTRL_DOWN);
+		gloghead(); printf("Reset pressed since CTRL_DOWN: %d\n", CTRL_DOWN);
 		do_reset();
 		return;
 	}
@@ -1740,7 +1740,7 @@ adb_physical_key_update(int a2code, int is_up)
 		switch(special) {
 		case 0x04: /* F4 - emulator config panel */
       if (CMD_DOWN) {
-          printf("Quit!\n");
+          glog("Quit!");
           iwm_shut();
           my_exit(1);
       }
@@ -1765,7 +1765,7 @@ adb_physical_key_update(int a2code, int is_up)
 			break;
 		case 0x07: /* F7 - fast disk emul */
 			g_fast_disk_emul = !g_fast_disk_emul;
-			printf("g_fast_disk_emul is now %d\n",
+			gloghead(); printf("g_fast_disk_emul is now %d\n",
 							g_fast_disk_emul);
 			break;
 		case 0x08: /* F8 - warp pointer */
@@ -1778,11 +1778,11 @@ adb_physical_key_update(int a2code, int is_up)
 		case 0x09: /* F9 - swap paddles */
 			if(SHIFT_DOWN) {
 				g_swap_paddles = !g_swap_paddles;
-				printf("Swap paddles is now: %d\n",
+				gloghead(); printf("Swap paddles is now: %d\n",
 							g_swap_paddles);
 			} else {
 				g_invert_paddles = !g_invert_paddles;
-				printf("Invert paddles is now: %d\n",
+				gloghead(); printf("Invert paddles is now: %d\n",
 							g_invert_paddles);
 			}
 			break;

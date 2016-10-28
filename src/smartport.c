@@ -22,6 +22,7 @@
 */
 
 #include "defc.h"
+#include "glog.h"
 
 extern int Verbose;
 extern int Halt_on;
@@ -552,7 +553,7 @@ do_read_c7(int unit_num, word32 buf, int blk)
 	image_start = iwm.smartport[unit_num].image_start;
 	image_size = iwm.smartport[unit_num].image_size;
 	if(!file) {
-		printf("c7_file is null!\n");
+		glog("Trying mapped file to $C7xx, but it's null!");
 #if 0
 		if(blk != 2 && blk != 0) {
 			/* don't print error if only reading directory */
@@ -785,7 +786,9 @@ do_c700(word32 ret)
 	engine.kpc = 0x801;
 
 	if(ret != 0) {
-		printf("Failure reading boot disk in s7d1!\n");
+		glog("Failure reading boot disk in s7d1!");
+		glog("- Press <F4> to enter config menu, or edit your config file");
+		glog("- if you intended to use slot slot 7.");
 		engine.kpc = 0xff59;	/* Jump to monitor, fix $36-$39 */
 	}
 }

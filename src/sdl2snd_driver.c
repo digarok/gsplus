@@ -19,7 +19,7 @@
 
 #include "SDL.h"
 #include "defc.h"
-
+#include "glog.h"
 #include "sound.h"
 #include <assert.h>
 extern word32	*g_sound_shm_addr;
@@ -39,12 +39,11 @@ static int g_zeroes_seen;
 
 void sdlsnd_init(word32 *shmaddr)
 {
-  printf("sdlsnd_init\n");
   if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-		printf("Cannot initialize SDL audio\n");
+		glog("Could not initialize SDL2 audio");
 		g_audio_enable = 0;
 	} else {
-		printf("SDL AUDIO INITIALIZED\n");
+		glog("SDL2 audio initialized");
 	}
 
   child_sound_loop(-1, -1, shmaddr);
@@ -86,12 +85,12 @@ sound_write_sdl(int real_samps, int size)
         SDL_UnlockAudio();
     }
     if(g_sound_paused && (g_playbuf_buffered > 0)) {
-        printf("Unpausing sound, %d buffered\n",g_playbuf_buffered);
+        gloghead(); printf("Unpausing sound, %d buffered\n",g_playbuf_buffered);
         g_sound_paused = 0;
         SDL_PauseAudio(0);
     }
     if(!g_sound_paused && (g_playbuf_buffered <= 0)) {
-        printf("Pausing sound\n");
+        glog("Pausing sound");
         g_sound_paused = 1;
         SDL_PauseAudio(1);
     }
@@ -179,7 +178,7 @@ sound_init_device_sdl()
         goto snd_error;
     g_playbuf_buffered = 0;
 
-    printf ("Sound shared memory size=%d\n",
+    gloghead(); printf("Sound shared memory size=%d\n",
             SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);
 
     g_sound_shm_addr = malloc(SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);

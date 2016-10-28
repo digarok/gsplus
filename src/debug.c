@@ -10,6 +10,7 @@
 #include <string.h>
 #include "defc.h"
 #include "debug.h"
+#include "glog.h"
 
 // DISASSEMBLER STUFF
 enum {
@@ -756,14 +757,14 @@ void debug_init()
 {
   if (g_dbg_enable_port > 0) {
     // g_dbg_enable_port should be enabled by
-    printf("Debug port enabled on: %d\n", g_dbg_enable_port);
+    gloghead(); printf("Debug port enabled on: %d\n", g_dbg_enable_port);
     debug_setup_socket();
     debug_server_poll();
     debug_wait_hello();
     // message is not popped off here because default behavior to send our cpu hello info to client
   } else {
     end_server = TRUE;
-    printf("Debug port not enabled\n");
+    glog("Debug port not enabled");
   }
 }
 
