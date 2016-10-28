@@ -23,11 +23,15 @@ package-ubuntu-x:
   stage: package
   script:
     - cp src/config.txt .
+    - cp COPYING.txt doc/
   artifacts:
     paths:
       - gsplusx
       - config.txt
       - doc/gsplusmanual.txt
+      - doc/gsplusmanual.pdf
+      - doc/COPYING.txt
+
 
 
 build-ubuntu-sdl:
@@ -60,11 +64,16 @@ package-ubuntu-sdl2:
   tags:
     - ubuntu
   stage: package
+  script:
+    - cp src/config.txt .
+    - cp COPYING.txt doc/
   artifacts:
     paths:
       - gsplus
-
-
+      - config.txt
+      - doc/gsplusmanual.txt
+      - doc/gsplusmanual.pdf
+      - doc/COPYING.txt
 
 
 build-osx:
@@ -112,13 +121,16 @@ package-win32:
   tags:
     - windows
   stage: package
+  script:
+    - cp src/config.txt .
+    - cp COPYING.txt doc/
   artifacts:
     paths:
       - gsplus32.exe
-
-
-
-
+      - config.txt
+      - doc/gsplusmanual.txt
+      - doc/gsplusmanual.pdf
+      - doc/COPYING.txt
 
 
 build-win-sdl:
@@ -139,6 +151,13 @@ package-win-sdl:
   tags:
     - windows
   stage: package
+  script:
+    - cp src/config.txt .
+    - cp COPYING.txt doc/
   artifacts:
     paths:
       - gsplus.exe
+      - config.txt
+      - doc/gsplusmanual.txt
+      - doc/gsplusmanual.pdf
+      - doc/COPYING.txt
