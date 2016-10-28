@@ -124,6 +124,10 @@ package-win32:
   script:
     - cp src/config.txt .
     - cp COPYING.txt doc/
+    - cp /bin/cyggcc_s-1.dll .
+    - cp /bin/cygstdc++-6.dll	.
+    - cp /bin/cygwin1.dll .
+
   artifacts:
     paths:
       - gsplus32.exe
@@ -131,6 +135,9 @@ package-win32:
       - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
       - doc/COPYING.txt
+      - cyggcc_s-1.dll
+      - cygstdc++-6.dll
+      - cygwin1.dll
 
 
 build-win-sdl:
@@ -154,6 +161,10 @@ package-win-sdl:
   script:
     - cp src/config.txt .
     - cp COPYING.txt doc/
+    - cp /bin/cyggcc_s-1.dll .
+    - cp /bin/cygstdc++-6.dll	.
+    - cp /bin/cygwin1.dll .
+
   artifacts:
     paths:
       - gsplus.exe
@@ -161,3 +172,6 @@ package-win-sdl:
       - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
       - doc/COPYING.txt
+      - cyggcc_s-1.dll
+      - cygstdc++-6.dll
+      - cygwin1.dll
