@@ -22,7 +22,7 @@ package-ubuntu-x:
     - ubuntu
   stage: package
   script:
-    - cp config.txt ..
+    - cp src/config.txt ..
   artifacts:
     paths:
       - gsplusx
