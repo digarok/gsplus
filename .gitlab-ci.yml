@@ -12,6 +12,19 @@ build-ubuntu-x:
     - cd src
     - ln -s vars_x86linux_x11 vars
     - make clean ; make
+  artifacts:
+    paths:
+      - gsplusx
+    expire_in: 5 minutes
+
+package-ubuntu-x:
+  tags:
+    - ubuntu
+  stage: package
+  artifacts:
+    paths:
+      - gsplusx
+
 
 build-ubuntu-sdl:
   tags:
@@ -23,6 +36,8 @@ build-ubuntu-sdl:
     - ln -s vars_x86linux_sdl vars
     - make clean ; make
 
+
+
 build-ubuntu-sdl2:
   tags:
     - ubuntu
@@ -32,6 +47,19 @@ build-ubuntu-sdl2:
     - cd src
     - ln -s vars_x86linux_sdl2 vars
     - make clean ; make
+  artifacts:
+    paths:
+      - gsplus
+    expire_in: 5 minutes
+
+package-ubuntu-sdl2:
+  tags:
+    - ubuntu
+  stage: package
+  artifacts:
+    paths:
+      - gsplus
+
 
 
 
@@ -110,7 +138,3 @@ package-win-sdl:
   artifacts:
     paths:
       - gsplus.exe
-
-
-
-
