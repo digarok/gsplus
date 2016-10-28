@@ -27,6 +27,7 @@ package-ubuntu-x:
     paths:
       - gsplusx
       - config.txt
+      - doc/gsplusmanual.txt
 
 
 build-ubuntu-sdl:
