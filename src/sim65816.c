@@ -746,7 +746,7 @@ void my_exit(int ret)
 	end_screen();
 	imagewriter_close();
 	printer_close();
-	printf("exiting (ret=%d)\n",ret);
+	gloghead(); printf("exiting (ret=%d)\n",ret);
 	fatalExit(ret);
 }
 
@@ -928,7 +928,7 @@ void banner() {
   printf("\x1b[31m |  | |  ||_____  |  |_|\x1b[0m  \n");
   printf("\x1b[35m |  |__| | _____| | \x1b[0m  \n");
   printf("\x1b[34m |_______||_______| \x1b[0m  \n\n");
-  printf("\x1b[37m    GSplus v0.12s \x1b[0m  \n\n");
+  printf("\x1b[37m    GSplus v%s \x1b[0m  \n\n", g_gsplus_version_str);
 }
 
 int
@@ -1348,12 +1348,15 @@ setup_gsplus_file(char *outname, int maxlen, int ok_if_missing,
 	}
 
 	/* couldn't find it, print out all the attempts */
+  /*
 	path_ptr = save_path_ptr;
 	gloghead(); fatal_printf("Could not find required file \"%s\" in any of these "
 						"directories:\n", *name_ptr);
 	while(*path_ptr) {
 		fatal_printf("  %s\n", *path_ptr++);
 	}
+  */
+  gloghead(); fatal_printf("Could not find required file \"%s\"", *name_ptr);
 
 	if(can_create_file) {
 		// If we didn't find a file, pick a place to put it.

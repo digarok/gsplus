@@ -24,6 +24,7 @@
 #include <time.h>
 
 #include "defc.h"
+#include "glog.h"
 
 extern int Verbose;
 
@@ -3012,7 +3013,7 @@ void video_release_kimages();
 void
 end_screen()
 {
-	printf("In end_screen\n");
+	glog("Shutting down display");
 
 	// OG Free up allocated images
 	video_release_kimages();

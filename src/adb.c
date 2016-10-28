@@ -1578,7 +1578,7 @@ adb_read_c000()
 		/* got one */
 		if((g_kbd_read_no_update++ > 5) && (g_kbd_chars_buffered > 1)) {
 			/* read 5 times, keys pending, let's move it along */
-			printf("Read %02x %d times, tossing\n", g_kbd_buf[0],
+			gloghead(); printf("Read %02x %d times, tossing\n", g_kbd_buf[0],
 					g_kbd_read_no_update);
 			adb_access_c010();
 		}

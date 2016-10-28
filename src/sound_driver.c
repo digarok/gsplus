@@ -199,7 +199,7 @@ child_sound_playit(word32 tmp)
 	int	size;
 
 	size = tmp & 0xffffff;
-	printf("SIze: %d ",size);
+
 	if((tmp >> 24) == 0xa2) {
 		/* play sound here */
 

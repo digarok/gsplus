@@ -24,6 +24,7 @@
 #include "defc.h"
 #include <stdarg.h>
 #include "config.h"
+#include "glog.h"
 #include "imagewriter.h"
 #if defined(__OS2__)
 #include "arch\os2\src\dirport.h"
@@ -136,8 +137,7 @@ int g_config_gsplus_auto_update = 1;
 int g_config_gsplus_update_needed = 0;
 
 const char *g_config_gsplus_name_list[] = {
-		"config.txt", "config.gsport", "gsport_conf", ".config.gsport",
-		".gsplus", "config.gsplus",0
+		"config.txt", "config.gsp",0
 };
 
 int	g_highest_smartport_unit = -1;
@@ -1258,7 +1258,7 @@ config_write_config_gsplus_file()
 	int	slot, drive;
 	int	i;
 
-	printf("Writing configuration file to %s\n", g_config_gsplus_name);
+	gloghead(); printf("Writing configuration file to %s\n", g_config_gsplus_name);
 
 	fconf = fopen(g_config_gsplus_name, "w+");
 	if(fconf == 0) {
@@ -1524,22 +1524,22 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 	if(buf_2img[0] == '2' && buf_2img[1] == 'I' && buf_2img[2] == 'M' &&
 			buf_2img[3] == 'G') {
 		/* It's a 2IMG disk */
-		printf("Image named %s is in 2IMG format\n", dsk->name_ptr);
+		gloghead(); printf("Image named %s is in 2IMG format\n", dsk->name_ptr);
 		image_identified = 1;
 
 		if(buf_2img[12] == 0) {
-			printf("2IMG is in DOS 3.3 sector order\n");
+			glog("2IMG is in DOS 3.3 sector order");
 			dsk->image_type = DSK_TYPE_DOS33;
 		}
 		if(buf_2img[19] & 0x80) {
 			/* disk is locked */
-			printf("2IMG is write protected\n");
+			glog("2IMG is write protected");
 			dsk->write_prot = 1;
 			dsk->write_through_to_unix = 0;
 		}
 		if((buf_2img[17] & 1) && (dsk->image_type == DSK_TYPE_DOS33)) {
 			dsk->vol_num = buf_2img[16];
-			printf("Setting DOS 3.3 vol num to %d\n", dsk->vol_num);
+			gloghead(); printf("Setting DOS 3.3 vol num to %d\n", dsk->vol_num);
 		}
 		//	Some 2IMG archives have the size byte reversed
 		size = (buf_2img[31] << 24) + (buf_2img[30] << 16) +
@@ -1563,8 +1563,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 				(buf_2img[0x42] << 8) + buf_2img[0x43];
 		if((size >= (exp_size + 0x54)) && (tmp == exp_size)) {
 			/* It's diskcopy since data size field matches */
-			printf("Image named %s is in Mac diskcopy format\n",
-								dsk->name_ptr);
+			gloghead(); printf("Image named %s is in Mac diskcopy format\n", dsk->name_ptr);
 			image_identified = 1;
 			dsk->image_start += 0x54;
 			dsk->image_size = exp_size;
@@ -1637,7 +1636,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 			nibs = len;
 		}
 		if(size != 35*len) {
-			fatal_printf("Disk 5.25 error: size is %d, not 140K.  "
+			gloghead(); fatal_printf("Disk 5.25 error: size is %d, not 140K.  "
 				"Will try to mount anyway\n", size, 35*len);
 		}
 		for(i = 0; i < 35; i++) {
@@ -1726,7 +1725,7 @@ eject_disk(Disk *dsk)
 
 	iwm_flush_disk_to_unix(dsk);
 
-	printf("Ejecting disk: %s\n", dsk->name_ptr);
+	gloghead(); printf("Ejecting disk: %s\n", dsk->name_ptr);
 
 	/* Free all memory, close file */
 
@@ -3176,7 +3175,7 @@ cfg_file_handle_key(int key)
 		}
 		break;
 	case 0x0d:	/* return */
-		printf("handling return press\n");
+		glog("Selected disk image file");
 		cfg_file_selected();
 		break;
 	case 0x09:	/* tab */
