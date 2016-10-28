@@ -12,17 +12,17 @@ build-ubuntu-x:
     - cd src
     - ln -s vars_x86linux_x11 vars
     - make clean ; make
-    - cp config.txt ..
   artifacts:
     paths:
       - gsplusx
-      - config.txt
     expire_in: 5 minutes
 
 package-ubuntu-x:
   tags:
     - ubuntu
   stage: package
+  script:
+    - cp config.txt ..
   artifacts:
     paths:
       - gsplusx
