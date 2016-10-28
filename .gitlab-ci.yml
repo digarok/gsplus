@@ -21,12 +21,10 @@ package-ubuntu-x:
   tags:
     - ubuntu
   stage: package
-  script:
-    - cp config.txt ..
   artifacts:
     paths:
       - gsplusx
-      - config.txt
+      - src/config.txt
 
 
 build-ubuntu-sdl:
