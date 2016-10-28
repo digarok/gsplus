@@ -16,3 +16,10 @@ gsport
 *.exe
 
 *.gsp
+
+# Storage for many disk images for testing the emulator.  
+# Games, demos, apps, etc.  Not part of the project.
+images/
+
+# Screenshot dir
+screens/
