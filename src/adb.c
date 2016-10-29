@@ -24,6 +24,7 @@
 /* adb_mode bit 3 and bit 2 (faster repeats for arrows and space/del) not done*/
 
 #include "adb.h"
+#include "glog.h"
 
 int g_fullscreen = 0;
 
