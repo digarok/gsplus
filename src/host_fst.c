@@ -24,7 +24,8 @@
 
 #ifdef _WIN32
 #include <io.h>
-#define ftruncate(a,b) _chsize(a,b)
+#include <sys/xattr.h>
+//#define ftruncate(a,b) _chsize(a,b)
 #endif
 
 #ifndef XATTR_FINDERINFO_NAME
@@ -368,7 +369,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 		finder_info_to_filetype(fi->finder_info, &fi->file_type, &fi->aux_type);
 	}
 }
-#elif defined _WIN32
+#elif defined _WIN32_old
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	struct stat st;
@@ -391,7 +392,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 
 }
-#elif defined __sun
+#elif defined(__sun)
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	struct stat st;
@@ -417,7 +418,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 		close(fd);
 	}
 }
-#elif defined __linux__
+#elif defined(__linux__) || defined(_WIN32)
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	ssize_t tmp;
@@ -426,7 +427,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 	fi->resource_eof = tmp;
 	fi->resource_blocks = (tmp + 511) / 512;
 
-	tmp = getxattr(path, "user.apple.FinderInfo", fi->finder_info, 32, 0, 0);
+	tmp = getxattr(path, "user.apple.FinderInfo", fi->finder_info, 32);
 	if (tmp == 16 || tmp == 32){
 		fi->has_fi = 1;
 
@@ -533,7 +534,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	if (i) ok = setattrlist(path, &list, dates, i * sizeof(struct timespec), 0);
 	return 0;
 }
-#elif defined _WIN32
+#elif defined _WIN32_old
 
 
 static void UnixTimeToFileTime(time_t t, LPFILETIME pft)
@@ -591,7 +592,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	return 0;
 }
 
-#elif defined __sun
+#elif defined(__sun) 
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
 	if (fi->has_fi && fi->storage_type != 0x0d) {
@@ -602,7 +603,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	}
 
 	if (fi->modified_date) {
-
+/*
 		struct timeval times[2];
 
 		memset(times, 0, sizeof(times));
@@ -610,13 +611,13 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 
 		times[0] = 0; // access
 		times[1].tv_sec = fi.modified_date; // modified
-
+*/
 		int ok = utimes(path);
 		if (ok < 0) return map_errno();
 	}
 	return 0;
 }
-#elif defined __linux__
+#elif defined(__linux__) || defined(_WIN32)
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
 	if (fi->has_fi && fi->storage_type != 0x0d) {
@@ -625,7 +626,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	}
 
 	if (fi->modified_date) {
-
+/*
 		struct timeval times[2];
 
 		memset(times, 0, sizeof(times));
@@ -633,7 +634,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 
 		times[0] = 0; // access
 		times[1].tv_sec = fi.modified_date; // modified
-
+*/
 		int ok = utimes(path);
 		if (ok < 0) return map_errno();
 	}
@@ -1831,7 +1832,7 @@ static word32 fst_get_eof(int class) {
 
 	if (S_ISREG(e->st_mode)) {
 
-#if _WIN32
+#if _WIN32_old
 		eof = filelength(fd);
 		if (eof == -1) return map_errno();
 #else
