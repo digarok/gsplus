@@ -135,7 +135,7 @@ int g_config_gsport_auto_update = 1;
 int g_config_gsport_update_needed = 0;
 
 const char *g_config_gsport_name_list[] = {
-		"config.txt", "config.gsport", "gsport_conf", ".config.gsport", 0
+		"gsplus_config.txt", "config.txt", 0
 };
 
 int	g_highest_smartport_unit = -1;

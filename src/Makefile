@@ -51,14 +51,14 @@ gsplusfb: $(OBJECTS) compile_time.o
 	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)
 	echo $(OBJECTS)
 	mv gsplusfb ..
-	cp -f ../config.template ../config.txt 
+	cp -f ../config.template ../gsplus_config.txt 
 
 # Mingw32 (native windows) / Cygwin builds:
 gsplus.exe: $(OBJECTS) compile_time.o
 	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
 	mkdir -p ../GSplus.app/lib
 	cp -f gsplus.exe ../GSplus.app/GSplus.exe
-	cp -f ../config.template ../GSplus.app/config.txt
+	cp -f ../config.template ../GSplus.app/gsplus_config.txt
 	cp -f ../lib/*.ttf ../GSplus.app/lib
 	cp -f ../lib/arch/win32/*.dll ../GSplus.app
 	cp -f ../lib/NoBoot.po ../GSplus.app
@@ -89,7 +89,7 @@ gsportmac: $(OBJECTS) compile_time.o
 	cp -f parallel.rom ../GSportDmg/GSport
 	cp -f ../lib/NoBoot.po ../GSportDmg/GSport
 	mv ../GSport.app ../GSportDmg/GSport
-	cp -f ../config.template ../GSportDmg/GSport/config.txt
+	cp -f ../config.template ../GSportDmg/GSport/gsplus_config.txt
 	cp ../GSport.html ../GSportDmg/GSport/GSport.html
 	arch/mac/makedmg.sh .. GSportDmg GSport GSport 7
 

@@ -1317,9 +1317,9 @@ setup_gsport_file(char *outname, int maxlen, int ok_if_missing,
 		// If we didn't find a file, pick a place to put it.
 		// Default is the current working directory.
 #ifdef MAC
-		gsport_expand_path(&(local_path[0]), "${0}/../config.txt", 250);
+		gsport_expand_path(&(local_path[0]), "${0}/../gsplus_config.txt", 250);
 #else
-		gsport_expand_path(&(local_path[0]), "${PWD}/config.txt", 250);
+		gsport_expand_path(&(local_path[0]), "${PWD}/gsplus_config.txt", 250);
 #endif
 		strcpy(outname, &(local_path[0]));
 		// Ask user if it's OK to create the file (or just create it)
