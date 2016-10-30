@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
+#include <time.h>
 
 #include "defc.h"
 #include "gsos.h"
@@ -19,6 +20,11 @@
 #include <sys/xattr.h>
 #include <sys/attr.h>
 #include <sys/paths.h>
+#endif
+
+#ifdef __linux__
+#include <sys/xattr.h>
+
 #endif
 
 
@@ -151,6 +157,8 @@ static word32 map_errno() {
 			return pathNotFound;
 		case ENOMEM:
 			return outOfMem;
+		case EEXIST:
+			return dupPathname;
 		default:
 			return drvrIOError;
 	}
@@ -533,7 +541,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	if (i) ok = setattrlist(path, &list, dates, i * sizeof(struct timespec), 0);
 	return 0;
 }
-#elif definde _WIN32
+#elif defined _WIN32
 
 
 static void UnixTimeToFileTime(time_t t, LPFILETIME pft)
