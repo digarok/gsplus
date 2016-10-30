@@ -2685,14 +2685,21 @@ do_mvn(word32 banks)
 }
 #endif
 
+extern void host_fst(void);
+
 void
 do_wdm(word32 arg)
 {
 	switch(arg) {
 	case 0x8d: /* Bouncin Ferno does WDM 8d */
 		break;
+
+	case 0xff: /* fst */
+		host_fst();
+		break;
+
 	default:
-		halt_printf("do_wdm: %02x!\n", arg);
+		halt_printf("do_wdm: %02x! pc = $%06x\n", arg, engine.kpc - 2);
 	}
 }
 

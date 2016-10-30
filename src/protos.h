@@ -59,6 +59,7 @@ word32 get_itimer(void);
 word32 get_memory_c(word32 addr, int cycs);
 word32 get_memory16_c(word32 addr, int cycs);
 word32 get_memory24_c(word32 addr, int cycs);
+word32 get_memory32_c(word32 addr, int cycs);
 
 int get_memory_asm(word32 addr, int cycs);
 int get_memory16_asm(word32 addr, int cycs);
@@ -69,6 +70,7 @@ int get_memory16_act_stub_asm(word32 addr, int cycs);
 void set_memory_c(word32 addr, word32 val, int cycs);
 void set_memory16_c(word32 addr, word32 val, int cycs);
 void set_memory24_c(word32 addr, word32 val, int cycs);
+void set_memory32_c(word32 addr, word32 val, int cycs);
 
 int enter_engine(Engine_reg *ptr);
 void clr_halt_act(void);

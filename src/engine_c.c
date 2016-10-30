@@ -602,6 +602,23 @@ get_memory24_c(word32 addr, int cycs)
 			(get_memory_c(addr+2, (int)fcycs) << 16);
 }
 
+
+
+
+word32
+get_memory32_c(word32 addr, int cycs)
+{
+	double	fcycs;
+
+	fcycs = 0;
+	return get_memory_c(addr, (int)fcycs) +
+			(get_memory_c(addr+1, (int)fcycs) << 8) +
+			(get_memory_c(addr+2, (int)fcycs) << 16) +
+			(get_memory_c(addr+3, (int)fcycs) << 24);
+}
+
+
+
 void
 set_memory_c(word32 addr, word32 val, int cycs)
 {
@@ -641,6 +658,17 @@ set_memory24_c(word32 addr, word32 val, int cycs)
 	set_memory_c(addr + 1, val >> 8, 0);
 	set_memory_c(addr + 2, val >> 16, 0);
 }
+
+void
+set_memory32_c(word32 addr, word32 val, int cycs)
+{
+	set_memory_c(addr, val, 0);
+	set_memory_c(addr + 1, val >> 8, 0);
+	set_memory_c(addr + 2, val >> 16, 0);
+	set_memory_c(addr + 3, val >> 24, 0);
+}
+
+
 
 word32
 do_adc_sbc8(word32 in1, word32 in2, word32 psr, int sub)

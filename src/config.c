@@ -116,6 +116,9 @@ extern int g_win_show_console_request;
 extern int g_win_status_debug_request;
 #endif
 
+extern char *g_cfg_host_path;
+extern int g_cfg_host_read_only;
+
 extern int g_screen_index[];
 extern word32 g_full_refresh_needed;
 extern word32 g_a2_screen_buffer_changed;
@@ -233,6 +236,19 @@ Cfg_menu g_cfg_rom_menu[] = {
 { "Back to Main Config", g_cfg_main_menu, 0, 0, CFGTYPE_MENU },
 { 0, 0, 0, 0, 0 },
 };
+
+
+Cfg_menu g_cfg_host_menu[] = {
+{ "Host FST Configuration", g_cfg_host_menu, 0, 0, CFGTYPE_MENU },
+{ "Shared Host Folder", KNMP(g_cfg_host_path), CFGTYPE_STR },
+{ "Read Only,0,No,1,Yes", KNMP(g_cfg_host_read_only), CFGTYPE_INT },
+{ "", 0, 0, 0, 0 },
+{ "Back to Main Config", g_cfg_main_menu, 0, 0, CFGTYPE_MENU },
+{ 0, 0, 0, 0, 0 },
+};
+
+
+
 
 Cfg_menu g_cfg_serial_menu[] = {
 { "Serial Port Configuration", g_cfg_serial_menu, 0, 0, CFGTYPE_MENU },
@@ -376,6 +392,7 @@ Cfg_menu g_cfg_main_menu[] = {
 { "Disk Configuration", g_cfg_disk_menu, 0, 0, CFGTYPE_MENU },
 { "Joystick Configuration", g_cfg_joystick_menu, 0, 0, CFGTYPE_MENU },
 { "ROM File Selection", g_cfg_rom_menu, 0, 0, CFGTYPE_MENU },
+{ "HOST FST Configuration", g_cfg_host_menu, 0, 0, CFGTYPE_MENU },
 { "Serial Port Configuration", g_cfg_serial_menu, 0, 0, CFGTYPE_MENU },
 { "Ethernet Card Configuration", g_cfg_ethernet_menu, 0, 0, CFGTYPE_MENU },
 { "Parallel Card Configuration", g_cfg_parallel_menu, 0, 0, CFGTYPE_MENU },
