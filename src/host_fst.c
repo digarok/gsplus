@@ -15,7 +15,7 @@
 #include "gsos.h"
 #include "fst.h"
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
 #include <sys/xattr.h>
 #include <sys/attr.h>
 #include <sys/paths.h>
@@ -352,7 +352,7 @@ static int file_type_to_finder_info(byte *buffer, word16 file_type, word32 aux_t
 }
 
 
-#if defined __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	ssize_t tmp;
@@ -451,7 +451,7 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 	fi->create_date = st.st_ctime;
 	fi->modified_date = st.st_mtime;
 
-#if defined __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
 	fi->create_date = st.st_birthtime;
 #endif
 
@@ -497,7 +497,7 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 
 
-#if defined __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
 	int ok;
@@ -533,7 +533,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	if (i) ok = setattrlist(path, &list, dates, i * sizeof(struct timespec), 0);
 	return 0;
 }
-#elif definde _WIN32
+#elif defined _WIN32
 
 
 static void UnixTimeToFileTime(time_t t, LPFILETIME pft)
@@ -1315,7 +1315,7 @@ static int open_data_fork(const char *path, word16 *access, word16 *error) {
 	}
 	return fd;
 }
-#if defined __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
 static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	// os x / hfs/apfs don't need to specifically create a resource fork.
 	// or do they?
