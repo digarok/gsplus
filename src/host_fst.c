@@ -15,18 +15,23 @@
 #include "gsos.h"
 #include "fst.h"
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) 
 #include <sys/xattr.h>
 #include <sys/attr.h>
 #include <sys/paths.h>
 #endif
 
 
-#if defined(_WIN32) || defined(WIN_SDL)
+#if defined(_WIN32) || defined(WIN_SDL) 
 #include <io.h>
 #include <sys/xattr.h>
 //#define ftruncate(a,b) _chsize(a,b)
 #endif
+
+#if defined(__linux__)
+#include <time.h>
+#endif
+
 
 #ifndef XATTR_FINDERINFO_NAME
 #define XATTR_FINDERINFO_NAME "com.apple.FinderInfo"
@@ -452,7 +457,7 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 	fi->create_date = st.st_ctime;
 	fi->modified_date = st.st_mtime;
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) 
 	fi->create_date = st.st_birthtime;
 #endif
 
@@ -498,7 +503,7 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__)
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
 	int ok;
@@ -1316,7 +1321,7 @@ static int open_data_fork(const char *path, word16 *access, word16 *error) {
 	}
 	return fd;
 }
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) 
 static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	// os x / hfs/apfs don't need to specifically create a resource fork.
 	// or do they?
@@ -1356,7 +1361,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 
 
 }
-#elif defined(_WIN32) || defined(WIN_SDL) 
+#elif defined(_WIN32) || defined(WIN_SDL) || defined(__linux__)
 static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	char *rpath = append_string(path, ":" XATTR_RESOURCEFORK_NAME);
 
