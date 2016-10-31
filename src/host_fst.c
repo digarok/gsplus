@@ -22,7 +22,7 @@
 #endif
 
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(WIN_SDL)
 #include <io.h>
 #include <sys/xattr.h>
 //#define ftruncate(a,b) _chsize(a,b)
@@ -418,7 +418,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 		close(fd);
 	}
 }
-#elif defined(__linux__) || defined(_WIN32)
+#elif defined(__linux__) || defined(_WIN32) || defined(WIN_SDL)
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	ssize_t tmp;
@@ -617,7 +617,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	}
 	return 0;
 }
-#elif defined(__linux__) || defined(_WIN32)
+#elif defined(__linux__) || defined(_WIN32) || defined(WIN_SDL)
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
 	if (fi->has_fi && fi->storage_type != 0x0d) {
@@ -634,9 +634,9 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 
 		times[0] = 0; // access
 		times[1].tv_sec = fi.modified_date; // modified
-*/
 		int ok = utimes(path);
 		if (ok < 0) return map_errno();
+*/
 	}
 	return 0;
 }
@@ -1356,7 +1356,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 
 
 }
-#elif defined _WIN32
+#elif defined(_WIN32) || defined(WIN_SDL) 
 static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	char *rpath = append_string(path, ":" XATTR_RESOURCEFORK_NAME);
 
