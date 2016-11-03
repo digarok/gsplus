@@ -96,9 +96,11 @@ package-osx:
   script:
     - chmod +x make_dist_mac.sh
     - ./make_dist_mac.sh
+    - chmod +x make_dmg_mac.sh
+    - ./make_dmg_mac.sh
   artifacts:
     paths:
-      - gsplus-osx.tar.gz
+      - GSplus-Install.dmg
 
 
 

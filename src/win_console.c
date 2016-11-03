@@ -66,7 +66,7 @@ void get_cwd(LPTSTR buffer, int size)
 	hSelf = GetModuleHandle(NULL);
 	GetModuleFileName(hSelf,buffer,size);
 	PathRemoveFileSpec(buffer);
-	printf("Local directory: [%s]\n",buffer);
+	//printf("Local directory: [%s]\n",buffer);
 }
 
 void
@@ -160,8 +160,8 @@ main(int argc, char **argv)
 
 	// Create the window.
 	get_default_window_size(&size);
-	
-	HWND hwnd = CreateWindowEx(WS_EX_ACCEPTFILES, "gsport", "GSport - Apple //gs Emulator",
+
+	HWND hwnd = CreateWindowEx(WS_EX_ACCEPTFILES, "gsport", "GSplus - Apple //gs Emulator",
 		WS_TILED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		size.cx, size.cy,

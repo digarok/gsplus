@@ -2,8 +2,8 @@
 # sudo pip install pillow
 #  ^^ on mac osx
 from PIL import Image
-im = Image.open("gsp_icon_128.png") #Can be many different formats.
-#im = Image.open("gsp_icon_256.png") #Can be many different formats.
+#im = Image.open("gsp_icon_128.png") #Can be many different formats.
+im = Image.open("gsp_icon_256.png") #Can be many different formats.
 pix = im.load()
 print im.size #Get the width and hight of the image for iterating over
 width = im.size[0]
