@@ -181,7 +181,7 @@ adb_init()
 	for(i = 0; i < 128; i++) {
 		keycode = a2_key_to_ascii[i][0];
 		if(keycode != i) {
-			printf("ADB keycode lost/skipped: i=%x: keycode=%x\n",
+			gloghead(); printf("ADB keycode lost/skipped: i=%x: keycode=%x\n",
 				i, keycode);
 			my_exit(1);
 		}
@@ -497,14 +497,12 @@ adb_set_config(word32 val0, word32 val1, word32 val2)
 	new_mouse = val0 >> 4;
 	new_kbd = val0  & 0xf;
 	if(new_mouse != g_mouse_ctl_addr) {
-		printf("ADB config: mouse from %x to %x!\n",
-			g_mouse_ctl_addr, new_mouse);
+		gloghead(); printf("ADB config: mouse from %x to %x!\n", g_mouse_ctl_addr, new_mouse);
 		adb_error();
 		g_mouse_ctl_addr = new_mouse;
 	}
 	if(new_kbd != g_kbd_ctl_addr) {
-		printf("ADB config: kbd from %x to %x!\n",
-			g_kbd_ctl_addr, new_kbd);
+		gloghead(); printf("ADB config: kbd from %x to %x!\n", g_kbd_ctl_addr, new_kbd);
 		adb_error();
 		g_kbd_ctl_addr = new_kbd;
 	}
@@ -567,7 +565,7 @@ void
 adb_set_new_mode(word32 val)
 {
 	if(val & 0x03) {
-		printf("Disabling keyboard/mouse:%02x!\n", val);
+		gloghead(); printf("Disabling keyboard/mouse:%02x!\n", val);
 	}
 
 	if(val & 0xa2) {
