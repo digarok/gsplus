@@ -15,17 +15,23 @@
 #include "gsos.h"
 #include "fst.h"
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) 
 #include <sys/xattr.h>
 #include <sys/attr.h>
 #include <sys/paths.h>
 #endif
 
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(WIN_SDL) 
 #include <io.h>
-#define ftruncate(a,b) _chsize(a,b)
+#include <sys/xattr.h>
+//#define ftruncate(a,b) _chsize(a,b)
 #endif
+
+#if defined(__linux__)
+#include <time.h>
+#endif
+
 
 #ifndef XATTR_FINDERINFO_NAME
 #define XATTR_FINDERINFO_NAME "com.apple.FinderInfo"
@@ -368,7 +374,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 		finder_info_to_filetype(fi->finder_info, &fi->file_type, &fi->aux_type);
 	}
 }
-#elif defined _WIN32
+#elif defined _WIN32_old
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	struct stat st;
@@ -391,7 +397,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 
 }
-#elif defined __sun
+#elif defined(__sun)
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	struct stat st;
@@ -417,7 +423,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 		close(fd);
 	}
 }
-#elif defined __linux__
+#elif defined(__linux__) || defined(_WIN32) || defined(WIN_SDL)
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	ssize_t tmp;
@@ -426,7 +432,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 	fi->resource_eof = tmp;
 	fi->resource_blocks = (tmp + 511) / 512;
 
-	tmp = getxattr(path, "user.apple.FinderInfo", fi->finder_info, 32, 0, 0);
+	tmp = getxattr(path, "user.apple.FinderInfo", fi->finder_info, 32);
 	if (tmp == 16 || tmp == 32){
 		fi->has_fi = 1;
 
@@ -451,7 +457,7 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 	fi->create_date = st.st_ctime;
 	fi->modified_date = st.st_mtime;
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) 
 	fi->create_date = st.st_birthtime;
 #endif
 
@@ -497,7 +503,7 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__)
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
 	int ok;
@@ -533,7 +539,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	if (i) ok = setattrlist(path, &list, dates, i * sizeof(struct timespec), 0);
 	return 0;
 }
-#elif defined _WIN32
+#elif defined _WIN32_old
 
 
 static void UnixTimeToFileTime(time_t t, LPFILETIME pft)
@@ -591,7 +597,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	return 0;
 }
 
-#elif defined __sun
+#elif defined(__sun) 
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
 	if (fi->has_fi && fi->storage_type != 0x0d) {
@@ -602,7 +608,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	}
 
 	if (fi->modified_date) {
-
+/*
 		struct timeval times[2];
 
 		memset(times, 0, sizeof(times));
@@ -610,13 +616,13 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 
 		times[0] = 0; // access
 		times[1].tv_sec = fi.modified_date; // modified
-
+*/
 		int ok = utimes(path);
 		if (ok < 0) return map_errno();
 	}
 	return 0;
 }
-#elif defined __linux__
+#elif defined(__linux__) || defined(_WIN32) || defined(WIN_SDL)
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
 	if (fi->has_fi && fi->storage_type != 0x0d) {
@@ -625,7 +631,7 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	}
 
 	if (fi->modified_date) {
-
+/*
 		struct timeval times[2];
 
 		memset(times, 0, sizeof(times));
@@ -633,9 +639,9 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 
 		times[0] = 0; // access
 		times[1].tv_sec = fi.modified_date; // modified
-
 		int ok = utimes(path);
 		if (ok < 0) return map_errno();
+*/
 	}
 	return 0;
 }
@@ -1315,7 +1321,7 @@ static int open_data_fork(const char *path, word16 *access, word16 *error) {
 	}
 	return fd;
 }
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) 
 static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	// os x / hfs/apfs don't need to specifically create a resource fork.
 	// or do they?
@@ -1355,7 +1361,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 
 
 }
-#elif defined _WIN32
+#elif defined(_WIN32) || defined(WIN_SDL) || defined(__linux__)
 static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	char *rpath = append_string(path, ":" XATTR_RESOURCEFORK_NAME);
 
@@ -1831,7 +1837,7 @@ static word32 fst_get_eof(int class) {
 
 	if (S_ISREG(e->st_mode)) {
 
-#if _WIN32
+#if _WIN32_old
 		eof = filelength(fd);
 		if (eof == -1) return map_errno();
 #else
