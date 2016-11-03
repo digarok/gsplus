@@ -12,7 +12,8 @@ dylibbundler -od -b -x $DDIR/Contents/MacOS/gsplus -d $DDIR/Contents/libs/
 # files to include in dmg
 cp doc/gsplusmanual.pdf $DEXTRAS
 cp doc/gsplusmanual.txt $DEXTRAS
-cp doc/README.TXT $DEXTRAS
+cp doc/README.txt $DEXTRAS
+cp COPYING.txt $DEXTRAS
 
 #tar -cvzf gsplus-osx.tar.gz gsplus-osx/
 

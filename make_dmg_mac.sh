@@ -13,9 +13,10 @@ test -f GSplus-Install.dmg && rm GSplus-Install.dmg
   --icon GSplus.app 180 130 \
   --hide-extension GSplus.app \
   --app-drop-link 410 130 \
-  --icon README.TXT  160 330 \
-  --icon gsplusmanual.pdf  300 330 \
-  --icon gsplusmanual.txt  440 330 \
+  --icon README.txt  80 330 \
+  --icon gsplusmanual.pdf  220 330 \
+  --icon gsplusmanual.txt  360 330 \
+  --icon COPYING.txt  500 330 \
   GSplus-Install.dmg \
   ../gsplus-osx/
 cp GSplus-Install.dmg ..

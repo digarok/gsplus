@@ -71,6 +71,7 @@ package-ubuntu-sdl2:
     paths:
       - gsplus
       - config.txt
+      - doc/README.txt
       - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
       - doc/COPYING.txt
@@ -136,6 +137,7 @@ package-win32:
       - config.txt
       - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
+      - doc/README.txt
       - doc/COPYING.txt
       - cyggcc_s-1.dll
       - cygstdc++-6.dll
@@ -174,6 +176,7 @@ package-win-sdl:
       - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
       - doc/COPYING.txt
+      - doc/README.txt
       - cyggcc_s-1.dll
       - cygstdc++-6.dll
       - cygwin1.dll
