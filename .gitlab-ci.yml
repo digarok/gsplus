@@ -130,6 +130,7 @@ package-win32:
     - cp /bin/cyggcc_s-1.dll .
     - cp /bin/cygstdc++-6.dll	.
     - cp /bin/cygwin1.dll .
+    - cp /bin/cygfreetype-6.dll .
 
   artifacts:
     paths:
@@ -142,6 +143,7 @@ package-win32:
       - cyggcc_s-1.dll
       - cygstdc++-6.dll
       - cygwin1.dll
+      - cygfreetype-6.dll .
 
 
 build-win-sdl:
@@ -168,6 +170,7 @@ package-win-sdl:
     - cp /bin/cyggcc_s-1.dll .
     - cp /bin/cygstdc++-6.dll	.
     - cp /bin/cygwin1.dll .
+    - cp /bin/cygfreetype-6.dll .
 
   artifacts:
     paths:
@@ -180,3 +183,4 @@ package-win-sdl:
       - cyggcc_s-1.dll
       - cygstdc++-6.dll
       - cygwin1.dll
+      - cygfreetype-6.dll 
