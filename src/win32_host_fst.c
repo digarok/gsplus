@@ -2,7 +2,9 @@
  * host_fst.c
  */
 
-#define _BSD_SOURCE
+#define _WIN32_WINNT 0x0600 // vista+
+#include <Windows.h>
+#include <io.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -17,32 +19,6 @@
 #include "gsos.h"
 #include "fst.h"
 
-#if defined(__APPLE__) 
-#include <sys/xattr.h>
-#include <sys/attr.h>
-#include <sys/paths.h>
-#endif
-
-
-
-
-#if defined(__linux__)
-#include <sys/xattr.h>
-#include <sys/time.h>
-#endif
-
-
-#ifndef XATTR_FINDERINFO_NAME
-#define XATTR_FINDERINFO_NAME "com.apple.FinderInfo"
-#endif
-
-#ifndef XATTR_RESOURCEFORK_NAME
-#define XATTR_RESOURCEFORK_NAME "com.apple.ResourceFork"
-#endif
-
-#ifndef O_BINARY
-#define O_BINARY 0
-#endif
 
 extern Engine_reg engine;
 
@@ -75,44 +51,74 @@ struct directory {
 struct fd_entry {
 	struct fd_entry *next;
 	char *path;
-	int fd;
+	int cookie;
 	int type;
 	int access;
+	HANDLE handle;
 	struct directory *dir;
 };
 
+#pragma pack(push, 2)
+struct AFP_Info {
+	uint32_t magic;
+	uint32_t version;
+	uint32_t file_id;
+	uint32_t backup_date;
+	uint8_t finder_info[32];
+	uint16_t prodos_file_type;
+	uint32_t prodos_aux_type;
+	uint8_t reserved[6];
+};
+#pragma pack(pop)
 
-#define PSEUDO_FD_BASE 0x8000
+static void init_afp_info(struct AFP_Info *info) {
+	//static_assert(sizeof(AFP_Info) == 60, "Incorrect AFP_Info size");
+	memset(info, 0, sizeof(*info));
+	info->magic = 0x00504641;
+	info->version = 0x00010000;
+}
 
-static word32 pseudo_fds[32] = {};
+static BOOL verify_afp_info(struct AFP_Info *info) {
+	if (!info) return 0;
 
-static int pseudo_fd_alloc() {
+	if (info->magic != 0x00504641) return 0;
+	if (info->version != 0x00010000) return 0;
+
+	return 1;
+}
+
+
+#define COOKIE_BASE 0x8000
+
+static word32 cookies[32] = {};
+
+static int cookie_alloc() {
 	for (int i = 0; i < 32; ++i) {
-		word32 x = pseudo_fds[i];
+		word32 x = cookies[i];
 
 		for (int j = 0; j < 32; ++j, x >>= 1) {
 			if (x & 0x01) continue;
 
-			pseudo_fds[i] |= (1 << j);
-			return PSEUDO_FD_BASE + (i * 32 + j);
+			cookies[i] |= (1 << j);
+			return COOKIE_BASE + (i * 32 + j);
 		}
 	}
 	return -1;
 }
 
-static int pseudo_fd_free(int fd) {
-	if (fd < PSEUDO_FD_BASE) return -1;
-	fd -= PSEUDO_FD_BASE;
-	if (fd >= 32 *32) return -1;
+static int cookie_free(int cookie) {
+	if (cookie < COOKIE_BASE) return -1;
+	cookie -= COOKIE_BASE;
+	if (cookie >= 32 *32) return -1;
 
-	int chunk = fd / 32;
-	int offset = 1 << (fd % 32);
+	int chunk = cookie / 32;
+	int offset = 1 << (cookie % 32);
 
-	word32 x = pseudo_fds[chunk];
+	word32 x = cookies[chunk];
 
 	if ((x & offset) == 0) return -1;
 	x &= ~offset;
-	pseudo_fds[chunk] = x;
+	cookies[chunk] = x;
 	return 0;
 }
 
@@ -184,6 +190,14 @@ static char *append_string(const char *a, const char *b) {
 	return cp;
 }
 
+static char *gc_strdup(const char *src) {
+	if (!src) return "";
+	if (!*src) return "";
+	int len = strlen(src) + 1;
+	char *cp = gc_malloc(len);
+	memcpy(cp, src, len);
+	return cp;
+}
 
 
 static word32 map_errno() {
@@ -207,48 +221,77 @@ static word32 map_errno() {
 	}
 }
 
+static word32 map_last_error() {
+	DWORD e = GetLastError();
+	switch (e) {
+		case ERROR_NO_MORE_FILES:
+			return endOfDir;
+		case ERROR_FILE_NOT_FOUND:
+			return fileNotFound;
+		case ERROR_PATH_NOT_FOUND:
+			return pathNotFound;
+		case ERROR_INVALID_ACCESS:
+			return invalidAccess;
+		case ERROR_FILE_EXISTS:
+		case ERROR_ALREADY_EXISTS:
+			return dupPathname;
+		case ERROR_DISK_FULL:
+			return volumeFull;
+		case ERROR_INVALID_PARAMETER:
+			return paramRangeErr;
+		case ERROR_DRIVE_LOCKED:
+			return drvrWrtProt;
+		case ERROR_NEGATIVE_SEEK:
+			return outOfRange;
+		case ERROR_SHARING_VIOLATION:
+			return fileBusy; // destroy open file, etc.
+		case ERROR_DIR_NOT_EMPTY:
+			// ...
+		default:
+			fprintf(stderr, "GetLastError: %08lx - %ld\n", e, e);
+			return drvrIOError;
+	}
+}
 
-static struct fd_entry *find_fd(int fd) {
+static struct fd_entry *find_fd(int cookie) {
 	struct fd_entry *head = fd_head;
 
 	while(head) {
-		if (head->fd == fd) return head;
+		if (head->cookie == cookie) return head;
 		head = head->next;
 	}
 	return NULL;
 }
 
 
-static void dir_free(struct directory *dd);
-static struct directory *dir_alloc(DIR *dirp);
+static void free_directory(struct directory *dd);
+static void free_fd(struct fd_entry	*e) {
+	if (!e) return;
+	if (e->cookie) cookie_free(e->cookie);
+	if (e->handle != INVALID_HANDLE_VALUE) CloseHandle(e->handle);
+	if (e->dir) free_directory(e->dir);
+	free(e->path);
+	free(e);
+}
 
+static struct fd_entry *alloc_fd() {
+	struct fd_entry *e = calloc(sizeof(struct fd_entry), 1);
+	e->handle = INVALID_HANDLE_VALUE;
+	return e;
+}
 
-static word32 remove_fd(int fd) {
+static word32 remove_fd(int cookie) {
 	word32 rv = invalidRefNum;
 
 	struct fd_entry *prev = NULL;
 	struct fd_entry *head = fd_head;
 	while (head) {
-		if (head->fd == fd) {
+		if (head->cookie == cookie) {
 			if (prev) prev->next = head->next;
 			else fd_head = head->next;
 
+			free_fd(head);
 			rv = 0;
-
-			int ok = 0;
-			if (head->fd >= PSEUDO_FD_BASE) pseudo_fd_free(head->fd);
-			switch (head->type) {
-				case regular_file:
-				case resource_file:
-					ok = close(head->fd);
-					if (ok < 0) rv = map_errno();
-					break;
-				case directory_file:
-					dir_free(head->dir);
-					break;
-			}
-			free(head->path);
-			free(head);
 			break;
 		}
 		prev = head;
@@ -257,24 +300,6 @@ static word32 remove_fd(int fd) {
 	return rv;
 }
 
-
-static ssize_t safe_read(int fd, void *buffer, size_t count) {
-	for (;;) {
-		ssize_t ok = read(fd, buffer, count);
-		if (ok >= 0) return ok;
-		if (ok < 0 && errno == EINTR) continue;
-		return ok;
-	}
-}
-
-static ssize_t safe_write(int fd, const void *buffer, size_t count) {
-	for (;;) {
-		ssize_t ok = write(fd, buffer, count);
-		if (ok >= 0) return ok;
-		if (ok < 0 && errno == EINTR) continue;
-		return ok;
-	}
-}
 
 struct file_info {
 
@@ -416,68 +441,42 @@ static int file_type_to_finder_info(byte *buffer, word16 file_type, word32 aux_t
 }
 
 
-#if defined(__APPLE__)
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
-	ssize_t tmp;
-	tmp = getxattr(path, XATTR_RESOURCEFORK_NAME, NULL, 0, 0, 0);
-	if (tmp < 0) tmp = 0;
-	fi->resource_eof = tmp;
-	fi->resource_blocks = (tmp + 511) / 512;
+	HANDLE h;
 
-	tmp = getxattr(path, XATTR_FINDERINFO_NAME, fi->finder_info, 32, 0, 0);
-	if (tmp == 16 || tmp == 32){
-		fi->has_fi = 1;
+	char *p = append_string(path, ":AFP_Resource");
+	FILE_STANDARD_INFO fsi;
+	memset(&fsi, 0, sizeof(fsi));
 
-		finder_info_to_filetype(fi->finder_info, &fi->file_type, &fi->aux_type);
+	h = CreateFile(p, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (h != INVALID_HANDLE_VALUE) {
+		GetFileInformationByHandleEx(h, FileStandardInfo, &fsi, sizeof(fsi));
+
+		CloseHandle(h);
 	}
-}
-#elif defined(__sun)
-static void get_file_xinfo(const char *path, struct file_info *fi) {
+	fi->resource_eof = fsi.EndOfFile.LowPart;
+	fi->resource_blocks = (fsi.AllocationSize.LowPart + 511) / 512;
 
-	struct stat st;
 
-	// can't stat an xattr directly?
-	int fd;
-	fd = attropen(path, XATTR_RESOURCEFORK_NAME, O_RDONLY);
-	if (fd >= 0) {
-		if (fstat(fd, &st) == 0) {
-			fi->resource_eof = st.st_size;
-			fi->resource_blocks = st.st_blocks;
-		}
-		close(fd);
-	}
+	p = append_string(path, ":AFP_AfpInfo");
 
-	fd = attropen(path, XATTR_FINDERINFO_NAME, O_RDONLY);
-	if (fd >= 0) {
+	h = CreateFile(p, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (h != INVALID_HANDLE_VALUE) {
+		// ... todo....
+		/*
 		int tmp = read(fd, fi->finder_info, 32);
 		if (tmp == 16 || tmp == 32) {
 			fi->has_fi = 1;
 			finder_info_to_filetype(fi->finder_info, &fi->file_type, &fi->aux_type);
 		}
-		close(fd);
+		*/
+		CloseHandle(h);
 	}
-}
-#elif defined(__linux__)
-static void get_file_xinfo(const char *path, struct file_info *fi) {
 
-	ssize_t tmp;
-	tmp = getxattr(path, "user.apple.ResourceFork", NULL, 0);
-	if (tmp < 0) tmp = 0;
-	fi->resource_eof = tmp;
-	fi->resource_blocks = (tmp + 511) / 512;
 
-	tmp = getxattr(path, "user.apple.FinderInfo", fi->finder_info, 32);
-	if (tmp == 16 || tmp == 32){
-		fi->has_fi = 1;
-
-		finder_info_to_filetype(fi->finder_info, &fi->file_type, &fi->aux_type);
-	}
 }
-#else
-static void get_file_xinfo(const char *path, struct file_info *fi) {
-}
-#endif
 
 static word32 get_file_info(const char *path, struct file_info *fi) {
 	struct stat st;
@@ -491,11 +490,6 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 	fi->create_date = st.st_ctime;
 	fi->modified_date = st.st_mtime;
-
-#if defined(__APPLE__) 
-	fi->create_date = st.st_birthtime;
-#endif
-
 
 	fi->st_mode = st.st_mode;
 
@@ -538,106 +532,59 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 
 
-#if defined(__APPLE__)
-static word32 set_file_info(const char *path, struct file_info *fi) {
 
-	int ok;
-	struct attrlist list;
-	unsigned i = 0;
-	struct timespec dates[2];
-
-	if (fi->has_fi && fi->storage_type != 0x0d) {
-		ok = setxattr(path, XATTR_FINDERINFO_NAME, fi->finder_info, 32, 0, 0);
-		if (ok < 0) return map_errno(); 
-	}	
-
-
-	memset(&list, 0, sizeof(list));
-	memset(dates, 0, sizeof(dates));
-
-	list.bitmapcount = ATTR_BIT_MAP_COUNT;
-	list.commonattr  = 0;
-
-	if (fi->create_date)
-	{
-		dates[i++].tv_sec = fi->create_date;
-		list.commonattr |= ATTR_CMN_CRTIME;
+static void UnixTimeToFileTime(time_t t, LARGE_INTEGER *out)
+{
+	if (t) {
+		out->QuadPart = Int32x32To64(t, 10000000) + 116444736000000000;
+	} else {
+		out->QuadPart = 0;
 	}
 
-	if (fi->modified_date)
-	{
-		dates[i++].tv_sec = fi->modified_date;
-		list.commonattr |= ATTR_CMN_MODTIME;
-	}
-
-	ok = 0;
-	if (i) ok = setattrlist(path, &list, dates, i * sizeof(struct timespec), 0);
-	return 0;
 }
-#elif defined(__sun) 
+
+
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
 	if (fi->has_fi && fi->storage_type != 0x0d) {
-		int fd = attropen(path, XATTR_FINDERINFO_NAME, O_WRONLY | O_CREAT, 0666);
-		if (fd < 0) return map_errno();
-		write(fd, fi->finder_info, 32);
-		close(fd);
+		char *rpath = append_string(path, ":AFP_AfpInfo");
+
+		HANDLE h = CreateFile(rpath, GENERIC_READ | GENERIC_WRITE, 
+			FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (h == INVALID_HANDLE_VALUE) return map_last_error();
+
+		// todo -- verify format, update, ...
+		CloseHandle(h);
 	}
 
-	if (fi->modified_date) {
-		struct timeval times[2];
+	if (fi->create_date || fi->modified_date) {
+		// SetFileInformationByHandle can modify dates.
+		HANDLE h;
+		h = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (h == INVALID_HANDLE_VALUE) return map_last_error();
 
-		memset(times, 0, sizeof(times));
+		// just use FILETIME in the file_info if WIN32?
 
-		//times[0] = 0; // access
-		times[1].tv_sec = fi.modified_date; // modified
-		int ok = utimes(path, times);
-		if (ok < 0) return map_errno();
-	}
-	return 0;
-}
-#elif defined(__linux__)
-static word32 set_file_info(const char *path, struct file_info *fi) {
+		FILE_BASIC_INFO fbi;
+		memset(&fbi, 0, sizeof(fbi));
 
-	if (fi->has_fi && fi->storage_type != 0x0d) {
-		int ok = setxattr(path, "user.apple.FinderInfo", fi->finder_info, 32, 0);
-		if (ok < 0) return map_errno();
-	}
+		if (fi->create_date) {
+			UnixTimeToFileTime(fi->create_date, &fbi.CreationTime);
+		}
+		if (fi->modified_date) {
+			LARGE_INTEGER ft;
+			UnixTimeToFileTime(fi->modified_date, &ft);
+			fbi.ChangeTime = ft;
+			fbi.LastAccessTime = ft;
+			fbi.LastWriteTime = ft;
+		}
 
-	if (fi->modified_date) {
-		struct timeval times[2];
 
-		memset(times, 0, sizeof(times));
-
-		//times[0] = 0; // access
-		times[1].tv_sec = fi->modified_date; // modified
-		int ok = utimes(path, times);
-		if (ok < 0) return map_errno();
-	}
-	return 0;
-}
-
-#else
-
-static word32 set_file_info(const char *path, struct file_info *fi) {
-
-	if (fi->modified_date) {
-
-		struct timeval times[2];
-
-		memset(times, 0, sizeof(times));
-
-		times[0] = 0; // access
-		times[1].tv_sec = fi->modified_date; // modified
-
-		int ok = utimes(path, times);
-		if (ok < 0) return map_errno();
+		BOOL ok = SetFileInformationByHandle(h, FileBasicInfo, &fbi, sizeof(fbi));
+		CloseHandle(h);
 	}
 	return 0;
 }
-
-#endif
-
 
 /*
  * if this is an absolute path, verify and skip past :Host:
@@ -929,21 +876,10 @@ static word32 fst_shutdown(void) {
 	// close any remaining files.
 	struct fd_entry *head = fd_head;
 	while (head) {
-		struct fd_entry *tmp = head->next;
-		if (head->fd >= PSEUDO_FD_BASE) pseudo_fd_free(head->fd);
-		switch(head->type) {
-			case regular_file:
-			case resource_file:
-				if (head->fd >= 0 && head->fd < PSEUDO_FD_BASE)
-					close(head->fd);
-				break;
-			case directory_file:
-				dir_free(head->dir);
-				break;
-		}
-		free(head->path);
-		free(head);
-		head = tmp;
+		struct fd_entry *next = head->next;
+
+		free_fd(head);
+		head = next;
 	}
 	return 0;
 }
@@ -962,7 +898,7 @@ static word32 fst_startup(void) {
 
 	fst_shutdown();
 
-	memset(&pseudo_fds, 0, sizeof(pseudo_fds));
+	memset(&cookies, 0, sizeof(cookies));
 	if (stat(root, &st) < 0) {
 		fprintf(stderr, "%s does not exist\n", root);
 		return invalidFSTop;
@@ -1002,7 +938,6 @@ static word32 fst_create(int class, const char *path) {
 			fi.has_fi = 1;
 		}
 
-
 	} else {
 
 		fi.access = get_memory16_c(pb + CreateRec_fAccess, 0);
@@ -1017,17 +952,24 @@ static word32 fst_create(int class, const char *path) {
 	int ok;
 
 	if (fi.storage_type == 0x0d) {
-		ok = mkdir(path, 0777);
-		if (ok < 0) return map_errno();
+		ok = CreateDirectory(path, NULL);
+		if (!ok) return map_last_error();
 		return 0;
 	}
-	if (fi.storage_type <= 3) {
+	if (fi.storage_type <= 3 || fi.storage_type == 0x05) {
 		// normal file.
-		ok = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
-		if (ok < 0) return map_errno();
+		// 0x05 is an extended/resource file but we don't do anything special.
+		HANDLE h = CreateFile(path, 
+			GENERIC_WRITE, 
+			FILE_SHARE_READ | FILE_SHARE_WRITE, 
+			NULL, 
+			CREATE_NEW, 
+			FILE_ATTRIBUTE_NORMAL, 
+			NULL);
+		if (h == INVALID_HANDLE_VALUE) return map_last_error();
 		// set ftype, auxtype...
-		set_file_info(path, &fi);
-		close(ok);
+		set_file_info(path, &fi); // set_file_info_handle(...);
+		CloseHandle(h);
 
 		if (class) {
 			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, 1, 0);
@@ -1037,16 +979,7 @@ static word32 fst_create(int class, const char *path) {
 
 		return 0;
 	}
-	if (fi.storage_type == 0x05) {
-		// create an extended file... 
-		// doesn't do anything particular yet.
 
-		ok = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
-		if (ok < 0) return map_errno();
-		close(ok);
-		// set ftype, auxtype...
-		return 0;
-	}
 
 	if (fi.storage_type == 0x8005) {
 		// convert an existing file to an extended file.
@@ -1078,10 +1011,9 @@ static word32 fst_destroy(int class, const char *path) {
 		return badStoreType;
 	}
 
-	int ok = S_ISDIR(st.st_mode) ? rmdir(path) : unlink(path);
+	int ok = S_ISDIR(st.st_mode) ? RemoveDirectory(path) : DeleteFile(path);
 
-
-	if (ok < 0) return map_errno();
+	if (!ok) return map_last_error();
 	return 0;
 }
 
@@ -1269,47 +1201,116 @@ static word32 fst_clear_backup(int class, const char *path) {
 	return invalidFSTop;
 }
 
-
-static int open_directory(const char *path, struct directory **out, word16 *error) {
-
-	DIR *dirp = opendir(path);
-	if (!dirp) {
-		*error = map_errno();
-		return -1;
+static void free_directory(struct directory *dd) {
+	if (!dd) return;
+	for (int i = 0; i < dd->num_entries; ++i) {
+		free(dd->entries[i]);
 	}
-
-	struct directory *dd = dir_alloc(dirp);
-	closedir(dirp);
-	if (!dd) { *error = outOfMem; return -1; }
-	int fd = pseudo_fd_alloc();
-	if (fd < 0) {
-		*error = tooManyFilesOpen;
-		dir_free(dd);
-		dd = NULL;
-	}
-	*out = dd;
-	return fd;
+	free(dd);
 }
-static int open_data_fork(const char *path, word16 *access, word16 *error) {
 
-	int fd = -1;
+static int qsort_callback(const void *a, const void *b) {
+	return strcmp((const char *)a, (const char *)b);
+}
+
+/*
+ * exclude files from get_dir_entries.
+ *
+ */
+static int exclude_dir_entry(const char *name) {
+	if (!name[0]) return 1;
+	if (name[0] == '.') {
+		return 1;
+		/*
+		if (!strcmp(name, ".")) return 1;
+		if (!strcmp(name, "..")) return 1;
+		if (!strncmp(name, "._", 2)) return 1; // ._ resource fork
+		if (!strcmp(name, ".fseventsd")) return 1;
+		*/
+	}
+	return 0;
+}
+
+static struct directory *read_directory(const char *path, word16 *error) {
+	HANDLE h;
+	WIN32_FIND_DATA data;
+	struct directory *dd;
+	int capacity = 100;
+	int size = sizeof(struct directory) + capacity * sizeof(char *);
+
+	memset(&data, 0, sizeof(data));
+
+	char *p = append_path(path, "*");
+	h = FindFirstFile(p, &data);
+	if (h == INVALID_HANDLE_VALUE) {
+		*error = map_last_error();
+		return NULL;
+	}
+
+	dd = (struct directory *)malloc(size);
+	if (!dd) {
+		FindClose(h);
+		*error = outOfMem;
+		return NULL;
+	}
+	memset(dd, 0, size);
+	do {
+		if (exclude_dir_entry(data.cFileName)) continue;
+		if (dd->num_entries >= capacity) {
+			capacity += capacity;
+			size = sizeof(struct directory) + capacity * sizeof(char *);
+			struct directory * tmp = realloc(dd, size);
+			if (!tmp) {
+				*error = map_errno();
+				free_directory(dd);
+				FindClose(h);
+				return NULL;
+			}
+			dd = tmp;
+		}
+		dd->entries[dd->num_entries++] = strdup(data.cFileName);
+	} while (FindNextFile(h, &data) != 0);
+
+	//?
+	if (GetLastError() != ERROR_NO_MORE_FILES) *error = map_last_error();
+
+	FindClose(h);
+
+	// sort them....
+	qsort(dd->entries, dd->num_entries, sizeof(char *), qsort_callback);
+
+	return dd;
+}
+
+
+
+static HANDLE open_data_fork(const char *path, word16 *access, word16 *error) {
+
+	HANDLE h = INVALID_HANDLE_VALUE;
 	for (;;) {
 
+		DWORD wAccess = 0;
+		DWORD wShare = FILE_SHARE_READ;
+		DWORD wCreate = OPEN_EXISTING;
+
 		switch(*access) {
 			case readEnableAllowWrite:
 			case readWriteEnable:
-				fd = open(path, O_RDWR);
+				wAccess = GENERIC_READ | GENERIC_WRITE;
 				break;
 			case readEnable:
-				fd = open(path, O_RDONLY);
+				wAccess = GENERIC_READ;
 				break;
 			case writeEnable:
-				fd = open(path, O_WRONLY);
+				wAccess = GENERIC_WRITE;
 				break;
 		}
 
+		h = CreateFile(path, wAccess, wShare, NULL, wCreate, FILE_ATTRIBUTE_NORMAL, NULL);
+
+
 		if (*access == readEnableAllowWrite) {
-			if (fd < 0) {
+			if (h == INVALID_HANDLE_VALUE) {
 				*access = readEnable;
 				continue;
 			}
@@ -1317,41 +1318,44 @@ static int open_data_fork(const char *path, word16 *access, word16 *error) {
 		}
 		break;
 	}
-	if (fd < 0) {
-		*error = map_errno();
+	if (h == INVALID_HANDLE_VALUE) {
+		*error = map_last_error();
 	}
-	if (fd >= PSEUDO_FD_BASE) {
-		close(fd);
-		*error = tooManyFilesOpen; 
-		fd = -1;
-	}
-	return fd;
+	return h;
 }
-#if defined(__APPLE__) 
-static int open_resource_fork(const char *path, word16 *access, word16 *error) {
-	// os x / hfs/apfs don't need to specifically create a resource fork.
-	// or do they?
 
-	char *rpath = append_path(path, _PATH_RSRCFORKSPEC);
+static HANDLE open_resource_fork(const char *path, word16 *access, word16 *error) {
 
-	int fd = -1;
+	char *rpath = append_string(path, ":AFP_Resource");
+
+	HANDLE h = INVALID_HANDLE_VALUE;
 	for (;;) {
 
+		DWORD wAccess = 0;
+		DWORD wShare = FILE_SHARE_READ;
+		DWORD wCreate = 0;
+
 		switch(*access) {
 			case readEnableAllowWrite:
 			case readWriteEnable:
-				fd = open(rpath, O_RDWR | O_CREAT, 0666);
+				wAccess = GENERIC_READ | GENERIC_WRITE;
+				wCreate = OPEN_ALWAYS;
 				break;
 			case readEnable:
-				fd = open(rpath, O_RDONLY);
+				wAccess = GENERIC_READ;
+				wCreate = OPEN_EXISTING;
 				break;
 			case writeEnable:
-				fd = open(rpath, O_WRONLY | O_CREAT, 0666);
+				wAccess = GENERIC_WRITE;
+				wCreate = OPEN_ALWAYS;
 				break;
 		}
 
+		h = CreateFile(rpath, wAccess, wShare, NULL, wCreate, FILE_ATTRIBUTE_NORMAL, NULL);
+
+
 		if (*access == readEnableAllowWrite) {
-			if (fd < 0) {
+			if (h == INVALID_HANDLE_VALUE) {
 				*access = readEnable;
 				continue;
 			}
@@ -1359,78 +1363,12 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 		}
 		break;
 	}
-	if (fd < 0) {
-		*error = map_errno();
+	if (h == INVALID_HANDLE_VALUE) {
+		*error = map_last_error();
 	}
-	if (fd >= PSEUDO_FD_BASE) {
-		close(fd);
-		*error = tooManyFilesOpen; 
-		fd = -1;
-	}
-
-	return fd;
-
-
-
+	return h;
 }
-#elif defined __sun
-static int open_resource_fork(const char *path, word16 *access, word16 *error) {
-	int tmp = open(path, O_RDONLY);
-	if (tmp < 0) {
-		*error = map_errno();
-		return -1;
-	}
 
-	int fd = -1;
-	for(;;) {
-
-		switch(*access) {
-			case readEnableAllowWrite:
-			case readWriteEnable:
-				fd = openat(tmp, XATTR_RESOURCEFORK_NAME, O_RDWR | O_CREAT | O_XATTR, 0666);
-				break;
-			case readEnable:
-				fd = openat(tmp, XATTR_RESOURCEFORK_NAME, O_RDONLY | O_XATTR);
-				break;
-			case writeEnable:
-				fd = openat(tmp, XATTR_RESOURCEFORK_NAME, O_WRONLY | O_CREAT | O_XATTR, 0666);
-				break;
-		}
-
-		if (*access == readEnableAllowWrite) {
-			if (fd < 0) {
-				*access = readEnable;
-				continue;
-			}
-			*access = readWriteEnable;
-		}
-		break;
-	}
-
-	if (fd < 0) {
-		*error = map_errno();
-		close(tmp);
-		return -1;
-	}
-	close(tmp);
-	if (fd >= PSEUDO_FD_BASE) {
-		close(fd);
-		*error = tooManyFilesOpen; 
-		fd = -1;
-	}
-	return fd;
-}
-#elif defined __linux__
-static int open_resource_fork(const char *path, word16 *access, word16 *error) {
-	*error = resForkNotFound;
-	return -1;
-}
-#else
-static int open_resource_fork(const char *path, word16 *access, word16 *error) {
-	*error = resForkNotFound;
-	return -1;
-}
-#endif
 
 
 static word32 fst_open(int class, const char *path) {
@@ -1445,7 +1383,7 @@ static word32 fst_open(int class, const char *path) {
 	if (rv) return rv;
 
 
-	int fd;
+	HANDLE h = INVALID_HANDLE_VALUE;
 	int type = regular_file;
 	struct directory *dd = NULL;
 
@@ -1496,17 +1434,17 @@ static word32 fst_open(int class, const char *path) {
 	access = request_access;
 	switch(type) {
 		case regular_file:
-			fd = open_data_fork(path, &access, &rv);
+			h = open_data_fork(path, &access, &rv);
 			break;
 		case resource_file:
-			fd = open_resource_fork(path, &access, &rv);
+			h = open_resource_fork(path, &access, &rv);
 			break;
 		case directory_file:
-			fd = open_directory(path, &dd, &rv);
+			dd = read_directory(path, &rv);
 			break;
 	}
 
-	if (fd < 0) return rv;
+	if (rv) return rv;
 
 
 	if (class) {
@@ -1536,23 +1474,31 @@ static word32 fst_open(int class, const char *path) {
 	}
 	// prodos 16 doesn't return anything in the parameter block.
 
-	struct fd_entry *e = calloc(sizeof(struct fd_entry), 1);
+	struct fd_entry *e = alloc_fd();
 	if (!e) {
-		close(fd);
+		if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
+		if (dd) free_directory(dd);
 		return outOfMem;
 	}
+	e->handle = h;
+	e->dir = dd;
 
-	e->fd = fd;
-	e->type = type;
-	if (type == directory_file) e->dir = dd;
-	if (resource_number) e->type = resource_file;
+	e->cookie = cookie_alloc();
+	if (!e->cookie) {
+		free_fd(e);
+		return tooManyFilesOpen;
+	}
 
 	e->access = access;
 	e->path = strdup(path);
+	e->type = type;
+
+
+	// insert it in the linked list.
 	e->next = fd_head;
 	fd_head = e;
 
-	engine.xreg = fd;
+	engine.xreg = e->cookie;
 	engine.yreg = access; // actual access, needed in fcr.
 
 	return rv;
@@ -1560,8 +1506,8 @@ static word32 fst_open(int class, const char *path) {
 
 static word32 fst_read(int class) {
 
-	int fd = engine.yreg;
-	struct fd_entry *e = find_fd(fd);
+	int cookie = engine.yreg;
+	struct fd_entry *e = find_fd(cookie);
 
 	if (!e) return invalidRefNum;
 
@@ -1602,9 +1548,10 @@ static word32 fst_read(int class) {
 
 		for (word32 i = 0 ; i < request_count; ++i) {
 			byte b;
-			ok = safe_read(fd, &b, 1);
-			if (ok < 0) return map_errno();
-			if (ok == 0) break;
+			DWORD read_count;
+			ok = ReadFile(e->handle, &b, 1, &read_count, NULL);
+			if (!ok) return map_last_error();
+			if (read_count == 0) break;
 			transfer_count++;
 			set_memory_c(data_buffer++, b, 0);
 			if (newline_table[b & newline_mask]) break;
@@ -1612,14 +1559,15 @@ static word32 fst_read(int class) {
 		if (transfer_count == 0) rv = eofEncountered;
 	}
 	else {
+		DWORD read_count;
 		byte *data = gc_malloc(request_count);
 		if (!data) return outOfMem;
 
-		ok = safe_read(fd, data, request_count);
-		if (ok < 0) rv = map_errno();
-		if (ok == 0) rv = eofEncountered;
-		if (ok > 0) {
-			transfer_count = ok;
+		ok = ReadFile(e->handle, data, request_count, &read_count, NULL);
+		if (!ok) rv = map_last_error();
+		else if (read_count == 0) rv = eofEncountered;
+		if (read_count > 0) {
+			transfer_count = read_count;
 			for (size_t i = 0; i < ok; ++i) {
 				set_memory_c(data_buffer + i, data[i], 0);
 			}
@@ -1638,8 +1586,8 @@ static word32 fst_read(int class) {
 
 static word32 fst_write(int class) {
 
-	int fd = engine.yreg;
-	struct fd_entry *e = find_fd(fd);
+	int cookie = engine.yreg;
+	struct fd_entry *e = find_fd(cookie);
 
 	if (!e) return invalidRefNum;
 
@@ -1677,29 +1625,30 @@ static word32 fst_write(int class) {
 	}
 
 	word32 rv = 0;
-	ssize_t ok = safe_write(fd, data, request_count);
-	if (ok < 0) rv = map_errno();
-	if (ok > 0) {
+	DWORD write_count = 0;
+	int ok = WriteFile(e->handle, data, request_count, &write_count, NULL);
+	if (!ok) rv = map_last_error();
+	if (write_count > 0) {
 		if (class)
-			set_memory32_c(pb + IORecGS_transferCount, ok, 0);
+			set_memory32_c(pb + IORecGS_transferCount, write_count, 0);
 		else
-			set_memory32_c(pb + FileIORec_transferCount, ok, 0);
+			set_memory32_c(pb + FileIORec_transferCount, write_count, 0);
 	}
 	return rv;
 }
 
 static word32 fst_close(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	return remove_fd(fd);
+	return remove_fd(cookie);
 
 }
 
 static word32 fst_flush(int class) {
 
-	int fd = engine.yreg;
-	struct fd_entry *e = find_fd(fd);
+	int cookie = engine.yreg;
+	struct fd_entry *e = find_fd(cookie);
 
 	if (!e) return invalidRefNum;
 
@@ -1708,42 +1657,45 @@ static word32 fst_flush(int class) {
 			return badStoreType;
 	}
 
-	int ok = fsync(e->fd);
-	if (ok < 0) return map_errno();
+	if (!FlushFileBuffers(e->handle)) return map_last_error();
 	return 0;
 }
 
-static off_t get_offset(int fd, word16 base, word32 displacement) {
 
-	off_t pos = lseek(fd, 0, SEEK_CUR);
-	off_t eof = lseek(fd, 0, SEEK_END);
-	lseek(fd, pos, SEEK_SET);
-
+static word16 win_seek(HANDLE h, word16 base, word32 displacement, LARGE_INTEGER *position) {
+	LARGE_INTEGER d;
+	int m = 0;
 	switch (base) {
 		case startPlus:
-			return displacement;
-			break;
-		case eofMinus:
-			return eof - displacement;
+			m = FILE_BEGIN;
+			d.QuadPart = displacement;
 			break;
 		case markPlus:
-			return pos + displacement;
+			m = FILE_CURRENT;
+			d.QuadPart = displacement;
 			break;
 		case markMinus:
-			return pos - displacement;
+			m = FILE_CURRENT;
+			d.QuadPart = -displacement;
 			break;
+		case eofMinus:
+			m = FILE_END;
+			d.QuadPart = -displacement;
+			break;
+
 		default:
-			return -1;
+			return paramRangeErr;
+
 	}
-
-
+	if (!SetFilePointerEx(h, d, position, m)) return map_last_error();
+	return 0;
 }
 
 static word32 fst_set_mark(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 	switch (e->type) {
@@ -1763,19 +1715,14 @@ static word32 fst_set_mark(int class) {
 	}
 	if (base > markMinus) return paramRangeErr;
 
-	off_t offset = get_offset(fd, base, displacement);
-	if (offset < 0) return outOfRange;
-
-	off_t ok = lseek(fd, offset, SEEK_SET);
-	if (ok < 0) return map_errno();
-	return 0;
+	return win_seek(e->handle, base, displacement, NULL);
 }
 
 static word32 fst_set_eof(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 	switch (e->type) {
@@ -1797,38 +1744,46 @@ static word32 fst_set_eof(int class) {
 
 	if (base > markMinus) return paramRangeErr;
 
-	off_t offset = get_offset(fd, base, displacement);
-	if (offset < 0) return outOfRange;
+	// get the current mark
+	LARGE_INTEGER mark;
+	LARGE_INTEGER zero; zero.QuadPart = 0;
+	SetFilePointerEx(e->handle, zero, &mark, FILE_CURRENT);
 
-	int ok = ftruncate(fd, offset);
-	if (ok < 0) return map_errno();
+	word16 rv = win_seek(e->handle, base, displacement, NULL);
+	if (rv) return rv;
+
+	// SetEndOfFile sets the current positions as eof.
+	if (!SetEndOfFile(e->handle)) return map_last_error();
+
+	// restore old mark. ???
+	SetFilePointerEx(e->handle, mark, NULL, FILE_BEGIN);
 	return 0;
 
 }
 
 static word32 fst_get_mark(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
-
-	off_t pos = 0;
 
 	switch (e->type) {
 		case directory_file:
 			return badStoreType;
 	}
 
-	pos = lseek(fd, 0, SEEK_CUR);
-	if (pos < 0) return map_errno();
+	// get the current mark
+	LARGE_INTEGER pos;
+	LARGE_INTEGER zero; zero.QuadPart = 0;
+	if (!SetFilePointerEx(e->handle, zero, &pos, FILE_CURRENT)) return map_last_error();
 
 	if (class) {
-		set_memory32_c(pb + PositionRecGS_position, pos, 0);
+		set_memory32_c(pb + PositionRecGS_position, pos.LowPart, 0);
 	} else {
-		set_memory32_c(pb + MarkRec_position, pos, 0);
+		set_memory32_c(pb + MarkRec_position, pos.LowPart, 0);
 	}
 
 	return 0;
@@ -1836,9 +1791,9 @@ static word32 fst_get_mark(int class) {
 
 static word32 fst_get_eof(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
@@ -1849,90 +1804,29 @@ static word32 fst_get_eof(int class) {
 			return badStoreType;
 	}
 
+	LARGE_INTEGER eof;
 
-	off_t eof = 0;
-	off_t pos = 0;
+	if (!GetFileSizeEx(e->handle, &eof)) return map_last_error();
 
-	pos = lseek(fd, 0, SEEK_CUR);
-	eof = lseek(fd, 0, SEEK_END);
-	if (eof < 0) return map_errno();
-	lseek(fd, pos, SEEK_SET);
-
+	// what if > 32 bits?
 
 	if (class) {
-		set_memory32_c(pb + PositionRecGS_position, eof, 0);
+		set_memory32_c(pb + PositionRecGS_position, eof.LowPart, 0);
 	} else {
-		set_memory32_c(pb + MarkRec_position, eof, 0);
+		set_memory32_c(pb + MarkRec_position, eof.LowPart, 0);
 	}
 
 	return 0;
 }
 
-/*
- * exclude files from get_dir_entries.
- *
- */
-static int exclude_dir_entry(const char *name) {
-	if (!name[0]) return 1;
-	if (name[0] == '.') {
-		return 1;
-		/*
-		if (!strcmp(name, ".")) return 1;
-		if (!strcmp(name, "..")) return 1;
-		if (!strncmp(name, "._", 2)) return 1; // ._ resource fork
-		if (!strcmp(name, ".fseventsd")) return 1;
-		*/
-	}
-	return 0;
-}
 
 
-static void dir_free(struct directory *dd) {
-	if (!dd) return;
-	for (int i = 0; i < dd->num_entries; ++i) {
-		free(dd->entries[i]);
-	}
-	free(dd);
-}
-
-static int qsort_callback(const void *a, const void *b) {
-	return strcmp((const char *)a, (const char *)b);
-}
-static struct directory *dir_alloc(DIR *dirp) {
-
-	int capacity = 100;
-	size_t size = sizeof(struct directory) + sizeof(char *) * capacity;
-	struct directory *dd = (struct directory *)malloc(size);
-	if (!dd) return NULL;
-
-	memset(dd, 0, size);
-
-	for (;;) {
-		struct dirent *d = readdir(dirp);
-		if (!d) break;
-		if (exclude_dir_entry(d->d_name)) continue;
-		if (dd->num_entries == capacity) {
-			size += capacity;
-			capacity += capacity;;
-			struct directory *tmp = realloc(dd, size);
-			if (!tmp) {
-				dir_free(dd);
-				return NULL;
-			}
-			dd = tmp;
-		}
-		dd->entries[dd->num_entries++] = strdup(d->d_name);
-	}
-	// sort them to make life more consistent.
-	qsort(dd->entries, dd->num_entries, sizeof(char *), qsort_callback);
-	return dd;
-}
 
 static word32 fst_get_dir_entry(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 
@@ -2055,8 +1949,7 @@ static word32 fst_change_path(int class, const char *path1, const char *path2) {
 	if (st.st_dev == root_dev && st.st_ino == root_ino)
 		return invalidAccess;
 
-	// rename will delete any previous file.
-	if (rename(path1, path2) < 0) return map_errno();
+	if (!MoveFile(path1, path2)) return map_last_error();	
 	return 0;
 }
 
@@ -2350,6 +2243,27 @@ static const char *error_name(word16 error) {
 	return "";
 }
 
+#ifdef __CYGWIN__
+
+#include <sys/cygwin.h>
+
+static char *expand_path(const char *path, word32 *error) {
+
+	char buffer[PATH_MAX];
+	ssize_t ok = cygwin_conv_path(CCP_POSIX_TO_WIN_A, path, buffer, sizeof(buffer));
+	if (ok < 0) {
+		*error = fstError;
+		return NULL;
+	}
+	return gc_strdup(buffer);
+}
+
+
+#else
+#define expand_path(x, y) (x)
+#endif
+
+
 void host_fst(void) {
 	
 	/*
@@ -2407,6 +2321,8 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
 
 				acc = fst_create(class, path3);
 				break;
@@ -2414,6 +2330,8 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
 
 				acc = fst_destroy(class, path3);
 				break;
@@ -2422,10 +2340,14 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
 
 				cp = check_path(path2, &acc);
 				if (acc) break;
 				path4 = append_path(root, cp);
+				path4 = expand_path(path4, &acc);
+				if (acc) break;
 
 				acc = fst_change_path(class, path3, path4);
 				break;
@@ -2433,6 +2355,8 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
 
 				acc = fst_set_file_info(class, path3);
 				break;
@@ -2440,6 +2364,9 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
+
 				acc = fst_get_file_info(class, path3);
 				break;
 			case 0x07:
@@ -2452,12 +2379,18 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
+
 				acc = fst_clear_backup(class, path3);
 				break;
 			case 0x10:
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
+
 				acc = fst_open(class, path3);
 				break;
 			case 0x012:
