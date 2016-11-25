@@ -1538,7 +1538,7 @@ static word32 fst_read(int class) {
 
 	word16 newline_mask;
 	word32 rv = 0;
-	ssize_t ok;
+	int ok;
 
 	newline_mask = get_memory16_c(global_buffer, 0);
 	if (newline_mask) {
@@ -1568,7 +1568,7 @@ static word32 fst_read(int class) {
 		else if (read_count == 0) rv = eofEncountered;
 		if (read_count > 0) {
 			transfer_count = read_count;
-			for (size_t i = 0; i < ok; ++i) {
+			for (size_t i = 0; i < transfer_count; ++i) {
 				set_memory_c(data_buffer + i, data[i], 0);
 			}
 		}
