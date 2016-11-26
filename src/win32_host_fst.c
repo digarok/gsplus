@@ -781,10 +781,10 @@ static void set_date_time_rec(word32 ptr, FILETIME utc) {
 	set_memory_c(ptr++, tmLocal.wMinute, 0);
 	set_memory_c(ptr++, tmLocal.wHour, 0);
 	set_memory_c(ptr++, tmLocal.wYear - 1900, 0);
-	set_memory_c(ptr++, dow + 1, 0); // 1 = sunday
+	set_memory_c(ptr++, tmLocal.wDay - 1, 0); // 1 = sunday
 	set_memory_c(ptr++, tmLocal.wMonth - 1, 0);
 	set_memory_c(ptr++, 0, 0);
-	set_memory_c(ptr++, tmLocal.wDay - 1, 0);
+	set_memory_c(ptr++, dow + 1, 0);
 }
 
 /*
