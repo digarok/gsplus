@@ -481,7 +481,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 static word32 get_file_info(const char *path, struct file_info *fi) {
 
 
-	HANDLE h = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE h = CreateFile(path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
 	if (h == INVALID_HANDLE_VALUE) return map_last_error();
 
 	//FILE_BASIC_INFO fbi;
