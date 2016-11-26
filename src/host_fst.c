@@ -75,44 +75,47 @@ struct directory {
 struct fd_entry {
 	struct fd_entry *next;
 	char *path;
-	int fd;
+	int cookie;
 	int type;
 	int access;
+	int fd;
 	struct directory *dir;
 };
 
+static void free_directory(struct directory *dd);
+static struct directory *read_directory(const char *path, word16 *error);
 
-#define PSEUDO_FD_BASE 0x8000
+#define COOKIE_BASE 0x8000
 
-static word32 pseudo_fds[32] = {};
+static word32 cookies[32] = {};
 
-static int pseudo_fd_alloc() {
+static int alloc_cookie() {
 	for (int i = 0; i < 32; ++i) {
-		word32 x = pseudo_fds[i];
+		word32 x = cookies[i];
 
 		for (int j = 0; j < 32; ++j, x >>= 1) {
 			if (x & 0x01) continue;
 
-			pseudo_fds[i] |= (1 << j);
-			return PSEUDO_FD_BASE + (i * 32 + j);
+			cookies[i] |= (1 << j);
+			return COOKIE_BASE + (i * 32 + j);
 		}
 	}
 	return -1;
 }
 
-static int pseudo_fd_free(int fd) {
-	if (fd < PSEUDO_FD_BASE) return -1;
-	fd -= PSEUDO_FD_BASE;
-	if (fd >= 32 *32) return -1;
+static int free_cookie(int cookie) {
+	if (cookie < COOKIE_BASE) return -1;
+	cookie -= COOKIE_BASE;
+	if (cookie >= 32 *32) return -1;
 
-	int chunk = fd / 32;
-	int offset = 1 << (fd % 32);
+	int chunk = cookie / 32;
+	int offset = 1 << (cookie % 32);
 
-	word32 x = pseudo_fds[chunk];
+	word32 x = cookies[chunk];
 
 	if ((x & offset) == 0) return -1;
 	x &= ~offset;
-	pseudo_fds[chunk] = x;
+	cookies[chunk] = x;
 	return 0;
 }
 
@@ -184,6 +187,14 @@ static char *append_string(const char *a, const char *b) {
 	return cp;
 }
 
+static char *gc_strdup(const char *src) {
+	if (!src) return "";
+	if (!*src) return "";
+	int len = strlen(src) + 1;
+	char *cp = gc_malloc(len);
+	memcpy(cp, src, len);
+	return cp;
+}
 
 
 static word32 map_errno() {
@@ -208,47 +219,45 @@ static word32 map_errno() {
 }
 
 
-static struct fd_entry *find_fd(int fd) {
+static struct fd_entry *find_fd(int cookie) {
 	struct fd_entry *head = fd_head;
 
 	while(head) {
-		if (head->fd == fd) return head;
+		if (head->cookie == cookie) return head;
 		head = head->next;
 	}
 	return NULL;
 }
 
 
-static void dir_free(struct directory *dd);
-static struct directory *dir_alloc(DIR *dirp);
+static void free_fd(struct fd_entry	*e) {
+	if (!e) return;
+	if (e->cookie) free_cookie(e->cookie);
+	if (e->fd >= 0) close(e->fd);
+	if (e->dir) free_directory(e->dir);
+	free(e->path);
+	free(e);
+}
+
+static struct fd_entry *alloc_fd() {
+	struct fd_entry *e = calloc(sizeof(struct fd_entry), 1);
+	e->fd = -1;
+	return e;
+}
 
 
-static word32 remove_fd(int fd) {
+static word32 remove_fd(int cookie) {
 	word32 rv = invalidRefNum;
 
 	struct fd_entry *prev = NULL;
 	struct fd_entry *head = fd_head;
 	while (head) {
-		if (head->fd == fd) {
+		if (head->cookie == cookie) {
 			if (prev) prev->next = head->next;
 			else fd_head = head->next;
 
+			free_fd(head);
 			rv = 0;
-
-			int ok = 0;
-			if (head->fd >= PSEUDO_FD_BASE) pseudo_fd_free(head->fd);
-			switch (head->type) {
-				case regular_file:
-				case resource_file:
-					ok = close(head->fd);
-					if (ok < 0) rv = map_errno();
-					break;
-				case directory_file:
-					dir_free(head->dir);
-					break;
-			}
-			free(head->path);
-			free(head);
 			break;
 		}
 		prev = head;
@@ -256,7 +265,6 @@ static word32 remove_fd(int fd) {
 	}
 	return rv;
 }
-
 
 static ssize_t safe_read(int fd, void *buffer, size_t count) {
 	for (;;) {
@@ -929,21 +937,10 @@ static word32 fst_shutdown(void) {
 	// close any remaining files.
 	struct fd_entry *head = fd_head;
 	while (head) {
-		struct fd_entry *tmp = head->next;
-		if (head->fd >= PSEUDO_FD_BASE) pseudo_fd_free(head->fd);
-		switch(head->type) {
-			case regular_file:
-			case resource_file:
-				if (head->fd >= 0 && head->fd < PSEUDO_FD_BASE)
-					close(head->fd);
-				break;
-			case directory_file:
-				dir_free(head->dir);
-				break;
-		}
-		free(head->path);
-		free(head);
-		head = tmp;
+		struct fd_entry *next = head->next;
+
+		free_fd(head);
+		head = next;
 	}
 	return 0;
 }
@@ -962,7 +959,7 @@ static word32 fst_startup(void) {
 
 	fst_shutdown();
 
-	memset(&pseudo_fds, 0, sizeof(pseudo_fds));
+	memset(&cookies, 0, sizeof(cookies));
 	if (stat(root, &st) < 0) {
 		fprintf(stderr, "%s does not exist\n", root);
 		return invalidFSTop;
@@ -1021,8 +1018,9 @@ static word32 fst_create(int class, const char *path) {
 		if (ok < 0) return map_errno();
 		return 0;
 	}
-	if (fi.storage_type <= 3) {
+	if (fi.storage_type <= 3 || fi.storage_type == 0x05) {
 		// normal file.
+		// 0x05 is an extended/resource file but we don't do anything special.
 		ok = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
 		if (ok < 0) return map_errno();
 		// set ftype, auxtype...
@@ -1037,16 +1035,7 @@ static word32 fst_create(int class, const char *path) {
 
 		return 0;
 	}
-	if (fi.storage_type == 0x05) {
-		// create an extended file... 
-		// doesn't do anything particular yet.
 
-		ok = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
-		if (ok < 0) return map_errno();
-		close(ok);
-		// set ftype, auxtype...
-		return 0;
-	}
 
 	if (fi.storage_type == 0x8005) {
 		// convert an existing file to an extended file.
@@ -1270,26 +1259,6 @@ static word32 fst_clear_backup(int class, const char *path) {
 }
 
 
-static int open_directory(const char *path, struct directory **out, word16 *error) {
-
-	DIR *dirp = opendir(path);
-	if (!dirp) {
-		*error = map_errno();
-		return -1;
-	}
-
-	struct directory *dd = dir_alloc(dirp);
-	closedir(dirp);
-	if (!dd) { *error = outOfMem; return -1; }
-	int fd = pseudo_fd_alloc();
-	if (fd < 0) {
-		*error = tooManyFilesOpen;
-		dir_free(dd);
-		dd = NULL;
-	}
-	*out = dd;
-	return fd;
-}
 static int open_data_fork(const char *path, word16 *access, word16 *error) {
 
 	int fd = -1;
@@ -1320,11 +1289,7 @@ static int open_data_fork(const char *path, word16 *access, word16 *error) {
 	if (fd < 0) {
 		*error = map_errno();
 	}
-	if (fd >= PSEUDO_FD_BASE) {
-		close(fd);
-		*error = tooManyFilesOpen; 
-		fd = -1;
-	}
+
 	return fd;
 }
 #if defined(__APPLE__) 
@@ -1361,11 +1326,6 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	}
 	if (fd < 0) {
 		*error = map_errno();
-	}
-	if (fd >= PSEUDO_FD_BASE) {
-		close(fd);
-		*error = tooManyFilesOpen; 
-		fd = -1;
 	}
 
 	return fd;
@@ -1413,11 +1373,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 		return -1;
 	}
 	close(tmp);
-	if (fd >= PSEUDO_FD_BASE) {
-		close(fd);
-		*error = tooManyFilesOpen; 
-		fd = -1;
-	}
+
 	return fd;
 }
 #elif defined __linux__
@@ -1445,7 +1401,7 @@ static word32 fst_open(int class, const char *path) {
 	if (rv) return rv;
 
 
-	int fd;
+	int fd = -1;
 	int type = regular_file;
 	struct directory *dd = NULL;
 
@@ -1502,11 +1458,11 @@ static word32 fst_open(int class, const char *path) {
 			fd = open_resource_fork(path, &access, &rv);
 			break;
 		case directory_file:
-			fd = open_directory(path, &dd, &rv);
+			dd = read_directory(path, &rv);
 			break;
 	}
 
-	if (fd < 0) return rv;
+	if (rv) return rv;
 
 
 	if (class) {
@@ -1536,23 +1492,31 @@ static word32 fst_open(int class, const char *path) {
 	}
 	// prodos 16 doesn't return anything in the parameter block.
 
-	struct fd_entry *e = calloc(sizeof(struct fd_entry), 1);
+	struct fd_entry *e = alloc_fd();
 	if (!e) {
-		close(fd);
+		if (fd >=0) close(fd);
+		if (dd) free_directory(dd);
 		return outOfMem;
 	}
-
 	e->fd = fd;
-	e->type = type;
-	if (type == directory_file) e->dir = dd;
-	if (resource_number) e->type = resource_file;
+	e->dir = dd;
+
+	e->cookie = alloc_cookie();
+	if (!e->cookie) {
+		free_fd(e);
+		return tooManyFilesOpen;
+	}
 
 	e->access = access;
 	e->path = strdup(path);
+	e->type = type;
+
+
+	// insert it in the linked list.
 	e->next = fd_head;
 	fd_head = e;
 
-	engine.xreg = fd;
+	engine.xreg = e->cookie;
 	engine.yreg = access; // actual access, needed in fcr.
 
 	return rv;
@@ -1560,8 +1524,8 @@ static word32 fst_open(int class, const char *path) {
 
 static word32 fst_read(int class) {
 
-	int fd = engine.yreg;
-	struct fd_entry *e = find_fd(fd);
+	int cookie = engine.yreg;
+	struct fd_entry *e = find_fd(cookie);
 
 	if (!e) return invalidRefNum;
 
@@ -1602,7 +1566,7 @@ static word32 fst_read(int class) {
 
 		for (word32 i = 0 ; i < request_count; ++i) {
 			byte b;
-			ok = safe_read(fd, &b, 1);
+			ok = safe_read(e->fd, &b, 1);
 			if (ok < 0) return map_errno();
 			if (ok == 0) break;
 			transfer_count++;
@@ -1615,7 +1579,7 @@ static word32 fst_read(int class) {
 		byte *data = gc_malloc(request_count);
 		if (!data) return outOfMem;
 
-		ok = safe_read(fd, data, request_count);
+		ok = safe_read(e->fd, data, request_count);
 		if (ok < 0) rv = map_errno();
 		if (ok == 0) rv = eofEncountered;
 		if (ok > 0) {
@@ -1638,8 +1602,8 @@ static word32 fst_read(int class) {
 
 static word32 fst_write(int class) {
 
-	int fd = engine.yreg;
-	struct fd_entry *e = find_fd(fd);
+	int cookie = engine.yreg;
+	struct fd_entry *e = find_fd(cookie);
 
 	if (!e) return invalidRefNum;
 
@@ -1677,7 +1641,7 @@ static word32 fst_write(int class) {
 	}
 
 	word32 rv = 0;
-	ssize_t ok = safe_write(fd, data, request_count);
+	ssize_t ok = safe_write(e->fd, data, request_count);
 	if (ok < 0) rv = map_errno();
 	if (ok > 0) {
 		if (class)
@@ -1690,16 +1654,16 @@ static word32 fst_write(int class) {
 
 static word32 fst_close(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	return remove_fd(fd);
+	return remove_fd(cookie);
 
 }
 
 static word32 fst_flush(int class) {
 
-	int fd = engine.yreg;
-	struct fd_entry *e = find_fd(fd);
+	int cookie = engine.yreg;
+	struct fd_entry *e = find_fd(cookie);
 
 	if (!e) return invalidRefNum;
 
@@ -1741,9 +1705,9 @@ static off_t get_offset(int fd, word16 base, word32 displacement) {
 
 static word32 fst_set_mark(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 	switch (e->type) {
@@ -1763,19 +1727,19 @@ static word32 fst_set_mark(int class) {
 	}
 	if (base > markMinus) return paramRangeErr;
 
-	off_t offset = get_offset(fd, base, displacement);
+	off_t offset = get_offset(e->fd, base, displacement);
 	if (offset < 0) return outOfRange;
 
-	off_t ok = lseek(fd, offset, SEEK_SET);
+	off_t ok = lseek(e->fd, offset, SEEK_SET);
 	if (ok < 0) return map_errno();
 	return 0;
 }
 
 static word32 fst_set_eof(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 	switch (e->type) {
@@ -1797,10 +1761,10 @@ static word32 fst_set_eof(int class) {
 
 	if (base > markMinus) return paramRangeErr;
 
-	off_t offset = get_offset(fd, base, displacement);
+	off_t offset = get_offset(e->fd, base, displacement);
 	if (offset < 0) return outOfRange;
 
-	int ok = ftruncate(fd, offset);
+	int ok = ftruncate(e->fd, offset);
 	if (ok < 0) return map_errno();
 	return 0;
 
@@ -1808,9 +1772,9 @@ static word32 fst_set_eof(int class) {
 
 static word32 fst_get_mark(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
@@ -1822,7 +1786,7 @@ static word32 fst_get_mark(int class) {
 			return badStoreType;
 	}
 
-	pos = lseek(fd, 0, SEEK_CUR);
+	pos = lseek(e->fd, 0, SEEK_CUR);
 	if (pos < 0) return map_errno();
 
 	if (class) {
@@ -1836,9 +1800,9 @@ static word32 fst_get_mark(int class) {
 
 static word32 fst_get_eof(int class) {
 
-	int fd = engine.yreg;
+	int cookie = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
@@ -1853,10 +1817,10 @@ static word32 fst_get_eof(int class) {
 	off_t eof = 0;
 	off_t pos = 0;
 
-	pos = lseek(fd, 0, SEEK_CUR);
-	eof = lseek(fd, 0, SEEK_END);
+	pos = lseek(e->fd, 0, SEEK_CUR);
+	eof = lseek(e->fd, 0, SEEK_END);
 	if (eof < 0) return map_errno();
-	lseek(fd, pos, SEEK_SET);
+	lseek(e->fd, pos, SEEK_SET);
 
 
 	if (class) {
@@ -1868,11 +1832,23 @@ static word32 fst_get_eof(int class) {
 	return 0;
 }
 
+static void free_directory(struct directory *dd) {
+	if (!dd) return;
+	for (int i = 0; i < dd->num_entries; ++i) {
+		free(dd->entries[i]);
+	}
+	free(dd);
+}
+
+static int qsort_callback(const void *a, const void *b) {
+	return strcmp(*(const char **)a, *(const char **)b);
+}
+
 /*
  * exclude files from get_dir_entries.
  *
  */
-static int exclude_dir_entry(const char *name) {
+static int filter_directory_entry(const char *name) {
 	if (!name[0]) return 1;
 	if (name[0] == '.') {
 		return 1;
@@ -1887,52 +1863,61 @@ static int exclude_dir_entry(const char *name) {
 }
 
 
-static void dir_free(struct directory *dd) {
-	if (!dd) return;
-	for (int i = 0; i < dd->num_entries; ++i) {
-		free(dd->entries[i]);
-	}
-	free(dd);
-}
-
-static int qsort_callback(const void *a, const void *b) {
-	return strcmp((const char *)a, (const char *)b);
-}
-static struct directory *dir_alloc(DIR *dirp) {
-
+static struct directory *read_directory(const char *path, word16 *error) {
+	DIR *dirp;
+	struct directory *dd;
 	int capacity = 100;
-	size_t size = sizeof(struct directory) + sizeof(char *) * capacity;
-	struct directory *dd = (struct directory *)malloc(size);
-	if (!dd) return NULL;
+	int size = sizeof(struct directory) + capacity * sizeof(char *);
 
+	dirp = opendir(path);
+	if (!dirp) {
+		*error = map_errno();
+		return NULL;
+	}
+
+	dd = (struct directory *)malloc(size);
+	if (!dd) {
+		*error = outOfMem;
+		closedir(dirp);
+		return NULL;
+	}
 	memset(dd, 0, size);
 
-	for (;;) {
+	for(;;) {
 		struct dirent *d = readdir(dirp);
 		if (!d) break;
-		if (exclude_dir_entry(d->d_name)) continue;
-		if (dd->num_entries == capacity) {
-			size += capacity;
-			capacity += capacity;;
-			struct directory *tmp = realloc(dd, size);
+		if (filter_directory_entry(d->d_name)) continue;
+
+		if (dd->num_entries >= capacity) {
+			capacity += capacity;
+			size = sizeof(struct directory) + capacity * sizeof(char *);
+			struct directory * tmp = realloc(dd, size);
 			if (!tmp) {
-				dir_free(dd);
+				*error = map_errno();
+				free_directory(dd);
+				closedir(dirp);
 				return NULL;
 			}
 			dd = tmp;
 		}
 		dd->entries[dd->num_entries++] = strdup(d->d_name);
-	}
-	// sort them to make life more consistent.
+	};
+
+	closedir(dirp);
+
+	// sort them....
 	qsort(dd->entries, dd->num_entries, sizeof(char *), qsort_callback);
+
 	return dd;
 }
 
+
 static word32 fst_get_dir_entry(int class) {
 
-	int fd = engine.yreg;
 
-	struct fd_entry *e = find_fd(fd);
+	int cookie = engine.yreg;
+
+	struct fd_entry *e = find_fd(cookie);
 	if (!e) return invalidRefNum;
 
 
@@ -1984,7 +1969,8 @@ static word32 fst_get_dir_entry(int class) {
 		default:
 			return paramRangeErr;
 	}
-	if (displacement) --displacement;
+	//if (displacement) --displacement;
+	--displacement;
 	if (displacement < 0) return endOfDir;
 	if (displacement >= e->dir->num_entries) return endOfDir;
 
@@ -1995,6 +1981,7 @@ static word32 fst_get_dir_entry(int class) {
 	char *fullpath = append_path(e->path, dname);
 	struct 	file_info fi;
 	rv = get_file_info(fullpath, &fi);
+
 
 
 	// p16 and gs/os both use truncating c1 output string.

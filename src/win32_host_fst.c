@@ -71,6 +71,11 @@ struct AFP_Info {
 };
 #pragma pack(pop)
 
+
+static void free_directory(struct directory *dd);
+static struct directory *read_directory(const char *path, word16 *error);
+
+
 static void init_afp_info(struct AFP_Info *info) {
 	//static_assert(sizeof(AFP_Info) == 60, "Incorrect AFP_Info size");
 	memset(info, 0, sizeof(*info));
@@ -92,7 +97,7 @@ static BOOL verify_afp_info(struct AFP_Info *info) {
 
 static word32 cookies[32] = {};
 
-static int cookie_alloc() {
+static int alloc_cookie() {
 	for (int i = 0; i < 32; ++i) {
 		word32 x = cookies[i];
 
@@ -106,7 +111,7 @@ static int cookie_alloc() {
 	return -1;
 }
 
-static int cookie_free(int cookie) {
+static int free_cookie(int cookie) {
 	if (cookie < COOKIE_BASE) return -1;
 	cookie -= COOKIE_BASE;
 	if (cookie >= 32 *32) return -1;
@@ -264,10 +269,9 @@ static struct fd_entry *find_fd(int cookie) {
 }
 
 
-static void free_directory(struct directory *dd);
 static void free_fd(struct fd_entry	*e) {
 	if (!e) return;
-	if (e->cookie) cookie_free(e->cookie);
+	if (e->cookie) free_cookie(e->cookie);
 	if (e->handle != INVALID_HANDLE_VALUE) CloseHandle(e->handle);
 	if (e->dir) free_directory(e->dir);
 	free(e->path);
@@ -1210,14 +1214,14 @@ static void free_directory(struct directory *dd) {
 }
 
 static int qsort_callback(const void *a, const void *b) {
-	return strcmp((const char *)a, (const char *)b);
+	return strcmp(*(const char **)a, *(const char **)b);
 }
 
 /*
  * exclude files from get_dir_entries.
  *
  */
-static int exclude_dir_entry(const char *name) {
+static int filter_directory_entry(const char *name) {
 	if (!name[0]) return 1;
 	if (name[0] == '.') {
 		return 1;
@@ -1255,7 +1259,7 @@ static struct directory *read_directory(const char *path, word16 *error) {
 	}
 	memset(dd, 0, size);
 	do {
-		if (exclude_dir_entry(data.cFileName)) continue;
+		if (filter_directory_entry(data.cFileName)) continue;
 		if (dd->num_entries >= capacity) {
 			capacity += capacity;
 			size = sizeof(struct directory) + capacity * sizeof(char *);
@@ -1483,7 +1487,7 @@ static word32 fst_open(int class, const char *path) {
 	e->handle = h;
 	e->dir = dd;
 
-	e->cookie = cookie_alloc();
+	e->cookie = alloc_cookie();
 	if (!e->cookie) {
 		free_fd(e);
 		return tooManyFilesOpen;
@@ -1878,7 +1882,8 @@ static word32 fst_get_dir_entry(int class) {
 		default:
 			return paramRangeErr;
 	}
-	if (displacement) --displacement;
+	//if (displacement) --displacement;
+	--displacement;
 	if (displacement < 0) return endOfDir;
 	if (displacement >= e->dir->num_entries) return endOfDir;
 
