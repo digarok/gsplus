@@ -6,14 +6,9 @@
 #include <Windows.h>
 #include <io.h>
 
-#include <unistd.h>
-#include <fcntl.h>
-#include <dirent.h>
 #include <errno.h>
-#include <unistd.h>
 #include <ctype.h>
 #include <string.h>
-#include <time.h>
 
 #include "defc.h"
 #include "gsos.h"
@@ -129,8 +124,9 @@ static int free_cookie(int cookie) {
 
 static struct fd_entry *fd_head = NULL;
 
-static ino_t root_ino = 0;
-static dev_t root_dev = 0;
+static DWORD root_file_id[3] = {};
+//static ino_t root_ino = 0;
+//static dev_t root_dev = 0;
 static char *root = NULL;
 static int read_only = 0;
 
@@ -253,7 +249,7 @@ static word32 map_last_error() {
 		case ERROR_DIR_NOT_EMPTY:
 			// ...
 		default:
-			fprintf(stderr, "GetLastError: %08lx - %ld\n", e, e);
+			fprintf(stderr, "GetLastError: %08x - %d\n", (int)e, (int)e);
 			return drvrIOError;
 	}
 }
@@ -307,8 +303,9 @@ static word32 remove_fd(int cookie) {
 
 struct file_info {
 
-	time_t create_date;
-	time_t modified_date;
+	FILETIME create_date;
+	FILETIME modified_date;
+
 	word16 access;
 	word16 storage_type;
 	word16 file_type;
@@ -317,7 +314,6 @@ struct file_info {
 	word32 blocks;
 	word32 resource_eof;
 	word32 resource_blocks;
-	mode_t st_mode;
 	int has_fi;
 	byte finder_info[32];
 };
@@ -453,7 +449,7 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 	FILE_STANDARD_INFO fsi;
 	memset(&fsi, 0, sizeof(fsi));
 
-	h = CreateFile(p, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	h = CreateFile(p, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
 	if (h != INVALID_HANDLE_VALUE) {
 		GetFileInformationByHandleEx(h, FileStandardInfo, &fsi, sizeof(fsi));
 
@@ -483,33 +479,50 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 }
 
 static word32 get_file_info(const char *path, struct file_info *fi) {
-	struct stat st;
+
+
+	HANDLE h = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (h == INVALID_HANDLE_VALUE) return map_last_error();
+
+	//FILE_BASIC_INFO fbi;
+	//FILE_STANDARD_INFO fsi;
+	//FILE_ID_INFO fii;
+ 	BY_HANDLE_FILE_INFORMATION info;
+
+
 	memset(fi, 0, sizeof(*fi));
+	//memset(&fbi, 0, sizeof(fbi));
+	//memset(&fsi, 0, sizeof(fsi));
 
-	int ok = stat(path, &st);
-	if (ok < 0) return map_errno();
+	GetFileInformationByHandle(h, &info);
+	//GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
+	//GetFileInformationByHandleEx(h, FileStandardInfo, &fsi, sizeof(fsi));
+ 	//GetFileInformationByHandleEx(h, FileIdInfo, &fii, sizeof(fii));
 
-	fi->eof = st.st_size;
-	fi->blocks = st.st_blocks;
+	word32 size = info.nFileSizeLow;
 
-	fi->create_date = st.st_ctime;
-	fi->modified_date = st.st_mtime;
+	fi->eof = size;
+	fi->blocks = (size + 511) / 512;
 
-	fi->st_mode = st.st_mode;
+	fi->create_date = info.ftCreationTime;
+	fi->modified_date = info.ftLastWriteTime;
 
-	if (S_ISDIR(st.st_mode)) {
+	if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 		fi->storage_type = 0x0d;
 		fi->file_type = 0x0f;
-		if (st.st_ino == root_ino && st.st_dev == root_dev)
+
+	 	DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
+ 		if (memcmp(&id, &root_file_id, sizeof(root_file_id)) == 0) {
 			fi->storage_type = 0x0f;
-	} else if (S_ISREG(st.st_mode)) {
-		fi->file_type = 0x06;
-		if (st.st_size < 0x200) fi->storage_type = seedling;
-		else if (st.st_size < 0x20000) fi->storage_type = 0x0002;
-		else fi->storage_type = 0x0003;
+ 		}
 	} else {
-		fi->storage_type = st.st_mode & S_IFMT;
-		fi->file_type = 0;
+		fi->file_type = 0x06;
+		if (size < 0x200) fi->storage_type = seedling;
+		else if (size < 0x20000) fi->storage_type = sapling;
+		else fi->storage_type = tree;
+
+		get_file_xinfo(path, fi);
+		if (fi->resource_eof) fi->storage_type = extendedFile;
 	}
 	// 0x01 = read enable
 	// 0x02 = write enable
@@ -522,35 +535,17 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 	fi->access = 0xc3; // placeholder...
 
-	if (S_ISREG(st.st_mode)) {
-		get_file_xinfo(path, fi);
-	}
-
 	// get file type/aux type
 
-	if (fi->resource_eof) fi->storage_type = 0x0005;
 
+	CloseHandle(h);
 	return 0;
-}
-
-
-
-
-
-static void UnixTimeToFileTime(time_t t, LARGE_INTEGER *out)
-{
-	if (t) {
-		out->QuadPart = Int32x32To64(t, 10000000) + 116444736000000000;
-	} else {
-		out->QuadPart = 0;
-	}
-
 }
 
 
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
-	if (fi->has_fi && fi->storage_type != 0x0d) {
+	if (fi->has_fi && fi->storage_type != 0x0d && fi->storage_type != 0x0f) {
 		char *rpath = append_string(path, ":AFP_AfpInfo");
 
 		HANDLE h = CreateFile(rpath, GENERIC_READ | GENERIC_WRITE, 
@@ -561,7 +556,8 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 		CloseHandle(h);
 	}
 
-	if (fi->create_date || fi->modified_date) {
+	if (fi->create_date.dwLowDateTime || fi->create_date.dwHighDateTime 
+		|| fi->modified_date.dwLowDateTime || fi->modified_date.dwHighDateTime) {
 		// SetFileInformationByHandle can modify dates.
 		HANDLE h;
 		h = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -572,17 +568,12 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 		FILE_BASIC_INFO fbi;
 		memset(&fbi, 0, sizeof(fbi));
 
-		if (fi->create_date) {
-			UnixTimeToFileTime(fi->create_date, &fbi.CreationTime);
-		}
-		if (fi->modified_date) {
-			LARGE_INTEGER ft;
-			UnixTimeToFileTime(fi->modified_date, &ft);
-			fbi.ChangeTime = ft;
-			fbi.LastAccessTime = ft;
-			fbi.LastWriteTime = ft;
-		}
-
+		fbi.CreationTime.LowPart = fi->create_date.dwLowDateTime;
+		fbi.CreationTime.HighPart = fi->create_date.dwHighDateTime;
+		fbi.ChangeTime.LowPart = fi->modified_date.dwLowDateTime; //?
+		fbi.ChangeTime.HighPart = fi->modified_date.dwHighDateTime; //?
+		fbi.LastWriteTime.LowPart = fi->modified_date.dwLowDateTime;
+		fbi.LastWriteTime.HighPart = fi->modified_date.dwHighDateTime;
 
 		BOOL ok = SetFileInformationByHandle(h, FileBasicInfo, &fbi, sizeof(fbi));
 		CloseHandle(h);
@@ -754,103 +745,144 @@ static word32 set_option_list(word32 ptr, word16 fstID, const byte *data, int si
 	return 0;
 }
 
+
+static int dayofweek(int y, int m, int d)	/* 1 <= m <= 12,  y > 1752 (in the U.K.) */
+    {
+        static int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+        y -= m < 3;
+        return (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
+    }
 /*
  * converts time_t to a gs/os readhextime date/time record.
  */
 
-static void set_date_time_rec(word32 ptr, time_t time) {
+static void set_date_time_rec(word32 ptr, FILETIME utc) {
 
-	if (time == 0) {
+	if (utc.dwLowDateTime == 0 && utc.dwHighDateTime == 0) {
 		for (int i = 0; i < 8; ++i) set_memory_c(ptr++, 0, 0);
 		return;
 	}
 
-	struct tm *tm = localtime(&time);
-	if (tm->tm_sec == 60) tm->tm_sec = 59; /* leap second */
 
-	set_memory_c(ptr++, tm->tm_sec, 0);
-	set_memory_c(ptr++, tm->tm_min, 0);
-	set_memory_c(ptr++, tm->tm_hour, 0);
-	set_memory_c(ptr++, tm->tm_year, 0);
-	set_memory_c(ptr++, tm->tm_mday - 1, 0);
-	set_memory_c(ptr++, tm->tm_mon, 0);
+	SYSTEMTIME tmLocal;
+	SYSTEMTIME tmUTC;
+
+	FileTimeToSystemTime(&utc, &tmUTC);
+	SystemTimeToTzSpecificLocalTime(NULL, &tmUTC, &tmLocal);
+
+	if (tmLocal.wYear < 1900 || tmLocal.wYear > 1900 + 255) {
+		for (int i = 0; i < 8; ++i) set_memory_c(ptr++, 0, 0);
+		return;
+	}
+	if (tmLocal.wSecond == 60) tmLocal.wSecond = 59; /* leap second */
+
+	int dow = dayofweek(tmLocal.wYear, tmLocal.wMonth, tmLocal.wDay);
+	set_memory_c(ptr++, tmLocal.wSecond, 0);
+	set_memory_c(ptr++, tmLocal.wMinute, 0);
+	set_memory_c(ptr++, tmLocal.wHour, 0);
+	set_memory_c(ptr++, tmLocal.wYear - 1900, 0);
+	set_memory_c(ptr++, dow + 1, 0); // 1 = sunday
+	set_memory_c(ptr++, tmLocal.wMonth - 1, 0);
 	set_memory_c(ptr++, 0, 0);
-	set_memory_c(ptr++, tm->tm_wday + 1, 0);
+	set_memory_c(ptr++, tmLocal.wDay - 1, 0);
 }
 
 /*
  * converts time_t to a prodos16 date/time record.
  */
-static void set_date_time(word32 ptr, time_t time) {
+static void set_date_time(word32 ptr, FILETIME utc) {
 
-	if (time == 0) {
+	if (utc.dwLowDateTime == 0 && utc.dwHighDateTime == 0) {
 		for (int i = 0; i < 4; ++i) set_memory_c(ptr++, 0, 0);
 		return;
 	}
 
-	struct tm *tm = localtime(&time);
+	SYSTEMTIME tmLocal;
+	SYSTEMTIME tmUTC;
+
+	FileTimeToSystemTime(&utc, &tmUTC);
+	SystemTimeToTzSpecificLocalTime(NULL, &tmUTC, &tmLocal);
+
+	if (tmLocal.wYear < 1940 || tmLocal.wYear > 2039) {
+		for (int i = 0; i < 4; ++i) set_memory_c(ptr++, 0, 0);
+		return;		
+	}
+	if (tmLocal.wSecond == 60) tmLocal.wSecond = 59; /* leap second */
 
 	word16 tmp = 0;
-	tmp |= (tm->tm_year % 100) << 9;
-	tmp |= tm->tm_mon << 5;
-	tmp |= tm->tm_mday;
+	tmp |= (tmLocal.wYear % 100) << 9;
+	tmp |= tmLocal.wMonth << 5;
+	tmp |= tmLocal.wDay;
 
 	set_memory16_c(ptr, tmp, 0);
 	ptr += 2;
 
 	tmp = 0;
-	tmp |= tm->tm_hour << 8;
-	tmp |= tm->tm_min;
+	tmp |= tmLocal.wHour << 8;
+	tmp |= tmLocal.wMinute;
 	set_memory16_c(ptr, tmp, 0);
 }
 
 
-static time_t get_date_time(word32 ptr) {
+static FILETIME get_date_time(word32 ptr) {
+
+	FILETIME utc = {0, 0};
 
 	word16 a = get_memory16_c(ptr + 0, 0);
 	word16 b = get_memory16_c(ptr + 2, 0);
-	if (!a && !b) return 0;
+	if (!a && !b) return utc;
 
-	struct tm tm;
-	memset(&tm, 0, sizeof(tm));
 
-	tm.tm_year = (a >> 9) & 0x7f;
-	tm.tm_mon = ((a >> 5) & 0x0f) - 1;
-	tm.tm_mday = (a >> 0) & 0x1f;
+	SYSTEMTIME tmLocal;
+	SYSTEMTIME tmUTC;
+	memset(&tmLocal, 0, sizeof(tmLocal));
+	memset(&tmUTC, 0, sizeof(tmUTC));
 
-	tm.tm_hour = (b >> 8) & 0x1f;
-	tm.tm_min = (b >> 0) & 0x3f;
-	tm.tm_sec = 0;
+	tmLocal.wYear = ((a >> 9) & 0x7f) + 1900;
+	tmLocal.wMonth = ((a >> 5) & 0x0f);
+	tmLocal.wDay = (a >> 0) & 0x1f;
 
-    tm.tm_isdst = -1;
+	tmLocal.wHour = (b >> 8) & 0x1f;
+	tmLocal.wMinute = (b >> 0) & 0x3f;
+	tmLocal.wSecond = 0;
+
 
 	// 00 - 39 => 2000-2039
 	// 40 - 99 => 1940-1999
-	if (tm.tm_year < 40) tm.tm_year += 100;
+	if (tmLocal.wYear < 40) tmLocal.wYear += 100;
 
 
-	return mktime(&tm);
+	TzSpecificLocalTimeToSystemTime(NULL, &tmLocal, &tmUTC);
+	if (!SystemTimeToFileTime(&tmUTC, &utc)) utc =(FILETIME){0, 0};
+
+	return utc;
 }
 
-static time_t get_date_time_rec(word32 ptr) {
+static FILETIME get_date_time_rec(word32 ptr) {
+
+	FILETIME utc = {0, 0};
 
 	byte buffer[8];
 	for (int i = 0; i < 8; ++i) buffer[i] = get_memory_c(ptr++, 0);
 
-	if (!memcmp(buffer, "\x00\x00\x00\x00\x00\x00\x00\x00", 8)) return 0;
+	if (!memcmp(buffer, "\x00\x00\x00\x00\x00\x00\x00\x00", 8)) return utc;
 
-	struct tm tm;
-	memset(&tm, 0, sizeof(tm));
+	SYSTEMTIME tmLocal;
+	SYSTEMTIME tmUTC;
+	memset(&tmLocal, 0, sizeof(tmLocal));
+	memset(&tmUTC, 0, sizeof(tmUTC));
 
-	tm.tm_sec = buffer[0];
-	tm.tm_min = buffer[1];
-	tm.tm_hour = buffer[2];
-	tm.tm_year = buffer[3];
-	tm.tm_mday = buffer[4] + 1;
-	tm.tm_mon = buffer[5];
-    tm.tm_isdst = -1;
+	tmLocal.wSecond = buffer[0];
+	tmLocal.wMinute = buffer[1];
+	tmLocal.wHour = buffer[2];
+	tmLocal.wYear = 1900 + buffer[3];
+	tmLocal.wDay = buffer[4] + 1;
+	tmLocal.wMonth = buffer[5] + 1;
 
-	return mktime(&tm);
+	TzSpecificLocalTimeToSystemTime(NULL, &tmLocal, &tmUTC);
+	if (!SystemTimeToFileTime(&tmUTC, &utc)) utc =(FILETIME){0, 0};
+
+	return utc;
 }
 
 
@@ -891,7 +923,6 @@ static word32 fst_shutdown(void) {
 static word32 fst_startup(void) {
 	// if restart, close any previous files.
 
-	struct stat st;
 
 	if (!g_cfg_host_path) return invalidFSTop;
 	if (!*g_cfg_host_path) return invalidFSTop;
@@ -903,17 +934,34 @@ static word32 fst_startup(void) {
 	fst_shutdown();
 
 	memset(&cookies, 0, sizeof(cookies));
-	if (stat(root, &st) < 0) {
-		fprintf(stderr, "%s does not exist\n", root);
-		return invalidFSTop;
-	}
-	if (!S_ISDIR(st.st_mode)) {
-		fprintf(stderr, "%s is not a directory\n", root);
-		return invalidFSTop;
-	}
 
-	root_ino = st.st_ino;
-	root_dev = st.st_dev;
+	HANDLE h = CreateFile(root, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (h == INVALID_HANDLE_VALUE) {
+		fprintf(stderr, "%s does not exist or is not accessible\n", root);
+		return invalidFSTop;
+	}
+	FILE_BASIC_INFO fbi;
+ 	BY_HANDLE_FILE_INFORMATION info;
+
+ 	GetFileInformationByHandle(h, &info);
+	GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
+	// can't delete volume root. 
+ 	CloseHandle(h);
+
+ 	root_file_id[0] = info.dwVolumeSerialNumber;
+ 	root_file_id[1] = info.nFileIndexHigh;
+ 	root_file_id[2] = info.nFileIndexLow;
+
+
+	if (!(fbi.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+		fprintf(stderr, "%s is not a directory\n", root);
+		CloseHandle(h);
+		return invalidFSTop;
+	}
+	CloseHandle(h);
+
+	//root_ino = st.st_ino;
+	//root_dev = st.st_dev;
 
 	return 0;
 }
@@ -1002,20 +1050,28 @@ static word32 fst_create(int class, const char *path) {
 
 static word32 fst_destroy(int class, const char *path) {
 
-	struct stat st;
-
+	HANDLE h;
 	if (!path) return badStoreType;
 
-	if (stat(path, &st) < 0) {
-		return map_errno();
-	}
+
+	h = CreateFile(path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (h == INVALID_HANDLE_VALUE) return map_last_error();
 
 	// can't delete volume root. 
-	if (st.st_ino == root_ino && st.st_dev == root_dev) {
-		return badStoreType;
-	}
+ 	FILE_BASIC_INFO fbi;
+ 	BY_HANDLE_FILE_INFORMATION info;
+ 	GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
+ 	GetFileInformationByHandle(h, &info);
+ 	CloseHandle(h);
 
-	int ok = S_ISDIR(st.st_mode) ? RemoveDirectory(path) : DeleteFile(path);
+ 	DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
+ 	if (memcmp(&id, &root_file_id, sizeof(root_file_id)) == 0) {
+  		return badStoreType;
+ 	}
+
+
+	int ok = fbi.FileAttributes & FILE_ATTRIBUTE_DIRECTORY ?
+		RemoveDirectory(path) : DeleteFile(path);
 
 	if (!ok) return map_last_error();
 	return 0;
@@ -1409,7 +1465,7 @@ static word32 fst_open(int class, const char *path) {
 	if (access > 3) return paramRangeErr;
 
 	// special access checks for directories.
-	if (S_ISDIR(fi.st_mode)) {
+	if (fi.storage_type == 0x0f || fi.storage_type == 0x0d) {
 		if (resource_number) return resForkNotFound;
 		switch (request_access) {
 			case readEnableAllowWrite:
@@ -1949,10 +2005,20 @@ static word32 fst_get_dir_entry(int class) {
 static word32 fst_change_path(int class, const char *path1, const char *path2) {
 
 	/* make sure they're not trying to rename the volume... */
-	struct stat st;
-	if (stat(path1, &st) < 0) return map_errno();
-	if (st.st_dev == root_dev && st.st_ino == root_ino)
-		return invalidAccess;
+	HANDLE h;
+
+	h = CreateFile(path1, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (h == INVALID_HANDLE_VALUE) return map_last_error();
+
+	// can't delete volume root. 
+ 	BY_HANDLE_FILE_INFORMATION info;
+ 	GetFileInformationByHandle(h, &info);
+ 	CloseHandle(h);
+
+ 	DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
+ 	if (memcmp(&id, &root_file_id, sizeof(root_file_id)) == 0) {
+ 		return invalidAccess;
+ 	}
 
 	if (!MoveFile(path1, path2)) return map_last_error();	
 	return 0;
