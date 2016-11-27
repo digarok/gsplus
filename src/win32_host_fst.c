@@ -533,7 +533,19 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 	// 0x40 = rename enable
 	// 0x80 = destroy enable
 
-	fi->access = 0xc3; // placeholder...
+	word16 access = 0;
+
+	if (info.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+		access = 0x01;
+	else
+		access = 0x01 | 0x02 | 0x40 | 0x80;
+
+	if (info.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
+		access |= 0x04;
+
+	// map FILE_ATTRIBUTE_ARCHIVE to backup needed bit?
+
+	fi->access = access;
 
 	// get file type/aux type
 
