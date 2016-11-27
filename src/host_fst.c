@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "defc.h"
 #include "gsos.h"
@@ -23,14 +24,18 @@
 #include <sys/paths.h>
 #endif
 
-
-
-
 #if defined(__linux__)
 #include <sys/xattr.h>
-#include <sys/time.h>
 #endif
 
+#if defined(__FreeBSD__)
+#include <sys/types.h>
+#include <sys/extattr.h>
+#endif
+
+#if defined(_AIX)
+#include <sys/ea.h>
+#endif
 
 #ifndef XATTR_FINDERINFO_NAME
 #define XATTR_FINDERINFO_NAME "com.apple.FinderInfo"
@@ -40,9 +45,6 @@
 #define XATTR_RESOURCEFORK_NAME "com.apple.ResourceFork"
 #endif
 
-#ifndef O_BINARY
-#define O_BINARY 0
-#endif
 
 extern Engine_reg engine;
 
