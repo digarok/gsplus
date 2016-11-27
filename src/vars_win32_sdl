@@ -1,6 +1,9 @@
 TARGET = gsplus.exe
 NAME = gsplus
-OBJECTS = sdl2_driver.o $(OBJECTS1) sdl2snd_driver.o
+
+FSTOBJ = win32_host_fst.o
+
+OBJECTS = sdl2_driver.o $(OBJECTS1)  $(FSTOBJ) sdl2snd_driver.o
 
 CCOPTS = -O2 -DGSPLUS_LITTLE_ENDIAN  -DHAVE_SDL -DWIN_SDL -DTOGGLE_STATUS -I/usr/include/SDL2 
 CPPOPTS = -O2 -DGSPLUS_LITTLE_ENDIAN -DHAVE_SDL -DWIN_SDL -DTOGGLE_STATUS -I /usr/include/freetype2 -I/usr/include/SDL2
