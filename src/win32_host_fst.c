@@ -110,14 +110,20 @@ static int afp_to_filetype(struct AFP_Info *info, word16 *file_type, word32 *aux
 	return 0;
 }
 
-static void afp_synchronize(struct AFP_Info *info) {
+enum { prefer_prodos, prefer_hfs };
+static void afp_synchronize(struct AFP_Info *info, int preference) {
 	// if ftype/auxtype is inconsistent between prodos and finder info, use
 	// prodos as source of truth.
 	word16 f;
 	word32 a;
 	if (finder_info_to_filetype(info->finder_info, &f, &a) != 0) return;
 	if (f == info->prodos_file_type && a == info->prodos_aux_type) return;
-	file_type_to_finder_info(info->finder_info, info->prodos_file_type, info->prodos_aux_type);
+	if (preference == prefer_prodos)
+		file_type_to_finder_info(info->finder_info, info->prodos_file_type, info->prodos_aux_type);
+	else {
+		info->prodos_file_type = f;
+		info->prodos_aux_type = a;
+	}
 }
 
 
@@ -508,6 +514,32 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 	}
 }
 
+static word16 map_attributes(DWORD dwFileAttributes) {
+
+	// 0x01 = read enable
+	// 0x02 = write enable
+	// 0x04 = invisible
+	// 0x08 = reserved
+	// 0x10 = reserved
+	// 0x20 = backup needed
+	// 0x40 = rename enable
+	// 0x80 = destroy enable
+
+	word16 access = 0;
+
+	if (dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+		access = readEnable;
+	else
+		access = readEnable | writeEnable | renameEnable | destroyEnable;
+
+	if (dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
+		access |= fileInvisible;
+
+	// map FILE_ATTRIBUTE_ARCHIVE to backup needed bit?
+
+	return access;
+}
+
 static word32 get_file_info(const char *path, struct file_info *fi) {
 
 
@@ -575,7 +607,7 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 	// map FILE_ATTRIBUTE_ARCHIVE to backup needed bit?
 
-	fi->access = access;
+	fi->access = map_attributes(info.dwFileAttributes);
 
 
 	CloseHandle(h);
@@ -588,36 +620,66 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 	if (fi->has_fi && fi->storage_type != 0x0d && fi->storage_type != 0x0f) {
 		char *rpath = append_string(path, ":AFP_AfpInfo");
 
-		HANDLE h = CreateFile(rpath, GENERIC_READ | GENERIC_WRITE, 
-			FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		HANDLE h = CreateFile(rpath, GENERIC_WRITE, 
+			FILE_SHARE_READ , NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (h == INVALID_HANDLE_VALUE) return map_last_error();
 
 		WriteFile(h, &fi->afp, sizeof(struct AFP_Info), NULL, NULL);
 		CloseHandle(h);
 	}
 
-	// todo -- also map hidden / read only attributes.
 
 	if (fi->create_date.dwLowDateTime || fi->create_date.dwHighDateTime 
 		|| fi->modified_date.dwLowDateTime || fi->modified_date.dwHighDateTime) {
 		// SetFileInformationByHandle can modify dates.
 		HANDLE h;
-		h = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		h = CreateFile(path, FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (h == INVALID_HANDLE_VALUE) return map_last_error();
 
-		// just use FILETIME in the file_info if WIN32?
-
 		FILE_BASIC_INFO fbi;
+		FILE_BASIC_INFO newfbi;
 		memset(&fbi, 0, sizeof(fbi));
+		memset(&newfbi, 0, sizeof(newfbi));
 
-		fbi.CreationTime.LowPart = fi->create_date.dwLowDateTime;
-		fbi.CreationTime.HighPart = fi->create_date.dwHighDateTime;
-		//fbi.ChangeTime.LowPart = fi->modified_date.dwLowDateTime; //?
-		//fbi.ChangeTime.HighPart = fi->modified_date.dwHighDateTime; //?
-		fbi.LastWriteTime.LowPart = fi->modified_date.dwLowDateTime;
-		fbi.LastWriteTime.HighPart = fi->modified_date.dwHighDateTime;
+		BOOL ok;
+		ok = GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
 
-		BOOL ok = SetFileInformationByHandle(h, FileBasicInfo, &fbi, sizeof(fbi));
+		int delta = 0;
+
+		word16 old_access = map_attributes(fbi.FileAttributes);
+		if (fi->access && fi->access != old_access) {
+			newfbi.FileAttributes = fbi.FileAttributes;
+
+			if (fi->access & fileInvisible) {
+				delta = 1;
+				newfbi.FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
+			}
+			// hfs fst only marks it read enable if all are clear.
+			word16 locked = writeEnable | destroyEnable | renameEnable;
+			if ((fi->access & locked) == 0) {
+				delta = 1;
+				newfbi.FileAttributes |= FILE_ATTRIBUTE_READONLY;
+			}
+		}
+
+		// todo -- compare against nt file time to see if it's actually changed.
+		// to prevent time stamp truncation.
+
+		if (fi->create_date.dwLowDateTime || fi->create_date.dwHighDateTime) {
+			delta = 1;
+			newfbi.CreationTime.LowPart = fi->create_date.dwLowDateTime;
+			newfbi.CreationTime.HighPart = fi->create_date.dwHighDateTime;
+		}
+		if (fi->modified_date.dwLowDateTime || fi->modified_date.dwHighDateTime) {
+			delta = 1;
+			newfbi.LastWriteTime.LowPart = fi->modified_date.dwLowDateTime;
+			newfbi.LastWriteTime.HighPart = fi->modified_date.dwHighDateTime;
+			//newfbi.ChangeTime.LowPart = fi->modified_date.dwLowDateTime; //?
+			//newfbi.ChangeTime.HighPart = fi->modified_date.dwHighDateTime; //?
+		}
+
+		if (delta)
+			ok = SetFileInformationByHandle(h, FileBasicInfo, &newfbi, sizeof(newfbi));
 		CloseHandle(h);
 	}
 	return 0;
@@ -1197,7 +1259,7 @@ static word32 fst_set_file_info(int class, const char *path) {
 
 	// one more check... if ftype/auxtype doesn't match the ftype/auxtype in finder info
 	// update finder info
-	if (fi.has_fi) afp_synchronize(&fi.afp);
+	if (fi.has_fi) afp_synchronize(&fi.afp, prefer_prodos);
 
 	return set_file_info(path, &fi);
 }
