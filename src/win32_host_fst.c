@@ -70,21 +70,54 @@ struct AFP_Info {
 static void free_directory(struct directory *dd);
 static struct directory *read_directory(const char *path, word16 *error);
 
+static int file_type_to_finder_info(byte *buffer, word16 file_type, word32 aux_type);
+static int finder_info_to_filetype(const byte *buffer, word16 *file_type, word32 *aux_type);
 
-static void init_afp_info(struct AFP_Info *info) {
+
+static void afp_init(struct AFP_Info *info, word16 file_type, word32 aux_type) {
 	//static_assert(sizeof(AFP_Info) == 60, "Incorrect AFP_Info size");
 	memset(info, 0, sizeof(*info));
 	info->magic = 0x00504641;
 	info->version = 0x00010000;
+	info->prodos_file_type = file_type;
+	info->prodos_aux_type = aux_type;
+	if (file_type || aux_type)
+		file_type_to_finder_info(info->finder_info, file_type, aux_type);
 }
 
-static BOOL verify_afp_info(struct AFP_Info *info) {
+static BOOL afp_verify(struct AFP_Info *info) {
 	if (!info) return 0;
 
 	if (info->magic != 0x00504641) return 0;
 	if (info->version != 0x00010000) return 0;
 
 	return 1;
+}
+
+
+static int afp_to_filetype(struct AFP_Info *info, word16 *file_type, word32 *aux_type) {
+	// check for prodos ftype/auxtype...
+	if (info->prodos_file_type || info->prodos_aux_type) {
+		*file_type = info->prodos_file_type;
+		*aux_type = info->prodos_aux_type;
+		return 0;
+	}
+	int ok = finder_info_to_filetype(info->finder_info, file_type, aux_type);
+	if (ok == 0) {
+		info->prodos_file_type = *file_type;
+		info->prodos_aux_type = *aux_type;
+	}
+	return 0;
+}
+
+static void afp_synchronize(struct AFP_Info *info) {
+	// if ftype/auxtype is inconsistent between prodos and finder info, use
+	// prodos as source of truth.
+	word16 f;
+	word32 a;
+	if (finder_info_to_filetype(info->finder_info, &f, &a) != 0) return;
+	if (f == info->prodos_file_type && a == info->prodos_aux_type) return;
+	file_type_to_finder_info(info->finder_info, info->prodos_file_type, info->prodos_aux_type);
 }
 
 
@@ -109,7 +142,7 @@ static int alloc_cookie() {
 static int free_cookie(int cookie) {
 	if (cookie < COOKIE_BASE) return -1;
 	cookie -= COOKIE_BASE;
-	if (cookie >= 32 *32) return -1;
+	if (cookie >= 32 * 32) return -1;
 
 	int chunk = cookie / 32;
 	int offset = 1 << (cookie % 32);
@@ -257,7 +290,7 @@ static word32 map_last_error() {
 static struct fd_entry *find_fd(int cookie) {
 	struct fd_entry *head = fd_head;
 
-	while(head) {
+	while (head) {
 		if (head->cookie == cookie) return head;
 		head = head->next;
 	}
@@ -315,7 +348,8 @@ struct file_info {
 	word32 resource_eof;
 	word32 resource_blocks;
 	int has_fi;
-	byte finder_info[32];
+	//byte finder_info[32];
+	struct AFP_Info afp;
 };
 
 static int hex(byte c)
@@ -325,6 +359,7 @@ static int hex(byte c)
 	if (c >= 'A' && c <= 'F') return c + 10 - 'A';
 	return 0;
 }
+
 
 
 static int finder_info_to_filetype(const byte *buffer, word16 *file_type, word32 *aux_type) {
@@ -441,22 +476,22 @@ static int file_type_to_finder_info(byte *buffer, word16 file_type, word32 aux_t
 }
 
 
+
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	HANDLE h;
 
 	char *p = append_string(path, ":AFP_Resource");
-	FILE_STANDARD_INFO fsi;
-	memset(&fsi, 0, sizeof(fsi));
+	LARGE_INTEGER size = { 0 };
+
 
 	h = CreateFile(p, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
 	if (h != INVALID_HANDLE_VALUE) {
-		GetFileInformationByHandleEx(h, FileStandardInfo, &fsi, sizeof(fsi));
-
+		GetFileSizeEx(h, &size);
 		CloseHandle(h);
 	}
-	fi->resource_eof = fsi.EndOfFile.LowPart;
-	fi->resource_blocks = (fsi.AllocationSize.LowPart + 511) / 512;
+	fi->resource_eof = size.LowPart;
+	fi->resource_blocks = (size.LowPart + 511) / 512;
 
 
 	p = append_string(path, ":AFP_AfpInfo");
@@ -464,18 +499,13 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 	h = CreateFile(p, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
 	if (h != INVALID_HANDLE_VALUE) {
-		// ... todo....
-		/*
-		int tmp = read(fd, fi->finder_info, 32);
-		if (tmp == 16 || tmp == 32) {
-			fi->has_fi = 1;
-			finder_info_to_filetype(fi->finder_info, &fi->file_type, &fi->aux_type);
+		DWORD read = 0;
+		if (ReadFile(h, &fi->afp, sizeof(struct AFP_Info), &read, NULL) && read == sizeof(struct AFP_Info)) {
+			if (afp_verify(&fi->afp)) fi->has_fi = 1;
+			afp_to_filetype(&fi->afp, &fi->file_type, &fi->aux_type);
 		}
-		*/
 		CloseHandle(h);
 	}
-
-
 }
 
 static word32 get_file_info(const char *path, struct file_info *fi) {
@@ -547,8 +577,6 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 	fi->access = access;
 
-	// get file type/aux type
-
 
 	CloseHandle(h);
 	return 0;
@@ -564,9 +592,11 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 			FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (h == INVALID_HANDLE_VALUE) return map_last_error();
 
-		// todo -- verify format, update, ...
+		WriteFile(h, &fi->afp, sizeof(struct AFP_Info), NULL, NULL);
 		CloseHandle(h);
 	}
+
+	// todo -- also map hidden / read only attributes.
 
 	if (fi->create_date.dwLowDateTime || fi->create_date.dwHighDateTime 
 		|| fi->modified_date.dwLowDateTime || fi->modified_date.dwHighDateTime) {
@@ -582,8 +612,8 @@ static word32 set_file_info(const char *path, struct file_info *fi) {
 
 		fbi.CreationTime.LowPart = fi->create_date.dwLowDateTime;
 		fbi.CreationTime.HighPart = fi->create_date.dwHighDateTime;
-		fbi.ChangeTime.LowPart = fi->modified_date.dwLowDateTime; //?
-		fbi.ChangeTime.HighPart = fi->modified_date.dwHighDateTime; //?
+		//fbi.ChangeTime.LowPart = fi->modified_date.dwLowDateTime; //?
+		//fbi.ChangeTime.HighPart = fi->modified_date.dwHighDateTime; //?
 		fbi.LastWriteTime.LowPart = fi->modified_date.dwLowDateTime;
 		fbi.LastWriteTime.HighPart = fi->modified_date.dwHighDateTime;
 
@@ -998,7 +1028,8 @@ static word32 fst_create(int class, const char *path) {
 
 
 		if (pcount >= 4) {
-			file_type_to_finder_info(fi.finder_info, fi.file_type, fi.aux_type);
+			afp_init
+		(&fi.afp, fi.file_type, fi.aux_type);
 			fi.has_fi = 1;
 		}
 
@@ -1010,12 +1041,13 @@ static word32 fst_create(int class, const char *path) {
 		fi.storage_type = get_memory16_c(pb + CreateRec_storageType, 0);
 		fi.create_date = get_date_time(pb + CreateRec_createDate);
 
-		file_type_to_finder_info(fi.finder_info, fi.file_type, fi.aux_type);
+		afp_init
+	(&fi.afp, fi.file_type, fi.aux_type);
 		fi.has_fi = 1;
 	}
 	int ok;
 
-	if (fi.storage_type == 0x0d) {
+	if (fi.storage_type == 0x0d || fi.storage_type == 0x0f) {
 		ok = CreateDirectory(path, NULL);
 		if (!ok) return map_last_error();
 		return 0;
@@ -1115,10 +1147,13 @@ static word32 fst_set_file_info(int class, const char *path) {
 		if (pcount >= 8) option_list = get_memory24_c(pb + FileInfoRecGS_optionList, 0);
 		// remainder reserved
 
-		if (pcount >= 4) {
-			file_type_to_finder_info(fi.finder_info, fi.file_type, fi.aux_type);
-			fi.has_fi = 1;
+		if (fi.has_fi) {
+			if (pcount < 4) fi.aux_type = fi.afp.prodos_aux_type;
+			if (pcount < 3) fi.file_type = fi.afp.prodos_file_type;
 		}
+
+
+
 
 	} else {
 		fi.access = get_memory16_c(pb + FileRec_fAccess, 0);
@@ -1128,10 +1163,19 @@ static word32 fst_set_file_info(int class, const char *path) {
 		//fi.storage_type = get_memory32_c(pb + FileRec_storageType, 0);
 		fi.create_date = get_date_time(pb + FileRec_createDate);
 		fi.modified_date = get_date_time(pb + FileRec_modDate);
+	}
 
-		file_type_to_finder_info(fi.finder_info, fi.file_type, fi.aux_type);
+
+	if (fi.has_fi) {
+		fi.afp.prodos_file_type = fi.file_type;
+		fi.afp.prodos_aux_type = fi.aux_type;
+	}
+	else {
+		afp_init(&fi.afp, fi.file_type, fi.aux_type);
 		fi.has_fi = 1;
 	}
+
+
 
 	if (option_list) {
 		// total size, req size, fst id, data...
@@ -1141,12 +1185,19 @@ static word32 fst_set_file_info(int class, const char *path) {
 
 		int size = req_size - 6;
 		if ((fst_id == proDOSFSID || fst_id == hfsFSID || fst_id == appleShareFSID) && size >= 32) {
+
+			// this should never happen...
+			if (!fi.has_fi) afp_init(&fi.afp, fi.file_type, fi.aux_type);
 			fi.has_fi = 1;
+
 			for (int i = 0; i <32; ++i) 
-				fi.finder_info[i] = get_memory_c(option_list + 6 + i, 0);
+				fi.afp.finder_info[i] = get_memory_c(option_list + 6 + i, 0);
 		}
 	}
 
+	// one more check... if ftype/auxtype doesn't match the ftype/auxtype in finder info
+	// update finder info
+	if (fi.has_fi) afp_synchronize(&fi.afp);
 
 	return set_file_info(path, &fi);
 }
@@ -1177,7 +1228,7 @@ static word32 fst_get_file_info(int class, const char *path) {
 			word16 fst_id = hfsFSID;
 			//if (fi.storage_type == 0x0f) fst_id = mfsFSID;
 			word32 option_list = get_memory24_c(pb + FileInfoRecGS_optionList, 0);
-			rv = set_option_list(option_list,  fst_id, fi.finder_info, fi.has_fi ? 32 : 0);
+			rv = set_option_list(option_list,  fst_id, fi.afp.finder_info, fi.has_fi ? 32 : 0);
 		}
 		if (pcount >= 9) set_memory32_c(pb + FileInfoRecGS_eof, fi.eof, 0);
 		if (pcount >= 10) set_memory32_c(pb + FileInfoRecGS_blocksUsed, fi.blocks, 0);
@@ -1533,7 +1584,7 @@ static word32 fst_open(int class, const char *path) {
 			//if (fi.storage_type == 0x0f) fst_id = mfsFSID;
 
 			word32 option_list = get_memory24_c(pb + OpenRecGS_optionList, 0); 
-			word32 tmp = set_option_list(option_list, fst_id, fi.finder_info, fi.has_fi ? 32 : 0);
+			word32 tmp = set_option_list(option_list, fst_id, fi.afp.finder_info, fi.has_fi ? 32 : 0);
 			if (!rv) rv = tmp; 
 		}
 
@@ -1987,7 +2038,7 @@ static word32 fst_get_dir_entry(int class) {
 			word16 fst_id = hfsFSID;
 			//if (fi.storage_type == 0x0f) fst_id = mfsFSID;
 			word32 option_list = get_memory24_c(pb + DirEntryRecGS_optionList, 0);
-			word32 tmp = set_option_list(option_list, fst_id, fi.finder_info, fi.has_fi ? 32 : 0);
+			word32 tmp = set_option_list(option_list, fst_id, fi.afp.finder_info, fi.has_fi ? 32 : 0);
 			if (!rv) rv = tmp;
 		}
 
