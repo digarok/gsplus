@@ -4,11 +4,11 @@
 
 #define _WIN32_WINNT 0x0600 // vista+
 #include <Windows.h>
-#include <io.h>
 
 #include <errno.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "defc.h"
 #include "gsos.h"
@@ -245,7 +245,9 @@ static word32 map_errno() {
 		case 0: return 0;
 		case EBADF:
 			return invalidAccess;
+#ifdef EDQUOT
 		case EDQUOT:
+#endif
 		case EFBIG:
 			return volumeFull;
 		case ENOENT:
