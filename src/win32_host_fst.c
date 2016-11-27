@@ -570,7 +570,7 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 	fi->modified_date = info.ftLastWriteTime;
 
 	if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-		fi->storage_type = 0x0d;
+		fi->storage_type = directoryFile;
 		fi->file_type = 0x0f;
 
 	 	DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
@@ -1154,36 +1154,67 @@ static word32 fst_create(int class, const char *path) {
 }
 
 
-static word32 fst_destroy(int class, const char *path) {
-
+static word16 storage_type(const char *path, word16 *error) {
+	if (!path) {
+		*error = badPathSyntax; 
+		return 0; // ?
+	}
 	HANDLE h;
-	if (!path) return badStoreType;
-
-
 	h = CreateFile(path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-	if (h == INVALID_HANDLE_VALUE) return map_last_error();
+	if (h == INVALID_HANDLE_VALUE) {
+		*error = map_last_error();
+		return 0;
+	}
 
-	// can't delete volume root. 
- 	FILE_BASIC_INFO fbi;
  	BY_HANDLE_FILE_INFORMATION info;
- 	GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
  	GetFileInformationByHandle(h, &info);
  	CloseHandle(h);
 
  	DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
  	if (memcmp(&id, &root_file_id, sizeof(root_file_id)) == 0) {
-  		return badStoreType;
+  		return 0x0f;
  	}
 
+ 	if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+ 		return directoryFile;
 
-	int ok = fbi.FileAttributes & FILE_ATTRIBUTE_DIRECTORY ?
-		RemoveDirectory(path) : DeleteFile(path);
+ 	return standardFile;
+}
+
+static word32 fst_destroy(int class, const char *path) {
+
+	word16 rv = 0;
+	BOOL ok = 0;
+	word16 type = storage_type(path, &rv);
+	if (rv) return rv;
+	if (read_only) return drvrWrtProt;
+
+	switch(type) {
+		case 0: return fileNotFound;
+		case 0x0f: return badStoreType;
+		default: return badStoreType;
+
+		case directoryFile:
+			ok = RemoveDirectory(path);
+			break;
+		case sapling:
+		case seedling:
+		case tree:
+		case extendedFile:
+			ok = DeleteFile(path);
+			break;
+	}
 
 	if (!ok) return map_last_error();
 	return 0;
 }
 
 static word32 fst_set_file_info(int class, const char *path) {
+
+	word16 rv = 0;
+	word16 type = storage_type(path, &rv);
+	if (rv) return rv;
+	if (read_only) return drvrWrtProt;
 
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
@@ -1214,9 +1245,6 @@ static word32 fst_set_file_info(int class, const char *path) {
 			if (pcount < 3) fi.file_type = fi.afp.prodos_file_type;
 		}
 
-
-
-
 	} else {
 		fi.access = get_memory16_c(pb + FileRec_fAccess, 0);
 		fi.file_type = get_memory16_c(pb + FileRec_fileType, 0);
@@ -1236,8 +1264,6 @@ static word32 fst_set_file_info(int class, const char *path) {
 		afp_init(&fi.afp, fi.file_type, fi.aux_type);
 		fi.has_fi = 1;
 	}
-
-
 
 	if (option_list) {
 		// total size, req size, fst id, data...
@@ -1383,6 +1409,12 @@ static word32 fst_volume(int class) {
 }
 
 static word32 fst_clear_backup(int class, const char *path) {
+
+	word16 rv = 0;
+	word16 type = storage_type(path, &rv);
+	if (rv) return rv;
+	if (read_only) return drvrWrtProt;
+
 	return invalidFSTop;
 }
 
@@ -1701,6 +1733,9 @@ static word32 fst_read(int class) {
 			return badStoreType;
 	}
 
+	if (!(e->access & readEnable))
+		return invalidAccess;
+
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
 
 	word32 data_buffer = 0;
@@ -1776,14 +1811,14 @@ static word32 fst_write(int class) {
 
 	if (!e) return invalidRefNum;
 
-	if (!(e->access & writeEnable))
-		return invalidAccess;
-
 	switch (e->type) {
 		case directory_file:
 			return badStoreType;
 	}
+	if (read_only) return drvrWrtProt;
 
+	if (!(e->access & writeEnable))
+		return invalidAccess;
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
 
@@ -1914,7 +1949,10 @@ static word32 fst_set_eof(int class) {
 		case directory_file:
 			return badStoreType;
 	}
+	if (read_only) return drvrWrtProt;
 
+	if (!(e->access & writeEnable))
+		return invalidAccess;
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
 
@@ -2130,20 +2168,13 @@ static word32 fst_get_dir_entry(int class) {
 static word32 fst_change_path(int class, const char *path1, const char *path2) {
 
 	/* make sure they're not trying to rename the volume... */
-	HANDLE h;
+	BOOL ok = 0;
 
-	h = CreateFile(path1, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-	if (h == INVALID_HANDLE_VALUE) return map_last_error();
-
-	// can't delete volume root. 
- 	BY_HANDLE_FILE_INFORMATION info;
- 	GetFileInformationByHandle(h, &info);
- 	CloseHandle(h);
-
- 	DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
- 	if (memcmp(&id, &root_file_id, sizeof(root_file_id)) == 0) {
- 		return invalidAccess;
- 	}
+	word16 rv = 0;
+	word16 type = storage_type(path1, &rv);
+	if (rv) return rv;
+	if (type == 0x0f) return badStoreType;
+	if (read_only) return drvrWrtProt;
 
 	if (!MoveFile(path1, path2)) return map_last_error();	
 	return 0;
