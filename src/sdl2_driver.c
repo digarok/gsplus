@@ -33,6 +33,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <string.h>
 #include "defc.h"
 
 // BITMASKS
@@ -555,9 +556,58 @@ void x_full_screen(int do_full) { }
 void x_release_kimage(Kimage* kimage_ptr) { }
 // OG Addding ratio
 int x_calc_ratio(float x,float y) { return 1; }
-// TODO: Add clipboard support
-void clipboard_paste(void) { }
-int clipboard_get_char(void) { return 0; }
+
+
+static char *g_clipboard = NULL;
+static size_t  g_clipboard_pos = 0;
+
+void clipboard_paste(void) {
+
+	char *cp;
+
+	if (g_clipboard) {
+		free(g_clipboard);
+		g_clipboard = NULL;
+		g_clipboard_pos = 0;
+	}
+
+	cp =  SDL_GetClipboardText();
+	if (!cp) return;
+
+	g_clipboard = strdup(cp);
+	g_clipboard_pos = 0;
+
+	SDL_free(cp);
+}
+
+int clipboard_get_char(void) {
+	char c;
+
+	if (!g_clipboard)
+		return 0;
+
+	/* skip utf-8 characters. */
+	do {
+		c = g_clipboard[g_clipboard_pos++];
+	} while (c & 0x80);
+
+	/* windows -- skip the \n in \r\n. */  
+	if (c == '\r' && g_clipboard[g_clipboard_pos] == '\n')
+			g_clipboard_pos++;
+
+	/* everybody else -- convert \n to \r */
+	if (c == '\n') c = '\r';
+
+	if (c == 0) {
+		free(g_clipboard);
+		g_clipboard = NULL;
+		g_clipboard_pos = 0;
+		return 0;		
+	}
+
+	return c | 0x80;
+}
+
 void x_set_mask_and_shift(word32 x_mask, word32 *mask_ptr, int *shift_left_ptr, int *shift_right_ptr) {	return; }
 void x_update_color(int col_num, int red, int green, int blue, word32 rgb) { }
 void x_update_physical_colormap() { }
