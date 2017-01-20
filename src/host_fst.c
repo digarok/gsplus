@@ -12,7 +12,6 @@
 #include <ctype.h>
 #include <string.h>
 #include <time.h>
-#include <sys/time.h>
 
 #include "defc.h"
 #include "gsos.h"
@@ -24,7 +23,14 @@
 #include <sys/paths.h>
 #endif
 
-#if defined(__linux__)
+#ifdef __linux__
+#include <sys/xattr.h>
+
+#endif
+
+
+#if defined(_WIN32) || defined(WIN_SDL) 
+#include <io.h>
 #include <sys/xattr.h>
 #endif
 

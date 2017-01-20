@@ -3,21 +3,21 @@
  Copyright (C) 2016 - Dagen Brock
 
  Copyright (C) 2010 - 2014 by GSport contributors
- 
+
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -36,7 +36,7 @@
 
 #ifdef HAVE_TFE
 #include "tfe/tfesupp.h"
-#include "tfe/protos_tfe.h" 
+#include "tfe/protos_tfe.h"
 #endif
 
 #if defined _MSC_VER
@@ -575,8 +575,7 @@ config_init()
 	// Find the configuration file
 	g_config_gsplus_name[0] = 0;
 	can_create = 1;
-	setup_gsplus_file(&g_config_gsplus_name[0], sizeof(g_config_gsplus_name), 0,
-				can_create, &g_config_gsplus_name_list[0]);
+	setup_gsplus_file(&g_config_gsplus_name[0], sizeof(g_config_gsplus_name), 0, can_create, &g_config_gsplus_name_list[0]);
 
 	config_parse_config_gsplus_file();
 }
@@ -656,9 +655,9 @@ cfg_iwreset()
 		return;
 }
 #ifdef HAVE_TFE
-void 
+void
 cfg_get_tfe_name()
-{   
+{
 	int i = 0;
 	char *ppname = NULL;
 	char *ppdes = NULL;
@@ -679,9 +678,9 @@ cfg_get_tfe_name()
 	else
 	{
 		#if defined(_WIN32) || defined(__CYGWIN__)
-		cfg_printf("ERROR: Install/Enable WinPcap for Ethernet Support!!");	
+		cfg_printf("ERROR: Install/Enable WinPcap for Ethernet Support!!");
 		#else
-		cfg_printf("ERROR: Install/Enable LibPcap for Ethernet Support!!");	
+		cfg_printf("ERROR: Install/Enable LibPcap for Ethernet Support!!");
 		#endif
 	}
 	return;
@@ -726,8 +725,9 @@ config_parse_option(char *buf, int pos, int len, int line)
 	}
 
 	// find "name" as first contiguous string
-	printf("...parse_option: line %d, %p,%p = %s (%s) len:%d\n", line,
-		&buf[pos], buf, &buf[pos], buf, len);
+	gloghead(); printf("...parse_option: line %d, len:%d  \"%s\"\n", line, len, &buf[pos]);
+
+	// printf("...parse_option: line %d, %p,%p = %s (%s) len:%d\n", line, &buf[pos], buf, &buf[pos], buf, len);
 
 	nameptr = &buf[pos];
 	while(pos < len) {
@@ -921,8 +921,7 @@ config_load_roms()
 		if(*names_ptr == 0) {
 			continue;
 		}
-		setup_gsplus_file(&g_cfg_tmp_path[0], CFG_PATH_MAX, 1, 0,
-								names_ptr);
+		setup_gsplus_file(&g_cfg_tmp_path[0], CFG_PATH_MAX, 1, 0, names_ptr);
 		if(g_cfg_tmp_path[0] != 0) {
 			file = fopen(&(g_cfg_tmp_path[0]), "rb");
 			if(!file) {
@@ -2556,7 +2555,7 @@ cfg_file_init()
 		// Just use g_cfg_file_def_name
 		strncpy(&g_cfg_tmp_path[0], g_cfg_file_def_name, CFG_PATH_MAX);
 	}
-	
+
 	cfg_get_base_path(&g_cfg_file_curpath[0], &g_cfg_tmp_path[0], 0);
 	g_cfg_dirlist.invalid = 1;
 }
@@ -2631,7 +2630,7 @@ cfg_dirent_sortfn(const void *obj1, const void *obj2)
 #if defined(MAC) || defined(_WIN32)
 	// OG
 	ret = 0;
-//	ret = strcasecmp(direntptr1->name, direntptr2->name); 
+//	ret = strcasecmp(direntptr1->name, direntptr2->name);
 #else
 	ret = strcmp(direntptr1->name, direntptr2->name);
 #endif
@@ -2804,7 +2803,7 @@ cfg_inspect_maybe_insert_file(char *filename, int should_boot)
 /*
 Take a look at a file.  Based on its size, guess a slot/drive to insert it into.
 Used for blind operations like dragging/dropping files.
-Optionally boot from that slot. 
+Optionally boot from that slot.
 */
 	int rc = 0;
 	int slot = 0;
@@ -2819,7 +2818,7 @@ Optionally boot from that slot.
 	}
 	if (slot > 0)
 	{
-		insert_disk(slot,0,filename,0,0,0,-1);	
+		insert_disk(slot,0,filename,0,0,0,-1);
 		printf("Inserted disk in slot %d, drive 1.  Filename: %s\n", slot, filename);
 		if (should_boot) {
 			g_temp_boot_slot = slot;
@@ -3340,7 +3339,7 @@ config_control_panel()
 		}
 #endif
 #ifdef HAVE_SDL
-		/*If user enters the Virtual Imagewriter control panel, flag it so we can 
+		/*If user enters the Virtual Imagewriter control panel, flag it so we can
 		automatically apply changes on exit.*/
 		if(menuptr == g_cfg_imagewriter_menu)
 		{

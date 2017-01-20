@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <libgen.h>  // just for basename :P
+#include <string.h>
 #include "defc.h"
 #ifdef HAVE_ICON    // Currently a flag because not supported outside of SDL builds.  Looking at full solution.
   #include "icongs.h"
@@ -53,7 +54,7 @@ int kb_shift_control_state = 0;
 void x_take_screenshot(); // screenshot stuff
 int g_screenshot_requested = 0; // DB to know if we want to save a screenshot
 extern char g_config_gsplus_name[];
-extern char *g_config_gsplus_screenshot_dir;
+extern char g_config_gsplus_screenshot_dir[];
 int screenshot_index = 0;  // allows us to save time by not scanning from 0 each time
 char screenshot_filename[256];
 
@@ -422,6 +423,14 @@ check_input_events_sdl()
 				SDL_Quit();
 				my_exit(1);
 				break;
+			case SDL_DROPFILE:
+				{
+				char *file = event.drop.file;
+				cfg_inspect_maybe_insert_file(file, 0);
+				SDL_free(file);
+				}
+				break;
+
 			default:
 				break;
 		}
@@ -573,32 +582,6 @@ x_dialog_create_gsport_conf(const char *str)
 	config_write_config_gsplus_file();
 }
 
-char *g_clipboard;
-size_t  g_clipboard_pos;
-
-void clipboard_paste(void) {
-  char *clipboard;
-  if (SDL_HasClipboardText()) {
-    clipboard = SDL_GetClipboardText();
-    if (g_clipboard) {
-      free(g_clipboard);
-      g_clipboard_pos = 0;
-    }
-    g_clipboard = strdup(clipboard);
-    free(clipboard);
-  }
-}
-
-int clipboard_get_char() {
-	if (!g_clipboard)
-		return 0;
-	if (g_clipboard[g_clipboard_pos] == '\n')
-		g_clipboard_pos++;
-	if (g_clipboard[g_clipboard_pos] == '\0')
-		return 0;
-	return g_clipboard[g_clipboard_pos++] | 0x80;
-}
-
 void x_full_screen(int do_full) {
   if (do_full) {
     SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
@@ -616,11 +599,12 @@ int file_exists(char *fname){
   }
 }
 
+// This tries to determine the next screenshot name.
+// It uses the config name as the basename.
 void make_next_screenshot_filename()
 {
   char filepart[256];
   char filename[256];
-
 
   int available_filename = 0;
   while (!available_filename) {
@@ -637,7 +621,6 @@ void make_next_screenshot_filename()
     } else {
       sprintf(filename, "%s/%s%04d.png",g_config_gsplus_screenshot_dir,filepart,screenshot_index);
     }
-
     screenshot_index++;
     if (!file_exists(filename)) {
       available_filename = 1;
@@ -650,7 +633,8 @@ void make_next_screenshot_filename()
 // workaround is this horrible hack of saving the bmp -> load bmp -> save png
 void x_take_screenshot() {
   make_next_screenshot_filename();
-  printf("Screenshot! --->  %s\n", screenshot_filename);
+  gloghead();
+  printf("Taking screenshot - %s\n", screenshot_filename);
   SDL_Surface *sshot = SDL_CreateRGBSurface(0, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
   SDL_LockSurface(sshot);
   int read = SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_ARGB8888, sshot->pixels, sshot->pitch);
@@ -689,6 +673,56 @@ void x_release_kimage(Kimage* kimage_ptr) { }
 // OG Addding ratio
 int x_calc_ratio(float x,float y) { return 1; }
 
+
+static char *g_clipboard = NULL;
+static size_t  g_clipboard_pos = 0;
+
+void clipboard_paste(void) {
+
+	char *cp;
+
+	if (g_clipboard) {
+		free(g_clipboard);
+		g_clipboard = NULL;
+		g_clipboard_pos = 0;
+	}
+
+	cp =  SDL_GetClipboardText();
+	if (!cp) return;
+
+	g_clipboard = strdup(cp);
+	g_clipboard_pos = 0;
+
+	SDL_free(cp);
+}
+
+int clipboard_get_char(void) {
+	char c;
+
+	if (!g_clipboard)
+		return 0;
+
+	/* skip utf-8 characters. */
+	do {
+		c = g_clipboard[g_clipboard_pos++];
+	} while (c & 0x80);
+
+	/* windows -- skip the \n in \r\n. */  
+	if (c == '\r' && g_clipboard[g_clipboard_pos] == '\n')
+			g_clipboard_pos++;
+
+	/* everybody else -- convert \n to \r */
+	if (c == '\n') c = '\r';
+
+	if (c == 0) {
+		free(g_clipboard);
+		g_clipboard = NULL;
+		g_clipboard_pos = 0;
+		return 0;		
+	}
+
+	return c | 0x80;
+}
 
 void x_set_mask_and_shift(word32 x_mask, word32 *mask_ptr, int *shift_left_ptr, int *shift_right_ptr) {	return; }
 void x_update_color(int col_num, int red, int green, int blue, word32 rgb) { }
