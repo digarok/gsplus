@@ -757,7 +757,7 @@ void debug_init()
 {
   if (g_dbg_enable_port > 0) {
     // g_dbg_enable_port should be enabled by
-    gloghead(); printf("Debug port enabled on: %d\n", g_dbg_enable_port);
+    glogf("Debug port enabled on: %d\n", g_dbg_enable_port);
     debug_setup_socket();
     debug_server_poll();
     debug_wait_hello();

@@ -181,8 +181,7 @@ adb_init()
 	for(i = 0; i < 128; i++) {
 		keycode = a2_key_to_ascii[i][0];
 		if(keycode != i) {
-			gloghead(); printf("ADB keycode lost/skipped: i=%x: keycode=%x\n",
-				i, keycode);
+			glogf("ADB keycode lost/skipped: i=%x: keycode=%x\n", i, keycode);
 			my_exit(1);
 		}
 	}
@@ -497,12 +496,12 @@ adb_set_config(word32 val0, word32 val1, word32 val2)
 	new_mouse = val0 >> 4;
 	new_kbd = val0  & 0xf;
 	if(new_mouse != g_mouse_ctl_addr) {
-		gloghead(); printf("ADB config: mouse from %x to %x!\n", g_mouse_ctl_addr, new_mouse);
+		glogf("ADB config: mouse from %x to %x!\n", g_mouse_ctl_addr, new_mouse);
 		adb_error();
 		g_mouse_ctl_addr = new_mouse;
 	}
 	if(new_kbd != g_kbd_ctl_addr) {
-		gloghead(); printf("ADB config: kbd from %x to %x!\n", g_kbd_ctl_addr, new_kbd);
+		glogf("ADB config: kbd from %x to %x!\n", g_kbd_ctl_addr, new_kbd);
 		adb_error();
 		g_kbd_ctl_addr = new_kbd;
 	}
@@ -565,7 +564,7 @@ void
 adb_set_new_mode(word32 val)
 {
 	if(val & 0x03) {
-		gloghead(); printf("Disabling keyboard/mouse:%02x!\n", val);
+		glogf("Disabling keyboard/mouse:%02x!\n", val);
 	}
 
 	if(val & 0xa2) {
@@ -1577,7 +1576,7 @@ adb_read_c000()
 		/* got one */
 		if((g_kbd_read_no_update++ > 5) && (g_kbd_chars_buffered > 1)) {
 			/* read 5 times, keys pending, let's move it along */
-			gloghead(); printf("Read %02x %d times, tossing\n", g_kbd_buf[0],
+			glogf("Read %02x %d times, tossing\n", g_kbd_buf[0],
 					g_kbd_read_no_update);
 			adb_access_c010();
 		}
@@ -1664,7 +1663,7 @@ adb_increment_speed()
 		str = "...  8.0MHz";
 		break;
 	}
-	gloghead(); printf("Setting g_limit_speed = %d  %s\n", g_limit_speed, str);
+	glogf("Setting g_limit_speed = %d  %s\n", g_limit_speed, str);
 }
 
 void
@@ -1730,7 +1729,7 @@ adb_physical_key_update(int a2code, int is_up)
 	/* Only process reset requests here */
 	if(is_up == 0 && a2code == 0x7f && CTRL_DOWN) {
 		/* Reset pressed! */
-		gloghead(); printf("Reset pressed since CTRL_DOWN: %d\n", CTRL_DOWN);
+		glogf("Reset pressed since CTRL_DOWN: %d\n", CTRL_DOWN);
 		do_reset();
 		return;
 	}
@@ -1764,7 +1763,7 @@ adb_physical_key_update(int a2code, int is_up)
 			break;
 		case 0x07: /* F7 - fast disk emul */
 			g_fast_disk_emul = !g_fast_disk_emul;
-			gloghead(); printf("g_fast_disk_emul is now %d\n",
+			glogf("g_fast_disk_emul is now %d\n",
 							g_fast_disk_emul);
 			break;
 		case 0x08: /* F8 - warp pointer */
@@ -1777,11 +1776,11 @@ adb_physical_key_update(int a2code, int is_up)
 		case 0x09: /* F9 - swap paddles */
 			if(SHIFT_DOWN) {
 				g_swap_paddles = !g_swap_paddles;
-				gloghead(); printf("Swap paddles is now: %d\n",
+				glogf("Swap paddles is now: %d\n",
 							g_swap_paddles);
 			} else {
 				g_invert_paddles = !g_invert_paddles;
-				gloghead(); printf("Invert paddles is now: %d\n",
+				glogf("Invert paddles is now: %d\n",
 							g_invert_paddles);
 			}
 			break;

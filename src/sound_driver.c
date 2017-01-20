@@ -229,7 +229,7 @@ child_sound_playit(word32 tmp)
 		reliable_buf_write(g_childsnd_shm_addr, g_childsnd_pos, size);
 
 		if(g_sound_paused) {
-			gloghead(); printf("Unpausing sound, zb: %d\n", g_zeroes_buffered);
+			glogf("Unpausing sound, zb: %d\n", g_zeroes_buffered);
 			g_sound_paused = 0;
 		}
 

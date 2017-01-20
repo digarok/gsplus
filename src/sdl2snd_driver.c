@@ -85,7 +85,7 @@ sound_write_sdl(int real_samps, int size)
         SDL_UnlockAudio();
     }
     if(g_sound_paused && (g_playbuf_buffered > 0)) {
-        gloghead(); printf("Unpausing sound, %d buffered\n",g_playbuf_buffered);
+        glogf("Unpausing sound, %d buffered\n",g_playbuf_buffered);
         g_sound_paused = 0;
         SDL_PauseAudio(0);
     }
@@ -178,7 +178,7 @@ sound_init_device_sdl()
         goto snd_error;
     g_playbuf_buffered = 0;
 
-    gloghead(); printf("Sound shared memory size=%d\n",
+    glogf("Sound shared memory size=%d\n",
             SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);
 
     g_sound_shm_addr = malloc(SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);

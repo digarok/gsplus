@@ -300,7 +300,7 @@ dev_video_init_sdl()
     // Check that the window was successfully created
     if (window == NULL) {
         // In the case that the window could not be made...
-        gloghead(); printf("Could not create window: %s\n", SDL_GetError());
+        glogf("Could not create window: %s\n", SDL_GetError());
 				//@todo die, i guess
     } else {
         glog("SDL2 graphics initialized");
@@ -633,8 +633,7 @@ void make_next_screenshot_filename()
 // workaround is this horrible hack of saving the bmp -> load bmp -> save png
 void x_take_screenshot() {
   make_next_screenshot_filename();
-  gloghead();
-  printf("Taking screenshot - %s\n", screenshot_filename);
+  glogf("Taking screenshot - %s\n", screenshot_filename);
   SDL_Surface *sshot = SDL_CreateRGBSurface(0, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
   SDL_LockSurface(sshot);
   int read = SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_ARGB8888, sshot->pixels, sshot->pitch);
@@ -707,7 +706,7 @@ int clipboard_get_char(void) {
 		c = g_clipboard[g_clipboard_pos++];
 	} while (c & 0x80);
 
-	/* windows -- skip the \n in \r\n. */  
+	/* windows -- skip the \n in \r\n. */
 	if (c == '\r' && g_clipboard[g_clipboard_pos] == '\n')
 			g_clipboard_pos++;
 
@@ -718,7 +717,7 @@ int clipboard_get_char(void) {
 		free(g_clipboard);
 		g_clipboard = NULL;
 		g_clipboard_pos = 0;
-		return 0;		
+		return 0;
 	}
 
 	return c | 0x80;

@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <time.h>
+#include <stdarg.h>
 
-int glog(char *s) {
+#include "glog.h"
+
+int glog(const char *s) {
     time_t timer;
     char buffer[26];
     struct tm* tm_info;
@@ -15,8 +18,9 @@ int glog(char *s) {
     return 0;
 }
 
-// only print partial, interim solution for not supporting printf style calling
-void gloghead() {
+
+int glogf(const char *fmt, ...) {
+
     time_t timer;
     char buffer[26];
     struct tm* tm_info;
@@ -25,5 +29,13 @@ void gloghead() {
     tm_info = localtime(&timer);
 
     strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+
     printf("%s - ", buffer);
+
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    fputc('\n', stdout);
+    return 0;
 }

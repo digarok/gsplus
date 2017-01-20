@@ -42,6 +42,7 @@
 
 #include "printer.h"
 #include <math.h>
+#include "glog.h"
 #include "support.h"
 //#include "png.h"
 //#pragma comment( lib, "libpng.lib" )
@@ -69,7 +70,7 @@ extern "C" char* g_printer_font_courier;
 extern "C" char* g_printer_font_prestige;
 extern "C" char* g_printer_font_script;
 extern "C" char* g_printer_font_ocra;
-extern "C" void gloghead();
+
 Bit8u paramc = '0';
 
 #include "printer_charmaps.h"
@@ -367,9 +368,7 @@ void CPrinter::updateFont()
 
 	if (FT_New_Face(FTlib, fontName, 0, &curFont))
 	{
-		gloghead();
-		printf("Unable to load font\n");
-		//LOG_MSG("Unable to load font %s", fontName);
+		glogf("Unable to load font %s", fontName);
 		curFont = NULL;
 	}
 
