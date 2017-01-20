@@ -135,7 +135,7 @@ char tmp_buffer2_4k[4097]; // adding +1 in case someone forgets \0
 struct sockaddr_in   addr;
 int timeout;  // poll timeout in ms
 struct pollfd fds[200];
-int nfds = 1, current_size = 0, i, j;
+int nfds = 0, current_size = 0, i, j;
 int debugger_sd = -1; // this holds our socket file descriptor for the debugger, once attached
 
 
@@ -840,6 +840,7 @@ void debug_setup_socket()
   /*************************************************************/
   fds[0].fd = listen_sd;
   fds[0].events = POLLIN;
+  nfds = 1;
   /*************************************************************/
   /* Initialize the timeout to 3 minutes. If no               */
   /* activity after 3 minutes this program will end.           */
@@ -1251,6 +1252,7 @@ void debug_server_poll()
       if(fds[i].fd >= 0)
       close(fds[i].fd);
     }
+    nfds = 0;
   }
 }
 
