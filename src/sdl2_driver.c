@@ -24,6 +24,7 @@
 // @todo: mouse clip bugs.. great western shootout. Paint 8/16.   still in win32
 #include "SDL.h"
 #include "SDL_image.h"
+#include "glog.h"
 
 #include <stdbool.h>
 #include <time.h>
@@ -264,7 +265,7 @@ dev_video_init()
 void do_icon() {
 #ifdef HAVE_ICON
 	//surface = SDL_CreateRGBSurfaceFrom(pixels,w,h,depth,pitch,rmask,gmask,bmask,amask);
-	int size = 128;           // icon size
+	int size = 256;           // icon size
 	SDL_Surface *surface;     // declare an SDL_Surface to be filled in with pixel data from an image file
 	surface = SDL_CreateRGBSurfaceFrom(icon_pixels,size,size,32,size*4,0xff000000,0x00ff0000,0x0000ff00,0x000000ff);
 

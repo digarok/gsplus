@@ -71,6 +71,7 @@ package-ubuntu-sdl2:
     paths:
       - gsplus
       - config.txt
+      - doc/README.txt
       - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
       - doc/COPYING.txt
@@ -96,9 +97,11 @@ package-osx:
   script:
     - chmod +x make_dist_mac.sh
     - ./make_dist_mac.sh
+    - chmod +x make_dmg_mac.sh
+    - ./make_dmg_mac.sh
   artifacts:
     paths:
-      - gsplus-osx.tar.gz
+      - GSplus-Install.dmg
 
 
 
@@ -127,6 +130,7 @@ package-win32:
     - cp /bin/cyggcc_s-1.dll .
     - cp /bin/cygstdc++-6.dll	.
     - cp /bin/cygwin1.dll .
+    - cp /bin/cygfreetype-6.dll .
 
   artifacts:
     paths:
@@ -134,10 +138,12 @@ package-win32:
       - config.txt
       - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
+      - doc/README.txt
       - doc/COPYING.txt
       - cyggcc_s-1.dll
       - cygstdc++-6.dll
       - cygwin1.dll
+      - cygfreetype-6.dll .
 
 
 build-win-sdl:
@@ -164,6 +170,7 @@ package-win-sdl:
     - cp /bin/cyggcc_s-1.dll .
     - cp /bin/cygstdc++-6.dll	.
     - cp /bin/cygwin1.dll .
+    - cp /bin/cygfreetype-6.dll .
 
   artifacts:
     paths:
@@ -172,6 +179,8 @@ package-win-sdl:
       - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
       - doc/COPYING.txt
+      - doc/README.txt
       - cyggcc_s-1.dll
       - cygstdc++-6.dll
       - cygwin1.dll
+      - cygfreetype-6.dll 

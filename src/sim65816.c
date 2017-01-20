@@ -1356,7 +1356,16 @@ setup_gsplus_file(char *outname, int maxlen, int ok_if_missing,
 		fatal_printf("  %s\n", *path_ptr++);
 	}
   */
-  gloghead(); fatal_printf("Could not find required file \"%s\"", *name_ptr);
+  gloghead(); printf("Could not find required file \"%s\" !!!\n", *name_ptr);
+  if (strcmp(*name_ptr, "ROM")) {
+    glog("  IIgs will likely hang now!");
+    glog("  Get an Apple IIgs firmware ROM image from somewhere like:");
+    glog("    ftp://ftp.apple.asimov.net/pub/apple_II/emulators/rom_images/");
+    glog("  ... and rename the file to \"ROM\" and restart");
+    glog("  ... or hit <F4> and browse for a valid ROM image.");
+  }
+  // if (strcmp(*name_ptr, "config.txt")) {
+  //}
 
 	if(can_create_file) {
 		// If we didn't find a file, pick a place to put it.
