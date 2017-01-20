@@ -29,7 +29,7 @@
 #include "glog.h"
 
 extern const char *g_config_gsplus_name_list[];
-extern char *g_config_gsplus_screenshot_dir;
+extern char g_config_gsplus_screenshot_dir[];
 #ifdef UNDER_CE
   #define vsnprintf _vsnprintf
 #endif
@@ -946,6 +946,10 @@ gsplusmain(int argc, char **argv)
 	sim65816_initglobals();
 	moremem_init();
 
+  printf("FOOOAAA\n" );
+  // initialize ss dir to default value (current path)
+  strcpy(g_config_gsplus_screenshot_dir, "./");
+
 	/* parse args */
 	for(i = 1; i < argc; i++) {
 		if(!strcmp("-badrd", argv[i])) {
@@ -1055,11 +1059,11 @@ gsplusmain(int argc, char **argv)
         exit(1);
       }
       printf("Using %s as configuration file\n", argv[i+1]);
-      g_config_gsplus_name_list[0] = argv[i+1]; // super dangerous ?
+      g_config_gsplus_name_list[0] = argv[i+1]; // overwrite default list with passed item as sole option
       g_config_gsplus_name_list[1] = 0; // terminate string array
       i++;
     } else if (!strcmp("-ssdir", argv[i])) {  // screenshot directory passed
-      g_config_gsplus_screenshot_dir = argv[i+1];
+      strcpy(g_config_gsplus_screenshot_dir, argv[i+1]);
       struct stat path_stat;
       int ret = stat(g_config_gsplus_screenshot_dir, &path_stat); // (weakly) validate path
       if (!S_ISDIR(path_stat.st_mode)) {
@@ -1308,9 +1312,7 @@ gsport_expand_path(char *out_ptr, const char *in_ptr, int maxlen)
 	}
 }
 
-void
-setup_gsplus_file(char *outname, int maxlen, int ok_if_missing,
-		int can_create_file, const char **name_ptr)
+void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_create_file, const char **name_ptr)
 {
 	char	local_path[256];
 	struct stat stat_buf;
@@ -1329,7 +1331,7 @@ setup_gsplus_file(char *outname, int maxlen, int ok_if_missing,
 		while(*cur_name_ptr) {
 			strcpy(outname, &(local_path[0]));
 			strncat(outname, *cur_name_ptr, 255-strlen(outname));
-			if(!ok_if_missing) {
+			if(!ok_if_missing) { // ??
 				gloghead(); printf("Trying '%s'\n", outname);
 			}
 			ret = stat(outname, &stat_buf);
@@ -1382,8 +1384,7 @@ setup_gsplus_file(char *outname, int maxlen, int ok_if_missing,
 
 		// But clear out the fatal_printfs first
 		clear_fatal_logs();
-		setup_gsplus_file(outname, maxlen, ok_if_missing,
-						can_create_file, name_ptr);
+		setup_gsplus_file(outname, maxlen, ok_if_missing,	can_create_file, name_ptr);
 		// It's one-level of recursion--it cannot loop since we
 		//  clear can_create_file.
 		// If it returns, then there was succes and we should get out

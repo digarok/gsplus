@@ -53,7 +53,7 @@ int kb_shift_control_state = 0;
 void x_take_screenshot(); // screenshot stuff
 int g_screenshot_requested = 0; // DB to know if we want to save a screenshot
 extern char g_config_gsplus_name[];
-extern char *g_config_gsplus_screenshot_dir;
+extern char g_config_gsplus_screenshot_dir[];
 int screenshot_index = 0;  // allows us to save time by not scanning from 0 each time
 char screenshot_filename[256];
 
@@ -650,7 +650,8 @@ void make_next_screenshot_filename()
 // workaround is this horrible hack of saving the bmp -> load bmp -> save png
 void x_take_screenshot() {
   make_next_screenshot_filename();
-  printf("Screenshot! --->  %s\n", screenshot_filename);
+  gloghead();
+  printf("Taking screenshot - %s\n", screenshot_filename);
   SDL_Surface *sshot = SDL_CreateRGBSurface(0, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
   SDL_LockSurface(sshot);
   int read = SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_ARGB8888, sshot->pixels, sshot->pitch);
