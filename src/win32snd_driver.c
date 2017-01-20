@@ -85,8 +85,8 @@ win32snd_shutdown()
 
 
 void CALLBACK
-handle_wav_snd(HWAVEOUT hwo, UINT uMsg, DWORD dwInstance, DWORD dwParam1,
-		DWORD dwParam2)
+handle_wav_snd(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1,
+		DWORD_PTR dwParam2)
 {
 	LPWAVEHDR	lpwavehdr;
 
@@ -155,7 +155,7 @@ child_sound_init_win32()
 	}
 
 	res = waveOutOpen(&g_wave_handle, WAVE_MAPPER, &wavefmt,
-		(DWORD)handle_wav_snd, 0, CALLBACK_FUNCTION | WAVE_ALLOWSYNC);
+		(DWORD_PTR)handle_wav_snd, 0, CALLBACK_FUNCTION | WAVE_ALLOWSYNC);
 
 	if(res != MMSYSERR_NOERROR) {
 		printf("Cannot register audio\n");
@@ -185,7 +185,7 @@ child_sound_init_win32()
 		check_wave_error(res, "waveOutPrepareHeader");
 	}
 
-	res = waveOutGetDevCaps((UINT)g_wave_handle, &caps, sizeof(caps));
+	res = waveOutGetDevCaps((UINT_PTR)g_wave_handle, &caps, sizeof(caps));
 	check_wave_error(res, "waveOutGetDevCaps");
 	printf("Using %s\n", caps.szPname);
 	printf(" Bits per Sample = %d.  Channels = %d\n",
