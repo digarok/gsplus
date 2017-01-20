@@ -163,7 +163,7 @@ int g_imagewriter_paper = 0;
 int g_imagewriter_banner = 0;
 
 int	g_config_iwm_vbl_count = 0;
-const char g_gsplus_version_str[] = "0.12s";	// 12 socket debug
+const char g_gsplus_version_str[] = "0.13";	// the "KS" special version
 int g_pause=0;	// OG Added pause
 
 #define START_DCYCS	(0.0)
@@ -946,7 +946,6 @@ gsplusmain(int argc, char **argv)
 	sim65816_initglobals();
 	moremem_init();
 
-  printf("FOOOAAA\n" );
   // initialize ss dir to default value (current path)
   strcpy(g_config_gsplus_screenshot_dir, "./");
 
@@ -1065,7 +1064,7 @@ gsplusmain(int argc, char **argv)
     } else if (!strcmp("-ssdir", argv[i])) {  // screenshot directory passed
       strcpy(g_config_gsplus_screenshot_dir, argv[i+1]);
       struct stat path_stat;
-      int ret = stat(g_config_gsplus_screenshot_dir, &path_stat); // (weakly) validate path
+      stat(g_config_gsplus_screenshot_dir, &path_stat); // (weakly) validate path
       if (!S_ISDIR(path_stat.st_mode)) {
         strcpy(g_config_gsplus_screenshot_dir, "./");
       }
@@ -2732,23 +2731,6 @@ size_fail(int val, word32 v1, word32 v2)
 }
 
 int
-fatal_printf(const char *fmt, ...)
-{
-	va_list	ap;
-	int	ret;
-
-	va_start(ap, fmt);
-
-	if(g_fatal_log < 0) {
-		g_fatal_log = 0;
-	}
-	ret = gsplus_vprintf(fmt, ap);
-	va_end(ap);
-
-	return ret;
-}
-
-int
 gsplus_vprintf(const char *fmt, va_list ap)
 {
 	char	*bufptr, *buf2ptr;
@@ -2772,6 +2754,24 @@ gsplus_vprintf(const char *fmt, va_list ap)
 		must_write(g_debug_file_fd, bufptr, len);
 	}
 	free(bufptr);
+
+	return ret;
+}
+
+
+int
+fatal_printf(const char *fmt, ...)
+{
+	va_list	ap;
+	int	ret;
+
+	va_start(ap, fmt);
+
+	if(g_fatal_log < 0) {
+		g_fatal_log = 0;
+	}
+	ret = gsplus_vprintf(fmt, ap);
+	va_end(ap);
 
 	return ret;
 }
