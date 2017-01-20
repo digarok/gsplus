@@ -23,6 +23,7 @@
 
 #include "defc.h"
 #include <time.h>
+#include "glog.h"
 #ifdef _WIN32
 # include <windows.h>
 # include <mmsystem.h>
@@ -115,8 +116,7 @@ micro_sleep(double dtime)
 	Timer.tv_sec = 0;
 	Timer.tv_usec = (dtime * 1000000.0);
 	if( (ret = select(0, 0, 0, 0, &Timer)) < 0) {
-		fprintf(stderr, "micro_sleep (select) ret: %d, errno: %d\n",
-			ret, errno);
+		glogf("micro_sleep (select) ret: %d, errno: %d", ret, errno);
 		return -1;
 	}
 #endif

@@ -746,7 +746,7 @@ void my_exit(int ret)
 	end_screen();
 	imagewriter_close();
 	printer_close();
-	glogf("exiting (ret=%d)\n",ret);
+	glogf("exiting (ret=%d)",ret);
 	fatalExit(ret);
 }
 
@@ -894,8 +894,7 @@ memory_ptr_init()
 	*/
 	g_memory_ptr = memalloc_align(mem_size, 256, &g_memory_alloc_ptr);
 
-	glogf("RAM size is 0 - %06x (%.2fMB)\n", mem_size,
-		(double)mem_size/(1024.0*1024.0));
+	glogf("RAM size is 0 - %06x (%.2fMB)", mem_size, (double)mem_size/(1024.0*1024.0));
 }
 
 // OG Added memory_ptr_shut
@@ -1331,7 +1330,7 @@ void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_cre
 			strcpy(outname, &(local_path[0]));
 			strncat(outname, *cur_name_ptr, 255-strlen(outname));
 			if(!ok_if_missing) { // ??
-				glogf("Trying '%s'\n", outname);
+				glogf("Trying '%s'", outname);
 			}
 			ret = stat(outname, &stat_buf);
 			if(ret == 0) {
@@ -1357,7 +1356,7 @@ void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_cre
 		fatal_printf("  %s\n", *path_ptr++);
 	}
   */
-  glogf("Could not find required file \"%s\" !!!\n", *name_ptr);
+  glogf("Could not find required file \"%s\" !!!", *name_ptr);
   if (strcmp(*name_ptr, "ROM")) {
     glog("  IIgs will likely hang now!");
     glog("  Get an Apple IIgs firmware ROM image from somewhere like:");

@@ -1,19 +1,19 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2016 - Dagen Brock
- 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
@@ -85,7 +85,7 @@ sound_write_sdl(int real_samps, int size)
         SDL_UnlockAudio();
     }
     if(g_sound_paused && (g_playbuf_buffered > 0)) {
-        glogf("Unpausing sound, %d buffered\n",g_playbuf_buffered);
+        glogf("Unpausing sound, %d buffered",g_playbuf_buffered);
         g_sound_paused = 0;
         SDL_PauseAudio(0);
     }
@@ -178,8 +178,7 @@ sound_init_device_sdl()
         goto snd_error;
     g_playbuf_buffered = 0;
 
-    glogf("Sound shared memory size=%d\n",
-            SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);
+    glogf("Sound shared memory size=%d", SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);
 
     g_sound_shm_addr = malloc(SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);
     memset(g_sound_shm_addr,0,SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);

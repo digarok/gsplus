@@ -725,7 +725,7 @@ config_parse_option(char *buf, int pos, int len, int line)
 	}
 
 	// find "name" as first contiguous string
-	glogf("...parse_option: line %d, len:%d  \"%s\"\n", line, len, &buf[pos]);
+	glogf("...parse_option: line %d, len:%d  \"%s\"", line, len, &buf[pos]);
 
 	// printf("...parse_option: line %d, %p,%p = %s (%s) len:%d\n", line, &buf[pos], buf, &buf[pos], buf, len);
 
@@ -889,7 +889,7 @@ config_load_roms()
 		return;
 	}
 
-	glogf("Read: %d bytes of ROM\n", ret);
+	glogf("Read: %d bytes of ROM", ret);
 	if(ret != len) {
 		fatal_printf("errno: %d\n", errno);
 		g_config_control_panel = 1;
@@ -1274,7 +1274,7 @@ config_write_config_gsplus_file()
 	int	slot, drive;
 	int	i;
 
-	glogf("Writing configuration file to %s\n", g_config_gsplus_name);
+	glogf("Writing configuration file to %s", g_config_gsplus_name);
 
 	fconf = fopen(g_config_gsplus_name, "w+");
 	if(fconf == 0) {
@@ -1540,7 +1540,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 	if(buf_2img[0] == '2' && buf_2img[1] == 'I' && buf_2img[2] == 'M' &&
 			buf_2img[3] == 'G') {
 		/* It's a 2IMG disk */
-		glogf("Image named %s is in 2IMG format\n", dsk->name_ptr);
+		glogf("Image named %s is in 2IMG format", dsk->name_ptr);
 		image_identified = 1;
 
 		if(buf_2img[12] == 0) {
@@ -1555,7 +1555,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 		}
 		if((buf_2img[17] & 1) && (dsk->image_type == DSK_TYPE_DOS33)) {
 			dsk->vol_num = buf_2img[16];
-			glogf("Setting DOS 3.3 vol num to %d\n", dsk->vol_num);
+			glogf("Setting DOS 3.3 vol num to %d", dsk->vol_num);
 		}
 		//	Some 2IMG archives have the size byte reversed
 		size = (buf_2img[31] << 24) + (buf_2img[30] << 16) +
@@ -1579,7 +1579,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 				(buf_2img[0x42] << 8) + buf_2img[0x43];
 		if((size >= (exp_size + 0x54)) && (tmp == exp_size)) {
 			/* It's diskcopy since data size field matches */
-			glogf("Image named %s is in Mac diskcopy format\n", dsk->name_ptr);
+			glogf("Image named %s is in Mac diskcopy format", dsk->name_ptr);
 			image_identified = 1;
 			dsk->image_start += 0x54;
 			dsk->image_size = exp_size;
@@ -1652,7 +1652,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 			nibs = len;
 		}
 		if(size != 35*len) {
-			glogf("Disk 5.25 error: size is %d, not 140K.  Will try to mount anyway\n", size, 35*len);
+			glogf("Disk 5.25 error: size is %d, not 140K.  Will try to mount anyway", size, 35*len);
 		}
 		for(i = 0; i < 35; i++) {
 			iwm_move_to_track(dsk, 4*i);
@@ -1740,7 +1740,7 @@ eject_disk(Disk *dsk)
 
 	iwm_flush_disk_to_unix(dsk);
 
-	glogf("Ejecting disk: %s\n", dsk->name_ptr);
+	glogf("Ejecting disk: %s", dsk->name_ptr);
 
 	/* Free all memory, close file */
 
