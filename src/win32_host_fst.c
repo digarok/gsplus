@@ -2,54 +2,17 @@
  * host_fst.c
  */
 
-#define _BSD_SOURCE
+#define _WIN32_WINNT 0x0600 // vista+
+#include <Windows.h>
 
-#include <unistd.h>
-#include <fcntl.h>
-#include <dirent.h>
 #include <errno.h>
-#include <unistd.h>
 #include <ctype.h>
 #include <string.h>
-#include <time.h>
+#include <stdint.h>
 
 #include "defc.h"
 #include "gsos.h"
 #include "fst.h"
-
-#if defined(__APPLE__) 
-#include <sys/xattr.h>
-#include <sys/attr.h>
-#include <sys/paths.h>
-#endif
-
-#ifdef __linux__
-#include <sys/xattr.h>
-
-#endif
-
-
-#if defined(_WIN32) || defined(WIN_SDL) 
-#include <io.h>
-#include <sys/xattr.h>
-#endif
-
-#if defined(__FreeBSD__)
-#include <sys/types.h>
-#include <sys/extattr.h>
-#endif
-
-#if defined(_AIX)
-#include <sys/ea.h>
-#endif
-
-#ifndef XATTR_FINDERINFO_NAME
-#define XATTR_FINDERINFO_NAME "com.apple.FinderInfo"
-#endif
-
-#ifndef XATTR_RESOURCEFORK_NAME
-#define XATTR_RESOURCEFORK_NAME "com.apple.ResourceFork"
-#endif
 
 
 extern Engine_reg engine;
@@ -86,12 +49,83 @@ struct fd_entry {
 	int cookie;
 	int type;
 	int access;
-	int fd;
+	HANDLE handle;
 	struct directory *dir;
 };
 
+#pragma pack(push, 2)
+struct AFP_Info {
+	uint32_t magic;
+	uint32_t version;
+	uint32_t file_id;
+	uint32_t backup_date;
+	uint8_t finder_info[32];
+	uint16_t prodos_file_type;
+	uint32_t prodos_aux_type;
+	uint8_t reserved[6];
+};
+#pragma pack(pop)
+
+
 static void free_directory(struct directory *dd);
 static struct directory *read_directory(const char *path, word16 *error);
+
+static int file_type_to_finder_info(byte *buffer, word16 file_type, word32 aux_type);
+static int finder_info_to_filetype(const byte *buffer, word16 *file_type, word32 *aux_type);
+
+
+static void afp_init(struct AFP_Info *info, word16 file_type, word32 aux_type) {
+	//static_assert(sizeof(AFP_Info) == 60, "Incorrect AFP_Info size");
+	memset(info, 0, sizeof(*info));
+	info->magic = 0x00504641;
+	info->version = 0x00010000;
+	info->prodos_file_type = file_type;
+	info->prodos_aux_type = aux_type;
+	if (file_type || aux_type)
+		file_type_to_finder_info(info->finder_info, file_type, aux_type);
+}
+
+static BOOL afp_verify(struct AFP_Info *info) {
+	if (!info) return 0;
+
+	if (info->magic != 0x00504641) return 0;
+	if (info->version != 0x00010000) return 0;
+
+	return 1;
+}
+
+
+static int afp_to_filetype(struct AFP_Info *info, word16 *file_type, word32 *aux_type) {
+	// check for prodos ftype/auxtype...
+	if (info->prodos_file_type || info->prodos_aux_type) {
+		*file_type = info->prodos_file_type;
+		*aux_type = info->prodos_aux_type;
+		return 0;
+	}
+	int ok = finder_info_to_filetype(info->finder_info, file_type, aux_type);
+	if (ok == 0) {
+		info->prodos_file_type = *file_type;
+		info->prodos_aux_type = *aux_type;
+	}
+	return 0;
+}
+
+enum { prefer_prodos, prefer_hfs };
+static void afp_synchronize(struct AFP_Info *info, int preference) {
+	// if ftype/auxtype is inconsistent between prodos and finder info, use
+	// prodos as source of truth.
+	word16 f;
+	word32 a;
+	if (finder_info_to_filetype(info->finder_info, &f, &a) != 0) return;
+	if (f == info->prodos_file_type && a == info->prodos_aux_type) return;
+	if (preference == prefer_prodos)
+		file_type_to_finder_info(info->finder_info, info->prodos_file_type, info->prodos_aux_type);
+	else {
+		info->prodos_file_type = f;
+		info->prodos_aux_type = a;
+	}
+}
+
 
 #define COOKIE_BASE 0x8000
 
@@ -114,7 +148,7 @@ static int alloc_cookie() {
 static int free_cookie(int cookie) {
 	if (cookie < COOKIE_BASE) return -1;
 	cookie -= COOKIE_BASE;
-	if (cookie >= 32 *32) return -1;
+	if (cookie >= 32 * 32) return -1;
 
 	int chunk = cookie / 32;
 	int offset = 1 << (cookie % 32);
@@ -129,8 +163,9 @@ static int free_cookie(int cookie) {
 
 static struct fd_entry *fd_head = NULL;
 
-static ino_t root_ino = 0;
-static dev_t root_dev = 0;
+static DWORD root_file_id[3] = {};
+//static ino_t root_ino = 0;
+//static dev_t root_dev = 0;
 static char *root = NULL;
 static int read_only = 0;
 
@@ -210,7 +245,9 @@ static word32 map_errno() {
 		case 0: return 0;
 		case EBADF:
 			return invalidAccess;
+#ifdef EDQUOT
 		case EDQUOT:
+#endif
 		case EFBIG:
 			return volumeFull;
 		case ENOENT:
@@ -226,11 +263,42 @@ static word32 map_errno() {
 	}
 }
 
+static word32 map_last_error() {
+	DWORD e = GetLastError();
+	switch (e) {
+		case ERROR_NO_MORE_FILES:
+			return endOfDir;
+		case ERROR_FILE_NOT_FOUND:
+			return fileNotFound;
+		case ERROR_PATH_NOT_FOUND:
+			return pathNotFound;
+		case ERROR_INVALID_ACCESS:
+			return invalidAccess;
+		case ERROR_FILE_EXISTS:
+		case ERROR_ALREADY_EXISTS:
+			return dupPathname;
+		case ERROR_DISK_FULL:
+			return volumeFull;
+		case ERROR_INVALID_PARAMETER:
+			return paramRangeErr;
+		case ERROR_DRIVE_LOCKED:
+			return drvrWrtProt;
+		case ERROR_NEGATIVE_SEEK:
+			return outOfRange;
+		case ERROR_SHARING_VIOLATION:
+			return fileBusy; // destroy open file, etc.
+		case ERROR_DIR_NOT_EMPTY:
+			// ...
+		default:
+			fprintf(stderr, "GetLastError: %08x - %d\n", (int)e, (int)e);
+			return drvrIOError;
+	}
+}
 
 static struct fd_entry *find_fd(int cookie) {
 	struct fd_entry *head = fd_head;
 
-	while(head) {
+	while (head) {
 		if (head->cookie == cookie) return head;
 		head = head->next;
 	}
@@ -241,7 +309,7 @@ static struct fd_entry *find_fd(int cookie) {
 static void free_fd(struct fd_entry	*e) {
 	if (!e) return;
 	if (e->cookie) free_cookie(e->cookie);
-	if (e->fd >= 0) close(e->fd);
+	if (e->handle != INVALID_HANDLE_VALUE) CloseHandle(e->handle);
 	if (e->dir) free_directory(e->dir);
 	free(e->path);
 	free(e);
@@ -249,10 +317,9 @@ static void free_fd(struct fd_entry	*e) {
 
 static struct fd_entry *alloc_fd() {
 	struct fd_entry *e = calloc(sizeof(struct fd_entry), 1);
-	e->fd = -1;
+	e->handle = INVALID_HANDLE_VALUE;
 	return e;
 }
-
 
 static word32 remove_fd(int cookie) {
 	word32 rv = invalidRefNum;
@@ -274,28 +341,12 @@ static word32 remove_fd(int cookie) {
 	return rv;
 }
 
-static ssize_t safe_read(int fd, void *buffer, size_t count) {
-	for (;;) {
-		ssize_t ok = read(fd, buffer, count);
-		if (ok >= 0) return ok;
-		if (ok < 0 && errno == EINTR) continue;
-		return ok;
-	}
-}
-
-static ssize_t safe_write(int fd, const void *buffer, size_t count) {
-	for (;;) {
-		ssize_t ok = write(fd, buffer, count);
-		if (ok >= 0) return ok;
-		if (ok < 0 && errno == EINTR) continue;
-		return ok;
-	}
-}
 
 struct file_info {
 
-	time_t create_date;
-	time_t modified_date;
+	FILETIME create_date;
+	FILETIME modified_date;
+
 	word16 access;
 	word16 storage_type;
 	word16 file_type;
@@ -304,9 +355,9 @@ struct file_info {
 	word32 blocks;
 	word32 resource_eof;
 	word32 resource_blocks;
-	mode_t st_mode;
 	int has_fi;
-	byte finder_info[32];
+	//byte finder_info[32];
+	struct AFP_Info afp;
 };
 
 static int hex(byte c)
@@ -316,6 +367,7 @@ static int hex(byte c)
 	if (c >= 'A' && c <= 'F') return c + 10 - 'A';
 	return 0;
 }
+
 
 
 static int finder_info_to_filetype(const byte *buffer, word16 *file_type, word32 *aux_type) {
@@ -432,102 +484,109 @@ static int file_type_to_finder_info(byte *buffer, word16 file_type, word32 aux_t
 }
 
 
-#if defined(__APPLE__)
+
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
-	ssize_t tmp;
-	tmp = getxattr(path, XATTR_RESOURCEFORK_NAME, NULL, 0, 0, 0);
-	if (tmp < 0) tmp = 0;
-	fi->resource_eof = tmp;
-	fi->resource_blocks = (tmp + 511) / 512;
+	HANDLE h;
 
-	tmp = getxattr(path, XATTR_FINDERINFO_NAME, fi->finder_info, 32, 0, 0);
-	if (tmp == 16 || tmp == 32){
-		fi->has_fi = 1;
+	char *p = append_string(path, ":AFP_Resource");
+	LARGE_INTEGER size = { 0 };
 
-		finder_info_to_filetype(fi->finder_info, &fi->file_type, &fi->aux_type);
+
+	h = CreateFile(p, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (h != INVALID_HANDLE_VALUE) {
+		GetFileSizeEx(h, &size);
+		CloseHandle(h);
 	}
-}
-#elif defined(__sun)
-static void get_file_xinfo(const char *path, struct file_info *fi) {
+	fi->resource_eof = size.LowPart;
+	fi->resource_blocks = (size.LowPart + 511) / 512;
 
-	struct stat st;
 
-	// can't stat an xattr directly?
-	int fd;
-	fd = attropen(path, XATTR_RESOURCEFORK_NAME, O_RDONLY);
-	if (fd >= 0) {
-		if (fstat(fd, &st) == 0) {
-			fi->resource_eof = st.st_size;
-			fi->resource_blocks = st.st_blocks;
+	p = append_string(path, ":AFP_AfpInfo");
+
+	h = CreateFile(p, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (h != INVALID_HANDLE_VALUE) {
+		DWORD read = 0;
+		if (ReadFile(h, &fi->afp, sizeof(struct AFP_Info), &read, NULL) && read == sizeof(struct AFP_Info)) {
+			if (afp_verify(&fi->afp)) fi->has_fi = 1;
+			afp_to_filetype(&fi->afp, &fi->file_type, &fi->aux_type);
 		}
-		close(fd);
-	}
-
-	fd = attropen(path, XATTR_FINDERINFO_NAME, O_RDONLY);
-	if (fd >= 0) {
-		int tmp = read(fd, fi->finder_info, 32);
-		if (tmp == 16 || tmp == 32) {
-			fi->has_fi = 1;
-			finder_info_to_filetype(fi->finder_info, &fi->file_type, &fi->aux_type);
-		}
-		close(fd);
+		CloseHandle(h);
 	}
 }
-#elif defined(__linux__)
-static void get_file_xinfo(const char *path, struct file_info *fi) {
 
-	ssize_t tmp;
-	tmp = getxattr(path, "user.apple.ResourceFork", NULL, 0);
-	if (tmp < 0) tmp = 0;
-	fi->resource_eof = tmp;
-	fi->resource_blocks = (tmp + 511) / 512;
+static word16 map_attributes(DWORD dwFileAttributes) {
 
-	tmp = getxattr(path, "user.apple.FinderInfo", fi->finder_info, 32);
-	if (tmp == 16 || tmp == 32){
-		fi->has_fi = 1;
+	// 0x01 = read enable
+	// 0x02 = write enable
+	// 0x04 = invisible
+	// 0x08 = reserved
+	// 0x10 = reserved
+	// 0x20 = backup needed
+	// 0x40 = rename enable
+	// 0x80 = destroy enable
 
-		finder_info_to_filetype(fi->finder_info, &fi->file_type, &fi->aux_type);
-	}
+	word16 access = 0;
+
+	if (dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+		access = readEnable;
+	else
+		access = readEnable | writeEnable | renameEnable | destroyEnable;
+
+	if (dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
+		access |= fileInvisible;
+
+	// map FILE_ATTRIBUTE_ARCHIVE to backup needed bit?
+
+	return access;
 }
-#else
-static void get_file_xinfo(const char *path, struct file_info *fi) {
-}
-#endif
 
 static word32 get_file_info(const char *path, struct file_info *fi) {
-	struct stat st;
+
+
+	HANDLE h = CreateFile(path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (h == INVALID_HANDLE_VALUE) return map_last_error();
+
+	//FILE_BASIC_INFO fbi;
+	//FILE_STANDARD_INFO fsi;
+	//FILE_ID_INFO fii;
+ 	BY_HANDLE_FILE_INFORMATION info;
+
+
 	memset(fi, 0, sizeof(*fi));
+	//memset(&fbi, 0, sizeof(fbi));
+	//memset(&fsi, 0, sizeof(fsi));
 
-	int ok = stat(path, &st);
-	if (ok < 0) return map_errno();
+	GetFileInformationByHandle(h, &info);
+	//GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
+	//GetFileInformationByHandleEx(h, FileStandardInfo, &fsi, sizeof(fsi));
+ 	//GetFileInformationByHandleEx(h, FileIdInfo, &fii, sizeof(fii));
 
-	fi->eof = st.st_size;
-	fi->blocks = st.st_blocks;
+	word32 size = info.nFileSizeLow;
 
-	fi->create_date = st.st_ctime;
-	fi->modified_date = st.st_mtime;
+	fi->eof = size;
+	fi->blocks = (size + 511) / 512;
 
-#if defined(__APPLE__) 
-	fi->create_date = st.st_birthtime;
-#endif
+	fi->create_date = info.ftCreationTime;
+	fi->modified_date = info.ftLastWriteTime;
 
-
-	fi->st_mode = st.st_mode;
-
-	if (S_ISDIR(st.st_mode)) {
-		fi->storage_type = 0x0d;
+	if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+		fi->storage_type = directoryFile;
 		fi->file_type = 0x0f;
-		if (st.st_ino == root_ino && st.st_dev == root_dev)
+
+	 	DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
+ 		if (memcmp(&id, &root_file_id, sizeof(root_file_id)) == 0) {
 			fi->storage_type = 0x0f;
-	} else if (S_ISREG(st.st_mode)) {
-		fi->file_type = 0x06;
-		if (st.st_size < 0x200) fi->storage_type = seedling;
-		else if (st.st_size < 0x20000) fi->storage_type = 0x0002;
-		else fi->storage_type = 0x0003;
+ 		}
 	} else {
-		fi->storage_type = st.st_mode & S_IFMT;
-		fi->file_type = 0;
+		fi->file_type = 0x06;
+		if (size < 0x200) fi->storage_type = seedling;
+		else if (size < 0x20000) fi->storage_type = sapling;
+		else fi->storage_type = tree;
+
+		get_file_xinfo(path, fi);
+		if (fi->resource_eof) fi->storage_type = extendedFile;
 	}
 	// 0x01 = read enable
 	// 0x02 = write enable
@@ -538,122 +597,95 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 	// 0x40 = rename enable
 	// 0x80 = destroy enable
 
-	fi->access = 0xc3; // placeholder...
+	word16 access = 0;
 
-	if (S_ISREG(st.st_mode)) {
-		get_file_xinfo(path, fi);
-	}
+	if (info.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+		access = 0x01;
+	else
+		access = 0x01 | 0x02 | 0x40 | 0x80;
 
-	// get file type/aux type
+	if (info.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
+		access |= 0x04;
 
-	if (fi->resource_eof) fi->storage_type = 0x0005;
+	// map FILE_ATTRIBUTE_ARCHIVE to backup needed bit?
 
+	fi->access = map_attributes(info.dwFileAttributes);
+
+
+	CloseHandle(h);
 	return 0;
 }
 
-
-
-
-#if defined(__APPLE__)
-static word32 set_file_info(const char *path, struct file_info *fi) {
-
-	int ok;
-	struct attrlist list;
-	unsigned i = 0;
-	struct timespec dates[2];
-
-	if (fi->has_fi && fi->storage_type != 0x0d) {
-		ok = setxattr(path, XATTR_FINDERINFO_NAME, fi->finder_info, 32, 0, 0);
-		if (ok < 0) return map_errno(); 
-	}	
-
-
-	memset(&list, 0, sizeof(list));
-	memset(dates, 0, sizeof(dates));
-
-	list.bitmapcount = ATTR_BIT_MAP_COUNT;
-	list.commonattr  = 0;
-
-	if (fi->create_date)
-	{
-		dates[i++].tv_sec = fi->create_date;
-		list.commonattr |= ATTR_CMN_CRTIME;
-	}
-
-	if (fi->modified_date)
-	{
-		dates[i++].tv_sec = fi->modified_date;
-		list.commonattr |= ATTR_CMN_MODTIME;
-	}
-
-	ok = 0;
-	if (i) ok = setattrlist(path, &list, dates, i * sizeof(struct timespec), 0);
-	return 0;
-}
-#elif defined(__sun) 
-static word32 set_file_info(const char *path, struct file_info *fi) {
-
-	if (fi->has_fi && fi->storage_type != 0x0d) {
-		int fd = attropen(path, XATTR_FINDERINFO_NAME, O_WRONLY | O_CREAT, 0666);
-		if (fd < 0) return map_errno();
-		write(fd, fi->finder_info, 32);
-		close(fd);
-	}
-
-	if (fi->modified_date) {
-		struct timeval times[2];
-
-		memset(times, 0, sizeof(times));
-
-		//times[0] = 0; // access
-		times[1].tv_sec = fi.modified_date; // modified
-		int ok = utimes(path, times);
-		if (ok < 0) return map_errno();
-	}
-	return 0;
-}
-#elif defined(__linux__)
-static word32 set_file_info(const char *path, struct file_info *fi) {
-
-	if (fi->has_fi && fi->storage_type != 0x0d) {
-		int ok = setxattr(path, "user.apple.FinderInfo", fi->finder_info, 32, 0);
-		if (ok < 0) return map_errno();
-	}
-
-	if (fi->modified_date) {
-		struct timeval times[2];
-
-		memset(times, 0, sizeof(times));
-
-		//times[0] = 0; // access
-		times[1].tv_sec = fi->modified_date; // modified
-		int ok = utimes(path, times);
-		if (ok < 0) return map_errno();
-	}
-	return 0;
-}
-
-#else
 
 static word32 set_file_info(const char *path, struct file_info *fi) {
 
-	if (fi->modified_date) {
+	if (fi->has_fi && fi->storage_type != 0x0d && fi->storage_type != 0x0f) {
+		char *rpath = append_string(path, ":AFP_AfpInfo");
 
-		struct timeval times[2];
+		HANDLE h = CreateFile(rpath, GENERIC_WRITE, 
+			FILE_SHARE_READ , NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (h == INVALID_HANDLE_VALUE) return map_last_error();
 
-		memset(times, 0, sizeof(times));
+		WriteFile(h, &fi->afp, sizeof(struct AFP_Info), NULL, NULL);
+		CloseHandle(h);
+	}
 
-		times[0] = 0; // access
-		times[1].tv_sec = fi->modified_date; // modified
 
-		int ok = utimes(path, times);
-		if (ok < 0) return map_errno();
+	if (fi->create_date.dwLowDateTime || fi->create_date.dwHighDateTime 
+		|| fi->modified_date.dwLowDateTime || fi->modified_date.dwHighDateTime) {
+		// SetFileInformationByHandle can modify dates.
+		HANDLE h;
+		h = CreateFile(path, FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (h == INVALID_HANDLE_VALUE) return map_last_error();
+
+		FILE_BASIC_INFO fbi;
+		FILE_BASIC_INFO newfbi;
+		memset(&fbi, 0, sizeof(fbi));
+		memset(&newfbi, 0, sizeof(newfbi));
+
+		BOOL ok;
+		ok = GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
+
+		int delta = 0;
+
+		word16 old_access = map_attributes(fbi.FileAttributes);
+		if (fi->access && fi->access != old_access) {
+			newfbi.FileAttributes = fbi.FileAttributes;
+
+			if (fi->access & fileInvisible) {
+				delta = 1;
+				newfbi.FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
+			}
+			// hfs fst only marks it read enable if all are clear.
+			word16 locked = writeEnable | destroyEnable | renameEnable;
+			if ((fi->access & locked) == 0) {
+				delta = 1;
+				newfbi.FileAttributes |= FILE_ATTRIBUTE_READONLY;
+			}
+		}
+
+		// todo -- compare against nt file time to see if it's actually changed.
+		// to prevent time stamp truncation.
+
+		if (fi->create_date.dwLowDateTime || fi->create_date.dwHighDateTime) {
+			delta = 1;
+			newfbi.CreationTime.LowPart = fi->create_date.dwLowDateTime;
+			newfbi.CreationTime.HighPart = fi->create_date.dwHighDateTime;
+		}
+		if (fi->modified_date.dwLowDateTime || fi->modified_date.dwHighDateTime) {
+			delta = 1;
+			newfbi.LastWriteTime.LowPart = fi->modified_date.dwLowDateTime;
+			newfbi.LastWriteTime.HighPart = fi->modified_date.dwHighDateTime;
+			//newfbi.ChangeTime.LowPart = fi->modified_date.dwLowDateTime; //?
+			//newfbi.ChangeTime.HighPart = fi->modified_date.dwHighDateTime; //?
+		}
+
+		if (delta)
+			ok = SetFileInformationByHandle(h, FileBasicInfo, &newfbi, sizeof(newfbi));
+		CloseHandle(h);
 	}
 	return 0;
 }
-
-#endif
-
 
 /*
  * if this is an absolute path, verify and skip past :Host:
@@ -819,103 +851,144 @@ static word32 set_option_list(word32 ptr, word16 fstID, const byte *data, int si
 	return 0;
 }
 
+
+static int dayofweek(int y, int m, int d)	/* 1 <= m <= 12,  y > 1752 (in the U.K.) */
+    {
+        static int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+        y -= m < 3;
+        return (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
+    }
 /*
  * converts time_t to a gs/os readhextime date/time record.
  */
 
-static void set_date_time_rec(word32 ptr, time_t time) {
+static void set_date_time_rec(word32 ptr, FILETIME utc) {
 
-	if (time == 0) {
+	if (utc.dwLowDateTime == 0 && utc.dwHighDateTime == 0) {
 		for (int i = 0; i < 8; ++i) set_memory_c(ptr++, 0, 0);
 		return;
 	}
 
-	struct tm *tm = localtime(&time);
-	if (tm->tm_sec == 60) tm->tm_sec = 59; /* leap second */
 
-	set_memory_c(ptr++, tm->tm_sec, 0);
-	set_memory_c(ptr++, tm->tm_min, 0);
-	set_memory_c(ptr++, tm->tm_hour, 0);
-	set_memory_c(ptr++, tm->tm_year, 0);
-	set_memory_c(ptr++, tm->tm_mday - 1, 0);
-	set_memory_c(ptr++, tm->tm_mon, 0);
+	SYSTEMTIME tmLocal;
+	SYSTEMTIME tmUTC;
+
+	FileTimeToSystemTime(&utc, &tmUTC);
+	SystemTimeToTzSpecificLocalTime(NULL, &tmUTC, &tmLocal);
+
+	if (tmLocal.wYear < 1900 || tmLocal.wYear > 1900 + 255) {
+		for (int i = 0; i < 8; ++i) set_memory_c(ptr++, 0, 0);
+		return;
+	}
+	if (tmLocal.wSecond == 60) tmLocal.wSecond = 59; /* leap second */
+
+	int dow = dayofweek(tmLocal.wYear, tmLocal.wMonth, tmLocal.wDay);
+	set_memory_c(ptr++, tmLocal.wSecond, 0);
+	set_memory_c(ptr++, tmLocal.wMinute, 0);
+	set_memory_c(ptr++, tmLocal.wHour, 0);
+	set_memory_c(ptr++, tmLocal.wYear - 1900, 0);
+	set_memory_c(ptr++, tmLocal.wDay - 1, 0); // 1 = sunday
+	set_memory_c(ptr++, tmLocal.wMonth - 1, 0);
 	set_memory_c(ptr++, 0, 0);
-	set_memory_c(ptr++, tm->tm_wday + 1, 0);
+	set_memory_c(ptr++, dow + 1, 0);
 }
 
 /*
  * converts time_t to a prodos16 date/time record.
  */
-static void set_date_time(word32 ptr, time_t time) {
+static void set_date_time(word32 ptr, FILETIME utc) {
 
-	if (time == 0) {
+	if (utc.dwLowDateTime == 0 && utc.dwHighDateTime == 0) {
 		for (int i = 0; i < 4; ++i) set_memory_c(ptr++, 0, 0);
 		return;
 	}
 
-	struct tm *tm = localtime(&time);
+	SYSTEMTIME tmLocal;
+	SYSTEMTIME tmUTC;
+
+	FileTimeToSystemTime(&utc, &tmUTC);
+	SystemTimeToTzSpecificLocalTime(NULL, &tmUTC, &tmLocal);
+
+	if (tmLocal.wYear < 1940 || tmLocal.wYear > 2039) {
+		for (int i = 0; i < 4; ++i) set_memory_c(ptr++, 0, 0);
+		return;		
+	}
+	if (tmLocal.wSecond == 60) tmLocal.wSecond = 59; /* leap second */
 
 	word16 tmp = 0;
-	tmp |= (tm->tm_year % 100) << 9;
-	tmp |= tm->tm_mon << 5;
-	tmp |= tm->tm_mday;
+	tmp |= (tmLocal.wYear % 100) << 9;
+	tmp |= tmLocal.wMonth << 5;
+	tmp |= tmLocal.wDay;
 
 	set_memory16_c(ptr, tmp, 0);
 	ptr += 2;
 
 	tmp = 0;
-	tmp |= tm->tm_hour << 8;
-	tmp |= tm->tm_min;
+	tmp |= tmLocal.wHour << 8;
+	tmp |= tmLocal.wMinute;
 	set_memory16_c(ptr, tmp, 0);
 }
 
 
-static time_t get_date_time(word32 ptr) {
+static FILETIME get_date_time(word32 ptr) {
+
+	FILETIME utc = {0, 0};
 
 	word16 a = get_memory16_c(ptr + 0, 0);
 	word16 b = get_memory16_c(ptr + 2, 0);
-	if (!a && !b) return 0;
+	if (!a && !b) return utc;
 
-	struct tm tm;
-	memset(&tm, 0, sizeof(tm));
 
-	tm.tm_year = (a >> 9) & 0x7f;
-	tm.tm_mon = ((a >> 5) & 0x0f) - 1;
-	tm.tm_mday = (a >> 0) & 0x1f;
+	SYSTEMTIME tmLocal;
+	SYSTEMTIME tmUTC;
+	memset(&tmLocal, 0, sizeof(tmLocal));
+	memset(&tmUTC, 0, sizeof(tmUTC));
 
-	tm.tm_hour = (b >> 8) & 0x1f;
-	tm.tm_min = (b >> 0) & 0x3f;
-	tm.tm_sec = 0;
+	tmLocal.wYear = ((a >> 9) & 0x7f) + 1900;
+	tmLocal.wMonth = ((a >> 5) & 0x0f);
+	tmLocal.wDay = (a >> 0) & 0x1f;
 
-    tm.tm_isdst = -1;
+	tmLocal.wHour = (b >> 8) & 0x1f;
+	tmLocal.wMinute = (b >> 0) & 0x3f;
+	tmLocal.wSecond = 0;
+
 
 	// 00 - 39 => 2000-2039
 	// 40 - 99 => 1940-1999
-	if (tm.tm_year < 40) tm.tm_year += 100;
+	if (tmLocal.wYear < 40) tmLocal.wYear += 100;
 
 
-	return mktime(&tm);
+	TzSpecificLocalTimeToSystemTime(NULL, &tmLocal, &tmUTC);
+	if (!SystemTimeToFileTime(&tmUTC, &utc)) utc =(FILETIME){0, 0};
+
+	return utc;
 }
 
-static time_t get_date_time_rec(word32 ptr) {
+static FILETIME get_date_time_rec(word32 ptr) {
+
+	FILETIME utc = {0, 0};
 
 	byte buffer[8];
 	for (int i = 0; i < 8; ++i) buffer[i] = get_memory_c(ptr++, 0);
 
-	if (!memcmp(buffer, "\x00\x00\x00\x00\x00\x00\x00\x00", 8)) return 0;
+	if (!memcmp(buffer, "\x00\x00\x00\x00\x00\x00\x00\x00", 8)) return utc;
 
-	struct tm tm;
-	memset(&tm, 0, sizeof(tm));
+	SYSTEMTIME tmLocal;
+	SYSTEMTIME tmUTC;
+	memset(&tmLocal, 0, sizeof(tmLocal));
+	memset(&tmUTC, 0, sizeof(tmUTC));
 
-	tm.tm_sec = buffer[0];
-	tm.tm_min = buffer[1];
-	tm.tm_hour = buffer[2];
-	tm.tm_year = buffer[3];
-	tm.tm_mday = buffer[4] + 1;
-	tm.tm_mon = buffer[5];
-    tm.tm_isdst = -1;
+	tmLocal.wSecond = buffer[0];
+	tmLocal.wMinute = buffer[1];
+	tmLocal.wHour = buffer[2];
+	tmLocal.wYear = 1900 + buffer[3];
+	tmLocal.wDay = buffer[4] + 1;
+	tmLocal.wMonth = buffer[5] + 1;
 
-	return mktime(&tm);
+	TzSpecificLocalTimeToSystemTime(NULL, &tmLocal, &tmUTC);
+	if (!SystemTimeToFileTime(&tmUTC, &utc)) utc =(FILETIME){0, 0};
+
+	return utc;
 }
 
 
@@ -956,7 +1029,6 @@ static word32 fst_shutdown(void) {
 static word32 fst_startup(void) {
 	// if restart, close any previous files.
 
-	struct stat st;
 
 	if (!g_cfg_host_path) return invalidFSTop;
 	if (!*g_cfg_host_path) return invalidFSTop;
@@ -968,17 +1040,34 @@ static word32 fst_startup(void) {
 	fst_shutdown();
 
 	memset(&cookies, 0, sizeof(cookies));
-	if (stat(root, &st) < 0) {
-		fprintf(stderr, "%s does not exist\n", root);
-		return invalidFSTop;
-	}
-	if (!S_ISDIR(st.st_mode)) {
-		fprintf(stderr, "%s is not a directory\n", root);
-		return invalidFSTop;
-	}
 
-	root_ino = st.st_ino;
-	root_dev = st.st_dev;
+	HANDLE h = CreateFile(root, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (h == INVALID_HANDLE_VALUE) {
+		fprintf(stderr, "%s does not exist or is not accessible\n", root);
+		return invalidFSTop;
+	}
+	FILE_BASIC_INFO fbi;
+ 	BY_HANDLE_FILE_INFORMATION info;
+
+ 	GetFileInformationByHandle(h, &info);
+	GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
+	// can't delete volume root. 
+ 	CloseHandle(h);
+
+ 	root_file_id[0] = info.dwVolumeSerialNumber;
+ 	root_file_id[1] = info.nFileIndexHigh;
+ 	root_file_id[2] = info.nFileIndexLow;
+
+
+	if (!(fbi.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+		fprintf(stderr, "%s is not a directory\n", root);
+		CloseHandle(h);
+		return invalidFSTop;
+	}
+	CloseHandle(h);
+
+	//root_ino = st.st_ino;
+	//root_dev = st.st_dev;
 
 	return 0;
 }
@@ -1003,10 +1092,10 @@ static word32 fst_create(int class, const char *path) {
 
 
 		if (pcount >= 4) {
-			file_type_to_finder_info(fi.finder_info, fi.file_type, fi.aux_type);
+			afp_init
+		(&fi.afp, fi.file_type, fi.aux_type);
 			fi.has_fi = 1;
 		}
-
 
 	} else {
 
@@ -1016,24 +1105,31 @@ static word32 fst_create(int class, const char *path) {
 		fi.storage_type = get_memory16_c(pb + CreateRec_storageType, 0);
 		fi.create_date = get_date_time(pb + CreateRec_createDate);
 
-		file_type_to_finder_info(fi.finder_info, fi.file_type, fi.aux_type);
+		afp_init
+	(&fi.afp, fi.file_type, fi.aux_type);
 		fi.has_fi = 1;
 	}
 	int ok;
 
-	if (fi.storage_type == 0x0d) {
-		ok = mkdir(path, 0777);
-		if (ok < 0) return map_errno();
+	if (fi.storage_type == 0x0d || fi.storage_type == 0x0f) {
+		ok = CreateDirectory(path, NULL);
+		if (!ok) return map_last_error();
 		return 0;
 	}
 	if (fi.storage_type <= 3 || fi.storage_type == 0x05) {
 		// normal file.
 		// 0x05 is an extended/resource file but we don't do anything special.
-		ok = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
-		if (ok < 0) return map_errno();
+		HANDLE h = CreateFile(path, 
+			GENERIC_WRITE, 
+			FILE_SHARE_READ | FILE_SHARE_WRITE, 
+			NULL, 
+			CREATE_NEW, 
+			FILE_ATTRIBUTE_NORMAL, 
+			NULL);
+		if (h == INVALID_HANDLE_VALUE) return map_last_error();
 		// set ftype, auxtype...
-		set_file_info(path, &fi);
-		close(ok);
+		set_file_info(path, &fi); // set_file_info_handle(...);
+		CloseHandle(h);
 
 		if (class) {
 			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, 1, 0);
@@ -1060,29 +1156,67 @@ static word32 fst_create(int class, const char *path) {
 }
 
 
+static word16 storage_type(const char *path, word16 *error) {
+	if (!path) {
+		*error = badPathSyntax; 
+		return 0; // ?
+	}
+	HANDLE h;
+	h = CreateFile(path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (h == INVALID_HANDLE_VALUE) {
+		*error = map_last_error();
+		return 0;
+	}
+
+ 	BY_HANDLE_FILE_INFORMATION info;
+ 	GetFileInformationByHandle(h, &info);
+ 	CloseHandle(h);
+
+ 	DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
+ 	if (memcmp(&id, &root_file_id, sizeof(root_file_id)) == 0) {
+  		return 0x0f;
+ 	}
+
+ 	if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+ 		return directoryFile;
+
+ 	return standardFile;
+}
+
 static word32 fst_destroy(int class, const char *path) {
 
-	struct stat st;
+	word16 rv = 0;
+	BOOL ok = 0;
+	word16 type = storage_type(path, &rv);
+	if (rv) return rv;
+	if (read_only) return drvrWrtProt;
 
-	if (!path) return badStoreType;
+	switch(type) {
+		case 0: return fileNotFound;
+		case 0x0f: return badStoreType;
+		default: return badStoreType;
 
-	if (stat(path, &st) < 0) {
-		return map_errno();
+		case directoryFile:
+			ok = RemoveDirectory(path);
+			break;
+		case sapling:
+		case seedling:
+		case tree:
+		case extendedFile:
+			ok = DeleteFile(path);
+			break;
 	}
 
-	// can't delete volume root. 
-	if (st.st_ino == root_ino && st.st_dev == root_dev) {
-		return badStoreType;
-	}
-
-	int ok = S_ISDIR(st.st_mode) ? rmdir(path) : unlink(path);
-
-
-	if (ok < 0) return map_errno();
+	if (!ok) return map_last_error();
 	return 0;
 }
 
 static word32 fst_set_file_info(int class, const char *path) {
+
+	word16 rv = 0;
+	word16 type = storage_type(path, &rv);
+	if (rv) return rv;
+	if (read_only) return drvrWrtProt;
 
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
@@ -1108,9 +1242,9 @@ static word32 fst_set_file_info(int class, const char *path) {
 		if (pcount >= 8) option_list = get_memory24_c(pb + FileInfoRecGS_optionList, 0);
 		// remainder reserved
 
-		if (pcount >= 4) {
-			file_type_to_finder_info(fi.finder_info, fi.file_type, fi.aux_type);
-			fi.has_fi = 1;
+		if (fi.has_fi) {
+			if (pcount < 4) fi.aux_type = fi.afp.prodos_aux_type;
+			if (pcount < 3) fi.file_type = fi.afp.prodos_file_type;
 		}
 
 	} else {
@@ -1121,8 +1255,15 @@ static word32 fst_set_file_info(int class, const char *path) {
 		//fi.storage_type = get_memory32_c(pb + FileRec_storageType, 0);
 		fi.create_date = get_date_time(pb + FileRec_createDate);
 		fi.modified_date = get_date_time(pb + FileRec_modDate);
+	}
 
-		file_type_to_finder_info(fi.finder_info, fi.file_type, fi.aux_type);
+
+	if (fi.has_fi) {
+		fi.afp.prodos_file_type = fi.file_type;
+		fi.afp.prodos_aux_type = fi.aux_type;
+	}
+	else {
+		afp_init(&fi.afp, fi.file_type, fi.aux_type);
 		fi.has_fi = 1;
 	}
 
@@ -1134,12 +1275,19 @@ static word32 fst_set_file_info(int class, const char *path) {
 
 		int size = req_size - 6;
 		if ((fst_id == proDOSFSID || fst_id == hfsFSID || fst_id == appleShareFSID) && size >= 32) {
+
+			// this should never happen...
+			if (!fi.has_fi) afp_init(&fi.afp, fi.file_type, fi.aux_type);
 			fi.has_fi = 1;
+
 			for (int i = 0; i <32; ++i) 
-				fi.finder_info[i] = get_memory_c(option_list + 6 + i, 0);
+				fi.afp.finder_info[i] = get_memory_c(option_list + 6 + i, 0);
 		}
 	}
 
+	// one more check... if ftype/auxtype doesn't match the ftype/auxtype in finder info
+	// update finder info
+	if (fi.has_fi) afp_synchronize(&fi.afp, prefer_prodos);
 
 	return set_file_info(path, &fi);
 }
@@ -1170,7 +1318,7 @@ static word32 fst_get_file_info(int class, const char *path) {
 			word16 fst_id = hfsFSID;
 			//if (fi.storage_type == 0x0f) fst_id = mfsFSID;
 			word32 option_list = get_memory24_c(pb + FileInfoRecGS_optionList, 0);
-			rv = set_option_list(option_list,  fst_id, fi.finder_info, fi.has_fi ? 32 : 0);
+			rv = set_option_list(option_list,  fst_id, fi.afp.finder_info, fi.has_fi ? 32 : 0);
 		}
 		if (pcount >= 9) set_memory32_c(pb + FileInfoRecGS_eof, fi.eof, 0);
 		if (pcount >= 10) set_memory32_c(pb + FileInfoRecGS_blocksUsed, fi.blocks, 0);
@@ -1263,30 +1411,125 @@ static word32 fst_volume(int class) {
 }
 
 static word32 fst_clear_backup(int class, const char *path) {
+
+	word16 rv = 0;
+	word16 type = storage_type(path, &rv);
+	if (rv) return rv;
+	if (read_only) return drvrWrtProt;
+
 	return invalidFSTop;
 }
 
+static void free_directory(struct directory *dd) {
+	if (!dd) return;
+	for (int i = 0; i < dd->num_entries; ++i) {
+		free(dd->entries[i]);
+	}
+	free(dd);
+}
 
-static int open_data_fork(const char *path, word16 *access, word16 *error) {
+static int qsort_callback(const void *a, const void *b) {
+	return strcmp(*(const char **)a, *(const char **)b);
+}
 
-	int fd = -1;
+/*
+ * exclude files from get_dir_entries.
+ *
+ */
+static int filter_directory_entry(const char *name) {
+	if (!name[0]) return 1;
+	if (name[0] == '.') {
+		return 1;
+		/*
+		if (!strcmp(name, ".")) return 1;
+		if (!strcmp(name, "..")) return 1;
+		if (!strncmp(name, "._", 2)) return 1; // ._ resource fork
+		if (!strcmp(name, ".fseventsd")) return 1;
+		*/
+	}
+	return 0;
+}
+
+static struct directory *read_directory(const char *path, word16 *error) {
+	HANDLE h;
+	WIN32_FIND_DATA data;
+	struct directory *dd;
+	int capacity = 100;
+	int size = sizeof(struct directory) + capacity * sizeof(char *);
+
+	memset(&data, 0, sizeof(data));
+
+	char *p = append_path(path, "*");
+	h = FindFirstFile(p, &data);
+	if (h == INVALID_HANDLE_VALUE) {
+		*error = map_last_error();
+		return NULL;
+	}
+
+	dd = (struct directory *)malloc(size);
+	if (!dd) {
+		FindClose(h);
+		*error = outOfMem;
+		return NULL;
+	}
+	memset(dd, 0, size);
+	do {
+		if (filter_directory_entry(data.cFileName)) continue;
+		if (dd->num_entries >= capacity) {
+			capacity += capacity;
+			size = sizeof(struct directory) + capacity * sizeof(char *);
+			struct directory * tmp = realloc(dd, size);
+			if (!tmp) {
+				*error = map_errno();
+				free_directory(dd);
+				FindClose(h);
+				return NULL;
+			}
+			dd = tmp;
+		}
+		dd->entries[dd->num_entries++] = strdup(data.cFileName);
+	} while (FindNextFile(h, &data) != 0);
+
+	//?
+	if (GetLastError() != ERROR_NO_MORE_FILES) *error = map_last_error();
+
+	FindClose(h);
+
+	// sort them....
+	qsort(dd->entries, dd->num_entries, sizeof(char *), qsort_callback);
+
+	return dd;
+}
+
+
+
+static HANDLE open_data_fork(const char *path, word16 *access, word16 *error) {
+
+	HANDLE h = INVALID_HANDLE_VALUE;
 	for (;;) {
 
+		DWORD wAccess = 0;
+		DWORD wShare = FILE_SHARE_READ;
+		DWORD wCreate = OPEN_EXISTING;
+
 		switch(*access) {
 			case readEnableAllowWrite:
 			case readWriteEnable:
-				fd = open(path, O_RDWR);
+				wAccess = GENERIC_READ | GENERIC_WRITE;
 				break;
 			case readEnable:
-				fd = open(path, O_RDONLY);
+				wAccess = GENERIC_READ;
 				break;
 			case writeEnable:
-				fd = open(path, O_WRONLY);
+				wAccess = GENERIC_WRITE;
 				break;
 		}
 
+		h = CreateFile(path, wAccess, wShare, NULL, wCreate, FILE_ATTRIBUTE_NORMAL, NULL);
+
+
 		if (*access == readEnableAllowWrite) {
-			if (fd < 0) {
+			if (h == INVALID_HANDLE_VALUE) {
 				*access = readEnable;
 				continue;
 			}
@@ -1294,37 +1537,44 @@ static int open_data_fork(const char *path, word16 *access, word16 *error) {
 		}
 		break;
 	}
-	if (fd < 0) {
-		*error = map_errno();
+	if (h == INVALID_HANDLE_VALUE) {
+		*error = map_last_error();
 	}
-
-	return fd;
+	return h;
 }
-#if defined(__APPLE__) 
-static int open_resource_fork(const char *path, word16 *access, word16 *error) {
-	// os x / hfs/apfs don't need to specifically create a resource fork.
-	// or do they?
 
-	char *rpath = append_path(path, _PATH_RSRCFORKSPEC);
+static HANDLE open_resource_fork(const char *path, word16 *access, word16 *error) {
 
-	int fd = -1;
+	char *rpath = append_string(path, ":AFP_Resource");
+
+	HANDLE h = INVALID_HANDLE_VALUE;
 	for (;;) {
 
+		DWORD wAccess = 0;
+		DWORD wShare = FILE_SHARE_READ;
+		DWORD wCreate = 0;
+
 		switch(*access) {
 			case readEnableAllowWrite:
 			case readWriteEnable:
-				fd = open(rpath, O_RDWR | O_CREAT, 0666);
+				wAccess = GENERIC_READ | GENERIC_WRITE;
+				wCreate = OPEN_ALWAYS;
 				break;
 			case readEnable:
-				fd = open(rpath, O_RDONLY);
+				wAccess = GENERIC_READ;
+				wCreate = OPEN_EXISTING;
 				break;
 			case writeEnable:
-				fd = open(rpath, O_WRONLY | O_CREAT, 0666);
+				wAccess = GENERIC_WRITE;
+				wCreate = OPEN_ALWAYS;
 				break;
 		}
 
+		h = CreateFile(rpath, wAccess, wShare, NULL, wCreate, FILE_ATTRIBUTE_NORMAL, NULL);
+
+
 		if (*access == readEnableAllowWrite) {
-			if (fd < 0) {
+			if (h == INVALID_HANDLE_VALUE) {
 				*access = readEnable;
 				continue;
 			}
@@ -1332,69 +1582,12 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 		}
 		break;
 	}
-	if (fd < 0) {
-		*error = map_errno();
+	if (h == INVALID_HANDLE_VALUE) {
+		*error = map_last_error();
 	}
-
-	return fd;
-
-
-
+	return h;
 }
-#elif defined __sun
-static int open_resource_fork(const char *path, word16 *access, word16 *error) {
-	int tmp = open(path, O_RDONLY);
-	if (tmp < 0) {
-		*error = map_errno();
-		return -1;
-	}
 
-	int fd = -1;
-	for(;;) {
-
-		switch(*access) {
-			case readEnableAllowWrite:
-			case readWriteEnable:
-				fd = openat(tmp, XATTR_RESOURCEFORK_NAME, O_RDWR | O_CREAT | O_XATTR, 0666);
-				break;
-			case readEnable:
-				fd = openat(tmp, XATTR_RESOURCEFORK_NAME, O_RDONLY | O_XATTR);
-				break;
-			case writeEnable:
-				fd = openat(tmp, XATTR_RESOURCEFORK_NAME, O_WRONLY | O_CREAT | O_XATTR, 0666);
-				break;
-		}
-
-		if (*access == readEnableAllowWrite) {
-			if (fd < 0) {
-				*access = readEnable;
-				continue;
-			}
-			*access = readWriteEnable;
-		}
-		break;
-	}
-
-	if (fd < 0) {
-		*error = map_errno();
-		close(tmp);
-		return -1;
-	}
-	close(tmp);
-
-	return fd;
-}
-#elif defined __linux__
-static int open_resource_fork(const char *path, word16 *access, word16 *error) {
-	*error = resForkNotFound;
-	return -1;
-}
-#else
-static int open_resource_fork(const char *path, word16 *access, word16 *error) {
-	*error = resForkNotFound;
-	return -1;
-}
-#endif
 
 
 static word32 fst_open(int class, const char *path) {
@@ -1409,7 +1602,7 @@ static word32 fst_open(int class, const char *path) {
 	if (rv) return rv;
 
 
-	int fd = -1;
+	HANDLE h = INVALID_HANDLE_VALUE;
 	int type = regular_file;
 	struct directory *dd = NULL;
 
@@ -1431,7 +1624,7 @@ static word32 fst_open(int class, const char *path) {
 	if (access > 3) return paramRangeErr;
 
 	// special access checks for directories.
-	if (S_ISDIR(fi.st_mode)) {
+	if (fi.storage_type == 0x0f || fi.storage_type == 0x0d) {
 		if (resource_number) return resForkNotFound;
 		switch (request_access) {
 			case readEnableAllowWrite:
@@ -1460,10 +1653,10 @@ static word32 fst_open(int class, const char *path) {
 	access = request_access;
 	switch(type) {
 		case regular_file:
-			fd = open_data_fork(path, &access, &rv);
+			h = open_data_fork(path, &access, &rv);
 			break;
 		case resource_file:
-			fd = open_resource_fork(path, &access, &rv);
+			h = open_resource_fork(path, &access, &rv);
 			break;
 		case directory_file:
 			dd = read_directory(path, &rv);
@@ -1487,7 +1680,7 @@ static word32 fst_open(int class, const char *path) {
 			//if (fi.storage_type == 0x0f) fst_id = mfsFSID;
 
 			word32 option_list = get_memory24_c(pb + OpenRecGS_optionList, 0); 
-			word32 tmp = set_option_list(option_list, fst_id, fi.finder_info, fi.has_fi ? 32 : 0);
+			word32 tmp = set_option_list(option_list, fst_id, fi.afp.finder_info, fi.has_fi ? 32 : 0);
 			if (!rv) rv = tmp; 
 		}
 
@@ -1502,11 +1695,11 @@ static word32 fst_open(int class, const char *path) {
 
 	struct fd_entry *e = alloc_fd();
 	if (!e) {
-		if (fd >=0) close(fd);
+		if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
 		if (dd) free_directory(dd);
 		return outOfMem;
 	}
-	e->fd = fd;
+	e->handle = h;
 	e->dir = dd;
 
 	e->cookie = alloc_cookie();
@@ -1542,6 +1735,9 @@ static word32 fst_read(int class) {
 			return badStoreType;
 	}
 
+	if (!(e->access & readEnable))
+		return invalidAccess;
+
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
 
 	word32 data_buffer = 0;
@@ -1564,7 +1760,7 @@ static word32 fst_read(int class) {
 
 	word16 newline_mask;
 	word32 rv = 0;
-	ssize_t ok;
+	int ok;
 
 	newline_mask = get_memory16_c(global_buffer, 0);
 	if (newline_mask) {
@@ -1574,9 +1770,10 @@ static word32 fst_read(int class) {
 
 		for (word32 i = 0 ; i < request_count; ++i) {
 			byte b;
-			ok = safe_read(e->fd, &b, 1);
-			if (ok < 0) return map_errno();
-			if (ok == 0) break;
+			DWORD read_count;
+			ok = ReadFile(e->handle, &b, 1, &read_count, NULL);
+			if (!ok) return map_last_error();
+			if (read_count == 0) break;
 			transfer_count++;
 			set_memory_c(data_buffer++, b, 0);
 			if (newline_table[b & newline_mask]) break;
@@ -1584,15 +1781,16 @@ static word32 fst_read(int class) {
 		if (transfer_count == 0) rv = eofEncountered;
 	}
 	else {
+		DWORD read_count;
 		byte *data = gc_malloc(request_count);
 		if (!data) return outOfMem;
 
-		ok = safe_read(e->fd, data, request_count);
-		if (ok < 0) rv = map_errno();
-		if (ok == 0) rv = eofEncountered;
-		if (ok > 0) {
-			transfer_count = ok;
-			for (size_t i = 0; i < ok; ++i) {
+		ok = ReadFile(e->handle, data, request_count, &read_count, NULL);
+		if (!ok) rv = map_last_error();
+		else if (read_count == 0) rv = eofEncountered;
+		if (read_count > 0) {
+			transfer_count = read_count;
+			for (size_t i = 0; i < transfer_count; ++i) {
 				set_memory_c(data_buffer + i, data[i], 0);
 			}
 		}
@@ -1615,14 +1813,14 @@ static word32 fst_write(int class) {
 
 	if (!e) return invalidRefNum;
 
-	if (!(e->access & writeEnable))
-		return invalidAccess;
-
 	switch (e->type) {
 		case directory_file:
 			return badStoreType;
 	}
+	if (read_only) return drvrWrtProt;
 
+	if (!(e->access & writeEnable))
+		return invalidAccess;
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
 
@@ -1649,13 +1847,14 @@ static word32 fst_write(int class) {
 	}
 
 	word32 rv = 0;
-	ssize_t ok = safe_write(e->fd, data, request_count);
-	if (ok < 0) rv = map_errno();
-	if (ok > 0) {
+	DWORD write_count = 0;
+	int ok = WriteFile(e->handle, data, request_count, &write_count, NULL);
+	if (!ok) rv = map_last_error();
+	if (write_count > 0) {
 		if (class)
-			set_memory32_c(pb + IORecGS_transferCount, ok, 0);
+			set_memory32_c(pb + IORecGS_transferCount, write_count, 0);
 		else
-			set_memory32_c(pb + FileIORec_transferCount, ok, 0);
+			set_memory32_c(pb + FileIORec_transferCount, write_count, 0);
 	}
 	return rv;
 }
@@ -1680,35 +1879,38 @@ static word32 fst_flush(int class) {
 			return badStoreType;
 	}
 
-	int ok = fsync(e->fd);
-	if (ok < 0) return map_errno();
+	if (!FlushFileBuffers(e->handle)) return map_last_error();
 	return 0;
 }
 
-static off_t get_offset(int fd, word16 base, word32 displacement) {
 
-	off_t pos = lseek(fd, 0, SEEK_CUR);
-	off_t eof = lseek(fd, 0, SEEK_END);
-	lseek(fd, pos, SEEK_SET);
-
+static word16 win_seek(HANDLE h, word16 base, word32 displacement, LARGE_INTEGER *position) {
+	LARGE_INTEGER d;
+	int m = 0;
 	switch (base) {
 		case startPlus:
-			return displacement;
-			break;
-		case eofMinus:
-			return eof - displacement;
+			m = FILE_BEGIN;
+			d.QuadPart = displacement;
 			break;
 		case markPlus:
-			return pos + displacement;
+			m = FILE_CURRENT;
+			d.QuadPart = displacement;
 			break;
 		case markMinus:
-			return pos - displacement;
+			m = FILE_CURRENT;
+			d.QuadPart = -displacement;
 			break;
+		case eofMinus:
+			m = FILE_END;
+			d.QuadPart = -displacement;
+			break;
+
 		default:
-			return -1;
+			return paramRangeErr;
+
 	}
-
-
+	if (!SetFilePointerEx(h, d, position, m)) return map_last_error();
+	return 0;
 }
 
 static word32 fst_set_mark(int class) {
@@ -1735,12 +1937,7 @@ static word32 fst_set_mark(int class) {
 	}
 	if (base > markMinus) return paramRangeErr;
 
-	off_t offset = get_offset(e->fd, base, displacement);
-	if (offset < 0) return outOfRange;
-
-	off_t ok = lseek(e->fd, offset, SEEK_SET);
-	if (ok < 0) return map_errno();
-	return 0;
+	return win_seek(e->handle, base, displacement, NULL);
 }
 
 static word32 fst_set_eof(int class) {
@@ -1754,7 +1951,10 @@ static word32 fst_set_eof(int class) {
 		case directory_file:
 			return badStoreType;
 	}
+	if (read_only) return drvrWrtProt;
 
+	if (!(e->access & writeEnable))
+		return invalidAccess;
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
 
@@ -1769,11 +1969,19 @@ static word32 fst_set_eof(int class) {
 
 	if (base > markMinus) return paramRangeErr;
 
-	off_t offset = get_offset(e->fd, base, displacement);
-	if (offset < 0) return outOfRange;
+	// get the current mark
+	LARGE_INTEGER mark;
+	LARGE_INTEGER zero; zero.QuadPart = 0;
+	SetFilePointerEx(e->handle, zero, &mark, FILE_CURRENT);
 
-	int ok = ftruncate(e->fd, offset);
-	if (ok < 0) return map_errno();
+	word16 rv = win_seek(e->handle, base, displacement, NULL);
+	if (rv) return rv;
+
+	// SetEndOfFile sets the current positions as eof.
+	if (!SetEndOfFile(e->handle)) return map_last_error();
+
+	// restore old mark. ???
+	SetFilePointerEx(e->handle, mark, NULL, FILE_BEGIN);
 	return 0;
 
 }
@@ -1787,20 +1995,20 @@ static word32 fst_get_mark(int class) {
 
 	word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
 
-	off_t pos = 0;
-
 	switch (e->type) {
 		case directory_file:
 			return badStoreType;
 	}
 
-	pos = lseek(e->fd, 0, SEEK_CUR);
-	if (pos < 0) return map_errno();
+	// get the current mark
+	LARGE_INTEGER pos;
+	LARGE_INTEGER zero; zero.QuadPart = 0;
+	if (!SetFilePointerEx(e->handle, zero, &pos, FILE_CURRENT)) return map_last_error();
 
 	if (class) {
-		set_memory32_c(pb + PositionRecGS_position, pos, 0);
+		set_memory32_c(pb + PositionRecGS_position, pos.LowPart, 0);
 	} else {
-		set_memory32_c(pb + MarkRec_position, pos, 0);
+		set_memory32_c(pb + MarkRec_position, pos.LowPart, 0);
 	}
 
 	return 0;
@@ -1821,107 +2029,25 @@ static word32 fst_get_eof(int class) {
 			return badStoreType;
 	}
 
+	LARGE_INTEGER eof;
 
-	off_t eof = 0;
-	off_t pos = 0;
+	if (!GetFileSizeEx(e->handle, &eof)) return map_last_error();
 
-	pos = lseek(e->fd, 0, SEEK_CUR);
-	eof = lseek(e->fd, 0, SEEK_END);
-	if (eof < 0) return map_errno();
-	lseek(e->fd, pos, SEEK_SET);
-
+	// what if > 32 bits?
 
 	if (class) {
-		set_memory32_c(pb + PositionRecGS_position, eof, 0);
+		set_memory32_c(pb + PositionRecGS_position, eof.LowPart, 0);
 	} else {
-		set_memory32_c(pb + MarkRec_position, eof, 0);
+		set_memory32_c(pb + MarkRec_position, eof.LowPart, 0);
 	}
 
 	return 0;
 }
 
-static void free_directory(struct directory *dd) {
-	if (!dd) return;
-	for (int i = 0; i < dd->num_entries; ++i) {
-		free(dd->entries[i]);
-	}
-	free(dd);
-}
 
-static int qsort_callback(const void *a, const void *b) {
-	return strcmp(*(const char **)a, *(const char **)b);
-}
-
-/*
- * exclude files from get_dir_entries.
- *
- */
-static int filter_directory_entry(const char *name) {
-	if (!name[0]) return 1;
-	if (name[0] == '.') {
-		return 1;
-		/*
-		if (!strcmp(name, ".")) return 1;
-		if (!strcmp(name, "..")) return 1;
-		if (!strncmp(name, "._", 2)) return 1; // ._ resource fork
-		if (!strcmp(name, ".fseventsd")) return 1;
-		*/
-	}
-	return 0;
-}
-
-
-static struct directory *read_directory(const char *path, word16 *error) {
-	DIR *dirp;
-	struct directory *dd;
-	int capacity = 100;
-	int size = sizeof(struct directory) + capacity * sizeof(char *);
-
-	dirp = opendir(path);
-	if (!dirp) {
-		*error = map_errno();
-		return NULL;
-	}
-
-	dd = (struct directory *)malloc(size);
-	if (!dd) {
-		*error = outOfMem;
-		closedir(dirp);
-		return NULL;
-	}
-	memset(dd, 0, size);
-
-	for(;;) {
-		struct dirent *d = readdir(dirp);
-		if (!d) break;
-		if (filter_directory_entry(d->d_name)) continue;
-
-		if (dd->num_entries >= capacity) {
-			capacity += capacity;
-			size = sizeof(struct directory) + capacity * sizeof(char *);
-			struct directory * tmp = realloc(dd, size);
-			if (!tmp) {
-				*error = map_errno();
-				free_directory(dd);
-				closedir(dirp);
-				return NULL;
-			}
-			dd = tmp;
-		}
-		dd->entries[dd->num_entries++] = strdup(d->d_name);
-	};
-
-	closedir(dirp);
-
-	// sort them....
-	qsort(dd->entries, dd->num_entries, sizeof(char *), qsort_callback);
-
-	return dd;
-}
 
 
 static word32 fst_get_dir_entry(int class) {
-
 
 	int cookie = engine.yreg;
 
@@ -1991,7 +2117,6 @@ static word32 fst_get_dir_entry(int class) {
 	rv = get_file_info(fullpath, &fi);
 
 
-
 	// p16 and gs/os both use truncating c1 output string.
 	rv = set_gsstr_truncate(name, dname);
 
@@ -2015,7 +2140,7 @@ static word32 fst_get_dir_entry(int class) {
 			word16 fst_id = hfsFSID;
 			//if (fi.storage_type == 0x0f) fst_id = mfsFSID;
 			word32 option_list = get_memory24_c(pb + DirEntryRecGS_optionList, 0);
-			word32 tmp = set_option_list(option_list, fst_id, fi.finder_info, fi.has_fi ? 32 : 0);
+			word32 tmp = set_option_list(option_list, fst_id, fi.afp.finder_info, fi.has_fi ? 32 : 0);
 			if (!rv) rv = tmp;
 		}
 
@@ -2045,13 +2170,15 @@ static word32 fst_get_dir_entry(int class) {
 static word32 fst_change_path(int class, const char *path1, const char *path2) {
 
 	/* make sure they're not trying to rename the volume... */
-	struct stat st;
-	if (stat(path1, &st) < 0) return map_errno();
-	if (st.st_dev == root_dev && st.st_ino == root_ino)
-		return invalidAccess;
+	BOOL ok = 0;
 
-	// rename will delete any previous file.
-	if (rename(path1, path2) < 0) return map_errno();
+	word16 rv = 0;
+	word16 type = storage_type(path1, &rv);
+	if (rv) return rv;
+	if (type == 0x0f) return badStoreType;
+	if (read_only) return drvrWrtProt;
+
+	if (!MoveFile(path1, path2)) return map_last_error();	
 	return 0;
 }
 
@@ -2345,6 +2472,27 @@ static const char *error_name(word16 error) {
 	return "";
 }
 
+#ifdef __CYGWIN__
+
+#include <sys/cygwin.h>
+
+static char *expand_path(const char *path, word32 *error) {
+
+	char buffer[PATH_MAX];
+	ssize_t ok = cygwin_conv_path(CCP_POSIX_TO_WIN_A, path, buffer, sizeof(buffer));
+	if (ok < 0) {
+		*error = fstError;
+		return NULL;
+	}
+	return gc_strdup(buffer);
+}
+
+
+#else
+#define expand_path(x, y) (x)
+#endif
+
+
 void host_fst(void) {
 	
 	/*
@@ -2402,6 +2550,8 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
 
 				acc = fst_create(class, path3);
 				break;
@@ -2409,6 +2559,8 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
 
 				acc = fst_destroy(class, path3);
 				break;
@@ -2417,10 +2569,14 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
 
 				cp = check_path(path2, &acc);
 				if (acc) break;
 				path4 = append_path(root, cp);
+				path4 = expand_path(path4, &acc);
+				if (acc) break;
 
 				acc = fst_change_path(class, path3, path4);
 				break;
@@ -2428,6 +2584,8 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
 
 				acc = fst_set_file_info(class, path3);
 				break;
@@ -2435,6 +2593,9 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
+
 				acc = fst_get_file_info(class, path3);
 				break;
 			case 0x07:
@@ -2447,12 +2608,18 @@ void host_fst(void) {
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
+
 				acc = fst_clear_backup(class, path3);
 				break;
 			case 0x10:
 				cp = check_path(path1, &acc);
 				if (acc) break;
 				path3 = append_path(root, cp);
+				path3 = expand_path(path3, &acc);
+				if (acc) break;
+
 				acc = fst_open(class, path3);
 				break;
 			case 0x012:
