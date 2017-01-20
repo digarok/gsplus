@@ -616,11 +616,12 @@ int file_exists(char *fname){
   }
 }
 
+// This tries to determine the next screenshot name.
+// It uses the config name as the basename.
 void make_next_screenshot_filename()
 {
   char filepart[256];
   char filename[256];
-
 
   int available_filename = 0;
   while (!available_filename) {
@@ -637,7 +638,6 @@ void make_next_screenshot_filename()
     } else {
       sprintf(filename, "%s/%s%04d.png",g_config_gsplus_screenshot_dir,filepart,screenshot_index);
     }
-
     screenshot_index++;
     if (!file_exists(filename)) {
       available_filename = 1;
