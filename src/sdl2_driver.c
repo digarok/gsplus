@@ -385,6 +385,14 @@ check_input_events_sdl()
 				SDL_Quit();
 				my_exit(1);
 				break;
+			case SDL_DROPFILE:
+				{
+				char *file = event.drop.file;
+				cfg_inspect_maybe_insert_file(file, 0);
+				SDL_free(file);
+				}
+				break;
+
 			default:
 				break;
 		}
