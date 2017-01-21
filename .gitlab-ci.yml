@@ -130,8 +130,6 @@ package-win32:
     - cp /bin/cygstdc++-6.dll	.
     - cp /bin/cygwin1.dll .
     - cp /bin/cygfreetype-6.dll .
-    - cp /bin/cygbz2-1.dll .
-    - cp /bin/cygpng16-16.dll .
     
   artifacts:
     paths:
@@ -145,8 +143,6 @@ package-win32:
       - cygstdc++-6.dll
       - cygwin1.dll
       - cygfreetype-6.dll 
-      - cygbz2-1.dll 
-      - cygpng16-16.dll
 
 build-win-sdl:
   tags:
