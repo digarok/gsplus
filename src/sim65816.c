@@ -915,12 +915,14 @@ extern int g_use_shmem;
 extern int g_use_dhr140;
 extern int g_use_bw_hires;
 
+
+/* display parameters */
 char g_display_env[512];
 int	g_force_depth = -1;
 int	g_screen_depth = 8;
+int g_scanline_simulator = 0;
 
 void banner() {
-
   printf("\x1b[32m  _______  _______    _ \x1b[0m  \n");
   printf("\x1b[32m |   ____||  _____| _| |_ \x1b[0m  \n");
   printf("\x1b[33m |  |  __ | |_____ |_   _| \x1b[0m  \n");
@@ -1042,7 +1044,11 @@ gsplusmain(int argc, char **argv)
 			printf("Forcing black-and-white hires modes\n");
 			g_cur_a2_stat |= ALL_STAT_COLOR_C021;
 			g_use_bw_hires = 1;
-		} else if(!strcmp("-enet", argv[i])) {
+		} else if(!strcmp("-scanline", argv[i])) {
+      g_scanline_simulator = 1;
+    } else if(!strcmp("-noscanline", argv[i])) {
+      g_scanline_simulator = 0;
+    } else if(!strcmp("-enet", argv[i])) {
 			if((i+1) >= argc) {
 				printf("Missing argument\n");
 				exit(1);
