@@ -178,6 +178,7 @@ package-win-sdl:
     - cp /bin/cygtiff-6.dll .
     - cp /bin/cygjbig-2.dll .
     - cp /bin/cyglzma-5.dll .
+    - cp /bin/cygwebp-5.dll .
 
 
 
@@ -202,3 +203,4 @@ package-win-sdl:
       - cygtiff-6.dll
       - cygjbig-2.dll
       - cyglzma-5.dll 
+      - cygwebp-5.dll 
