@@ -1,6 +1,9 @@
-GSPLUS ALPHA
-============
+# GSPLUS
+An Apple IIgs emulator for Mac OSX, Windows, and Linux.
 
+![Screenshot of starting the program](doc/web/Screenshot.png "Screenshot of starting the program")
+
+# ABOUT
 This is an early release of an experimental project to modernize the
 KEGS/GSport emulator platform and eventually extend it.
 
@@ -10,13 +13,7 @@ and output (video, mouse, keyboard, audio, joystick).  The hope is that I can
 leverage the multi-platform nature of SDL to provide first-class support for
 the major plaforms supported by SDL, which includes Mac OSX, Windows and Linux.
 
-I'm not a huge fan of OSX, but I keep a MacBook Pro nearby for work, so the
-first version to be release is this OSX build.  I'll try to have builds for
-other platforms available in a few weeks.
-
-
-
-Some notes:
+# USAGE NOTES
 You need to provide the ROM file and disk images and a config file.  I'd
 recommend you just drop it in your current GSport or KEGS folder and run it
 from there.
