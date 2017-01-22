@@ -1,8 +1,9 @@
-﻿gsp_icon_512.png 
+doc/gsplusmanual.pdfgsp_icon_512.png 
  
 GSplus
 Modern cross-platform Apple IIgs emulator and tools based on KEGS & GSPort
 Manual Versions: 
+Beta Release: 2017-01-21
 Alpha Release: 2016-11-02
 Alpha Draft: 2016-10-27
 Initial Draft: 2016-05-01
@@ -36,26 +37,29 @@ ________________
 
 Emulator Hot-Keys
 There are several keys used to interact with the emulator while it is running.  Here’s a quick list of the main hot-keys and what they do.
-F4                 - Configuration menu
-F5                 - Paste from host OS into emulator
-Shift-F5         - Screenshot
-F6                 - Toggle System Speed  (1, 2.8, 8, ∞ MHz )
-F7                 - Toggle Fast Disk Emulation
-F9                 - Invert Paddles
-F10                 - Toggle a2vid_palette (?)
-F11                 - Toggle Fullscreen Mode
-F12                 - RESET Key (so to hit “Ctrl-Reset” on an Apple II, you hit “Ctrl-F12”)
-
+F4                 - configuration menu - set lots of options here!
+F5                 - paste from host OS into emulator
+F6                 - toggle system speed  (1, 2.8, 8, ∞ MHz )
+F7                 - toggle fast disk emulation
+F9                 - invert paddles
+F10                 - toggle a2vid_palette (?)
+F11                 - toggle fullscreen mode *
+F12                 - hit RESET (e.g. - to do “Ctrl-Reset” on an Apple II, you hit “Ctrl-F12”)
+Shift-F5         - take a screenshot *
+Shift-F10         - toggle status line *
+Shift-F11         - toggle simulated scanlines *
+* not available on all platforms
 Other Input/Output
    1. Mouse and keyboard should automatically work
    2. Joystick with SDL2 driver is known to be working.  It simply uses the “first” joystick and the first analog pad on that stick plus the first two buttons.  The axes and buttons are not yet configurable.  Better info forthcoming.
    3. There are drivers for serial controller, ImageWriter (II?) printer, and networking.  I may have broken some of this functionality to get builds working.  I’m not currently familiar with the state of these drivers or their usage.  More info will be added as I take time to research more of the modules. 
+   4. You can also drag-and-drop disk images onto the emulator window and it will try to automount the disk!  (SDL versions)
 Configuration Menu
 Configuration options are loaded from, and saved to, a configuration text file.  The default configuration file is config.txt.  If you are just starting out, it’s recommended to use the configuration menu versus editing the file yourself.
 Enter the configuration menu at any time while running GSplus by hitting <F4>.
  Screen Shot 2016-05-01 at 9.10.00 AM.png 
 
-Most importantly, you can use the Disk Configuration menu option to “mount” and “eject” disks.          
+Most importantly, you can use the Disk Configuration menu option to “mount” and “eject” disks.  There is also        
 Command-line Options
 This is from source, some are experimental and not all may be built on your system.
 -badrd                        Halt on bad reads
@@ -81,11 +85,9 @@ This is from source, some are experimental and not all may be built on your syst
 -config value                Set config file to value
 -debugport value        Set debugport to value
 -ssdir value                Set screenshot save directory to value
+-scanline                Enable scanline simulator
+-noscanline                Disable scanline simulator (default)
 Note: The final argument, if not a flag, will be tried as a mountable device.
-
-
-
-
 
 
 Debugger Commands  - BROKEN!!!
@@ -96,8 +98,6 @@ GSplus CLI Debugger help (courtesy Fredric Devernay)
 General command syntax: [bank]/[address][command]  
 e.g. 'e1/0010B' to set a breakpoint at the interrupt jump pt
 Enter all addresses using lower-case.  As with the IIgs monitor, you can omit the bank number after having set it: 'e1/0010B' followed by '14B' will set breakpoints at e1/0010 and e1/0014
-
-
 g                                       Go
 [bank]/[addr]g             Go from [bank]/[address]
 s                                       Step one instruction
@@ -136,4 +136,24 @@ Project Info
 Developers inquire within  :P
 Main page and full source code repository: https://github.com/digarok/gsplus
 This project has a homepage at http://apple2.gs/plus/
-The homepage hosts the latest build for a variety of OSes.
+The homepage hosts the latest build for a variety of OSes. 
+  
+
+Release Changelog
+Version 0.13 - Jan. 22 2017
+Scanline simulator
+Drag-and-drop disk images and it will try to automount
+Fixes and improvements to logging
+Win32 icon parity with other versions
+Experimental host FST support
+Various bug fixes
+
+
+Version 0.12s - Nov. 12, 2016
+First official alpha release with packages
+“S” in version is because it introduces new Socket Debugger, large effort
+
+
+Version 0.11 - 2015 - 2016
+Not publicly released
+Features first major contribution - SDL2 driver supporting displays, sound and joysticks
