@@ -245,7 +245,7 @@ void dev_video_init() {
       g_num_a2_keycodes = i;
       break;
     } else if(keycode > 0x7f) {
-      printf("a2_key_to_xsym[%d] = %02x!\n", i, keycode);
+      glogf("a2_key_to_xsym[%d] = %02x!\n", i, keycode);
       exit(2);
     }
   }
@@ -339,9 +339,7 @@ void dev_video_init_sdl() {
 
         if (y%2 == 1) {
           overlay_pixels[(y*BASE_WINDOW_WIDTH)+x] = 0x30000000;
-          printf("%d\n",(y*BASE_WINDOW_WIDTH)+x);
         }
-
       }
     }
   }
