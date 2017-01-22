@@ -174,6 +174,8 @@ package-win-sdl:
     - cp /bin/cygz.dll .
     - cp /bin/cygSDL2-2-0-0.dll .
     - cp /bin/cygSDL2_image-2-0-0.dll .
+    - cp /bin/cygjpeg-8.dll .
+
 
   artifacts:
     paths:
@@ -192,3 +194,4 @@ package-win-sdl:
       - cygz.dll
       - cygSDL2-2-0-0.dll
       - cygSDL2_image-2-0-0.dll
+      - cygjpeg-8.dll
