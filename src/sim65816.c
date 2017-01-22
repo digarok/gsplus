@@ -119,6 +119,17 @@ extern int g_audio_enable;
 extern int g_preferred_rate;
 extern int g_dbg_enable_port;
 
+/* display parameters */
+char g_display_env[512];
+int	g_force_depth = -1;
+int	g_screen_depth = 8;
+int g_scanline_simulator = 0;
+
+extern int g_screen_redraw_skip_amt;
+extern int g_use_shmem;
+extern int g_use_dhr140;
+extern int g_use_bw_hires;
+
 void U_STACK_TRACE();
 
 double	g_fcycles_stop = 0.0;
@@ -244,8 +255,7 @@ Data_log *g_log_data_start_ptr = &(g_data_log_array[0]);
 Data_log *g_log_data_end_ptr = &(g_data_log_array[PC_LOG_LEN]);
 
 // OG Added sim65816_initglobals()
-void sim65816_initglobals()
-{
+void sim65816_initglobals() {
   g_fcycles_stop = 0.0;
   halt_sim = 0;
   enter_debug = 0;
@@ -305,9 +315,7 @@ void sim65816_initglobals()
   g_mem_size_total = 256*1024;	/* Total contiguous RAM from 0 */
 }
 
-void
-show_pc_log()
-{
+void show_pc_log() {
 	FILE *pcfile;
 	Pc_log	*log_pc_ptr;
 	Data_log *log_data_ptr;
@@ -407,9 +415,7 @@ show_pc_log()
 int g_toolbox_log_pos = 0;
 word32 g_toolbox_log_array[TOOLBOX_LOG_LEN][8];
 
-word32
-toolbox_debug_4byte(word32 addr)
-{
+word32 toolbox_debug_4byte(word32 addr) {
 	word32	part1, part2;
 
 	/* If addr looks safe, use it */
@@ -425,9 +431,7 @@ toolbox_debug_4byte(word32 addr)
 	return (part1 << 16) + part2;
 }
 
-void
-toolbox_debug_c(word32 xreg, word32 stack, double *cyc_ptr)
-{
+void toolbox_debug_c(word32 xreg, word32 stack, double *cyc_ptr) {
 	int	pos;
 
 	pos = g_toolbox_log_pos;
@@ -450,9 +454,7 @@ toolbox_debug_c(word32 xreg, word32 stack, double *cyc_ptr)
 	g_toolbox_log_pos = pos;
 }
 
-void
-show_toolbox_log()
-{
+void show_toolbox_log() {
 	int	pos;
 	int	i;
 
@@ -503,9 +505,7 @@ get_memory_c(word32 loc, int diff_cycles)
 #endif
 
 
-word32
-get_memory_io(word32 loc, double *cyc_ptr)
-{
+word32 get_memory_io(word32 loc, double *cyc_ptr) {
 	int	tmp;
 
 	if(loc > 0xffffff) {
@@ -624,9 +624,7 @@ set_memory(word32 loc, int val, int diff_cycles)
 }
 #endif
 
-void
-set_memory_io(word32 loc, int val, double *cyc_ptr)
-{
+void set_memory_io(word32 loc, int val, double *cyc_ptr) {
 	word32	tmp;
 	tmp = loc & 0xfef000;
 	if(tmp == 0xc000 || tmp == 0xe0c000) {
@@ -718,22 +716,17 @@ show_regs_act(Engine_reg *eptr)
 		dbank, g_cur_dcycs);
 }
 
-void
-show_regs()
-{
+void show_regs() {
 	show_regs_act(&engine);
 }
 
 //OG for regular exit, use quitEmulator()
-
-void quitEmulator()
-{
+void quitEmulator() {
 	printf("set_halt(HALT_WANTTOQUIT)\n");
 	set_halt(HALT_WANTTOQUIT);
 }
 
 //OG change exit to fatal_exit()
-
 #ifndef ACTIVEGS
 	// use standard exit function
 	#define fatalExit	exit
@@ -741,8 +734,7 @@ void quitEmulator()
 	extern void fatalExit(int);
 #endif
 
-void my_exit(int ret)
-{
+void my_exit(int ret) {
 	end_screen();
 	imagewriter_close();
 	printer_close();
@@ -751,9 +743,7 @@ void my_exit(int ret)
 }
 
 
-void
-do_reset()
-{
+void do_reset() {
 
 	// OG Cleared remaining IRQS on RESET
 	extern int	g_irq_pending;
@@ -807,9 +797,7 @@ do_reset()
 		exit(5);						\
 	}
 
-void
-check_engine_asm_defines()
-{
+void check_engine_asm_defines() {
 	Fplus	fplus;
 	Fplus	*fplusptr;
 	Pc_log	pclog;
@@ -850,9 +838,7 @@ check_engine_asm_defines()
 	CHECK(fplusptr, fplusptr->plus_x_minus_1, FPLUS_PLUS_X_M1, val1, val2);
 }
 
-byte *
-memalloc_align(int size, int skip_amt, void **alloc_ptr)
-{
+byte * memalloc_align(int size, int skip_amt, void **alloc_ptr) {
 	byte	*bptr;
 	word32	addr;
 	word32	offset;
@@ -874,9 +860,7 @@ memalloc_align(int size, int skip_amt, void **alloc_ptr)
 	return (bptr + offset);
 }
 
-void
-memory_ptr_init()
-{
+void memory_ptr_init() {
 	word32	mem_size;
 
 	/* This routine may be called several times--each time the ROM file */
@@ -898,9 +882,7 @@ memory_ptr_init()
 }
 
 // OG Added memory_ptr_shut
-void
-memory_ptr_shut()
-{
+void memory_ptr_shut() {
 	if(g_memory_alloc_ptr)
 	{
 		free(g_memory_alloc_ptr);
@@ -910,17 +892,6 @@ memory_ptr_shut()
 }
 
 
-extern int g_screen_redraw_skip_amt;
-extern int g_use_shmem;
-extern int g_use_dhr140;
-extern int g_use_bw_hires;
-
-
-/* display parameters */
-char g_display_env[512];
-int	g_force_depth = -1;
-int	g_screen_depth = 8;
-int g_scanline_simulator = 0;
 
 void banner() {
   printf("\x1b[32m  _______  _______    _ \x1b[0m  \n");
@@ -932,17 +903,44 @@ void banner() {
   printf("\x1b[37m    GSplus v%s \x1b[0m  \n\n", g_gsplus_version_str);
 }
 
-int
-gsplusmain(int argc, char **argv)
-{
+void help_exit() {
+  printf(" USAGE: \n\n");
+  printf("   ./gsplus                           # simple - uses default config.txt\n");
+  printf("   ./gsplus -config games_hds.gsp     # set custom config file\n\n");
+  printf(" You need to supply your own Apple IIgs Firmware ROM image.\n");
+  printf(" Press F4 when running gsplus to enter config menu and select ROM image location.\n");
+  printf(" Or copy the ROM image to the gsplus directory.\n");
+  printf(" It will search for:   \"ROM\", \"ROM.01\", \"ROM.03\" \n\n\n");
+  printf("  Other command line options: \n\n");
+  printf("    -badrd                Halt on bad reads\n");
+  printf("    -noignbadacc          Don’t ignore bad memory accesses\n");
+  printf("    -noignhalt            Don’t ignore code red halts\n");
+  printf("    -test                 Allow testing\n");
+  printf("    -joystick             Ignore joystick option\n");
+  printf("    -bw                   Force B/W modes\n");
+  printf("    -dhr140               Use simple double-hires color map\n");
+  printf("    -mem value            Set memory size to value\n");
+  printf("    -skip value           Set skip_amt to value\n");
+  printf("    -audio value          Set audio enable to value\n");
+  printf("    -arate value          Set preferred audio rate to value\n");
+  printf("    -enet value           Set ethernet to value\n");
+  printf("    -config value         Set config file to value\n");
+  printf("    -debugport value      Set debugport to value\n");
+  printf("    -ssdir value          Set screenshot save directory to value\n");
+  printf("    -scanline             Enable scanline simulator\n");
+  printf("    -noscanline           Disable scanline simulator (default)\n");
+  printf("    -v value              Set verbose flags to value\n\n");
+  printf("  Note: The final argument, if not a flag, will be tried as a mountable device.\n\n");
+  exit(1);
+}
+
+int gsplusmain(int argc, char **argv) {
 	int	diff;
 	int	skip_amt;
 	int	tmp1;
 	int	i;
 	char	*final_arg = 0;
 
-  // just for fun
-  banner();
 	// OG Restoring globals
 	sim65816_initglobals();
 	moremem_init();
@@ -952,7 +950,9 @@ gsplusmain(int argc, char **argv)
 
 	/* parse args */
 	for(i = 1; i < argc; i++) {
-		if(!strcmp("-badrd", argv[i])) {
+    if( (!strcmp("-?", argv[i])) || (!strcmp("-h", argv[i])) || (!strcmp("-help", argv[i]))) {
+      help_exit();
+		} else if(!strcmp("-badrd", argv[i])) {
 			printf("Halting on bad reads\n");
 			g_halt_on_bad_read = 2;
 		} else if(!strcmp("-noignbadacc", argv[i])) {
@@ -1092,6 +1092,9 @@ gsplusmain(int argc, char **argv)
 			}
 		}
 	}
+
+  // just for fun
+  banner();
 
 	check_engine_asm_defines();
 	fixed_memory_ptrs_init();

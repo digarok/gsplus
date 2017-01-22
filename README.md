@@ -18,6 +18,5 @@ from there.
 See the doc/gsplusmanual.pdf file for much more complete documentation.
 
 # Build Instructions
-==========================
 See the /doc/ directory for "Developer-Quickstart" docs which cover building
 for the various platforms.  

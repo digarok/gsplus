@@ -439,12 +439,19 @@ void check_input_events_sdl() {
         motion |= handle_sdl_mouse_motion_event(event);
         break;
       case SDL_QUIT:
-        //quit = 1;     /* SDL_QUIT event (window close) */
-        SDL_DestroyWindow(window);
-        iwm_shut();
-        // Clean up
-        SDL_Quit();
-        my_exit(1);
+        {
+          const Uint8 *state = SDL_GetKeyboardState(NULL);
+          if (state[SDL_SCANCODE_Q]) {
+            glog("Skipping keyboard quit event.  Not allowed.");
+          } else {
+            //quit = 1;     /* SDL_QUIT event (window close) */
+            SDL_DestroyWindow(window);
+            iwm_shut();
+            // Clean up
+            SDL_Quit();
+            my_exit(1);
+          }
+        }
         break;
       case SDL_DROPFILE:
       {

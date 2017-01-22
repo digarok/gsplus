@@ -957,15 +957,12 @@ void debug_server_poll()
     /***********************************************************/
     /* Call poll() and wait for it to complete/timeout.        */
     /***********************************************************/
-    //printf("Waiting on poll()...\n");
-    //printf("Waiting on debugger connection\n");
     rc = poll(fds, nfds, timeout);
 
     /***********************************************************/
     /* Check to see if the poll call failed.                   */
     /***********************************************************/
-    if (rc < 0)
-    {
+    if (rc < 0) {
       perror("  poll() failed");
       return; // @todo: break/exit?
     }
@@ -973,10 +970,7 @@ void debug_server_poll()
     /***********************************************************/
     /* Check to see if the 3 minute time out expired.          */
     /***********************************************************/
-    if (rc == 0)
-    {
-      //printf("  poll() timed out.  End program.\n");
-      //printf("~");
+    if (rc == 0) {
       return; // @todo: break/exit?
     }
 
@@ -986,29 +980,27 @@ void debug_server_poll()
     /* determine which ones they are.                          */
     /***********************************************************/
     current_size = nfds;
-    for (i = 0; i < current_size; i++)
-    {
+    for (i = 0; i < current_size; i++) {
       /*********************************************************/
       /* Loop through to find the descriptors that returned    */
       /* POLLIN and determine whether it's the listening       */
       /* or the active connection.                             */
       /*********************************************************/
-      if(fds[i].revents == 0)
-      continue;
+      if(fds[i].revents == 0) {
+        continue;
+      }
 
       /*********************************************************/
       /* If revents is not POLLIN, it's an unexpected result,  */
       /* log and end the server.                               */
       /*********************************************************/
-      if(fds[i].revents != POLLIN)
-      {
+      if(fds[i].revents != POLLIN) {
         printf("  Error! revents = %d\n", fds[i].revents);
         end_server = TRUE;
         break;
-
       }
-      if (fds[i].fd == listen_sd)
-      {
+
+      if (fds[i].fd == listen_sd) {
         /*******************************************************/
         /* Listening descriptor is readable.                   */
         /*******************************************************/
@@ -1019,8 +1011,7 @@ void debug_server_poll()
         /* queued up on the listening socket before we         */
         /* loop back and call poll again.                      */
         /*******************************************************/
-        do
-        {
+        do {
           /*****************************************************/
           /* Accept each incoming connection. If              */
           /* accept fails with EWOULDBLOCK, then we            */
@@ -1029,10 +1020,8 @@ void debug_server_poll()
           /* server.                                           */
           /*****************************************************/
           new_sd = accept(listen_sd, NULL, NULL);
-          if (new_sd < 0)
-          {
-            if (errno != EWOULDBLOCK)
-            {
+          if (new_sd < 0) {
+            if (errno != EWOULDBLOCK) {
               perror("  accept() failed");
               end_server = TRUE;
             }
@@ -1043,7 +1032,7 @@ void debug_server_poll()
           /* Add the new incoming connection to the            */
           /* pollfd structure                                  */
           /*****************************************************/
-          printf("  New incoming connection - %d\n", new_sd);
+          glogf("  New incoming connection - %d\n", new_sd);
           fds[nfds].fd = new_sd;
           fds[nfds].events = POLLIN;
           nfds++;
@@ -1064,8 +1053,7 @@ void debug_server_poll()
       /* existing connection must be readable                  */
       /*********************************************************/
 
-      else
-      {
+      else {
         //printf("  Descriptor %d is readable\n", fds[i].fd);
         close_conn = FALSE;
         /*******************************************************/
@@ -1073,8 +1061,7 @@ void debug_server_poll()
         /* before we loop back and call poll again.            */
         /*******************************************************/
 
-        do
-        {
+        do {
           /*****************************************************/
           /* Receive data on this connection until the         */
           /* recv fails with EWOULDBLOCK. If any other        */
@@ -1097,7 +1084,7 @@ void debug_server_poll()
           /* closed by the client                              */
           /*****************************************************/
           if (rc == 0) {
-            printf("  Connection closed\n");
+            glog("Connection closed\n");
             close_conn = TRUE;
             end_server = TRUE;
             break;
@@ -1107,15 +1094,12 @@ void debug_server_poll()
           /* Data was received                                 */
           /*****************************************************/
           len = rc;
-          //printf("\n\n === debug_server_poll() %d bytes received \n", len);
-          //printf(" ==== current queue len: %d\n", dbg_cmd_queue_len);
           char *mesg_ptr = buffer;
           char *split_ptr = strchr(mesg_ptr, '\n');
 
           int mesg_len = len-1;		// stripping that first char
           if(split_ptr) {
             int index = split_ptr - buffer;
-            //printf("Found: %d\n", index);
             mesg_len = index - 1;	// stripping that first char
           }
           int debug_echo = FALSE;
@@ -1182,11 +1166,9 @@ void debug_server_poll()
             }
 
             mesg_ptr += mesg_len + 2;	// +1 for command char and +1 for '\n'
-            // printf(mesg_ptr);
             split_ptr = strchr(mesg_ptr, '\n');
             if(split_ptr) {
               int index = split_ptr - mesg_ptr;
-              //  printf("Found: %d\n", index);
               mesg_len = index - 1;	// stripping that first char
             }
           }
@@ -1195,8 +1177,7 @@ void debug_server_poll()
           /*****************************************************/
           if (debug_echo) {
             rc = send(fds[i].fd, buffer, len, 0);
-            if (rc < 0)
-            {
+            if (rc < 0) {
               perror("  send() failed");
               close_conn = TRUE;
               break;
@@ -1214,13 +1195,11 @@ void debug_server_poll()
         /* clean up process includes removing the              */
         /* descriptor.                                         */
         /*******************************************************/
-        if (close_conn)
-        {
+        if (close_conn) {
           close(fds[i].fd);
           fds[i].fd = -1;
           compress_array = TRUE;
         }
-
 
       }  /* End of existing connection is readable             */
     } /* End of loop through pollable descriptors              */
@@ -1257,9 +1236,7 @@ void debug_server_poll()
 }
 
 
-int do_dis_json(char *buf, word32 kpc, int accsize, int xsize,
-  int op_provided, word32 instr, int chain)
-  {
+int do_dis_json(char *buf, word32 kpc, int accsize, int xsize, int op_provided, word32 instr, int chain) {
     char buf_instructions[5*5]; // '["12","DE","AB"]'
     char buf_disasm[50];
 
@@ -1532,13 +1509,11 @@ int do_dis_json(char *buf, word32 kpc, int accsize, int xsize,
   // BASE 64 ENCODER (FOR MEMORY DUMPS)
   static const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-  int b64encode_len(int len)
-  {
+  int b64encode_len(int len) {
     return ((len + 2) / 3 * 4) + 1;
   }
 
-  int b64encode(char *encoded, const char *string, int len)
-  {
+  int b64encode(char *encoded, const char *string, int len) {
     int i;
     char *p;
 
