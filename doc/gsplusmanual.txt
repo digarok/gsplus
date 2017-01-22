@@ -19,26 +19,32 @@ The first steps were a release of a new SDL2 driver.  SDL or "Simple DirectMedia
 Part of this effort has also led to the development of an automated build and packaging pipeline using Gitlab CI.  This helps our team of one continue to develop on primarily a single platform, while still ensuring that it works across many operating systems
 Currently, the main supported platforms are Linux, OSX and Windows.  
 Getting started
-1. Download the emulator package from https://apple2.gs/plus and put it in a folder
+1. Download the emulator package from https://apple2.gs/plus and put it in a folder. 
 2. Download the Apple IIgs Firmware ROMs, for either a ROM01 or ROM03 machine.
  (If you have a real IIgs, there are ways to save it from your machine too.)
 Try: ftp://ftp.apple.asimov.net/pub/apple_II/emulators/rom_images/
-3. Download some Apple IIgs software.
+   1. Put the ROM image in the same folder where you run the emulator from. 
+It will search for:  "ROM", "ROM.01", "ROM.03"
+If your ROM image is named differently, launch the program from the command line and hit F4 to go to the config menu to choose your ROM location
+      1. Download some Apple IIgs software.
  I recommend the excellent Apple IIgs dedicated site:
    http://www.whatisthe2gs.apple2.org.za/
  If you have a real IIgs, you can transfer your disks using ADTPro
    http://adtpro.sourceforge.net/
-4. Edit your config:
+      2. Edit your config:
  You can manually edit the config.txt file
    .. or while the emulator is running… hit F4 to enter config menu.
- Set up the ROM to point to your IIgs ROM file from step 2.
+ Set it to point to your IIgs ROM file from step 2 if not already configured.
  Set up the slots to point to disks from step 3.
-5. Boot the Apple IIgs by running the emulator
+      3. Boot the Apple IIgs by running the emulator
  Windows:                gsplus32.exe
- Mac/Ubuntu:        ./gsplus
+ Mac*/Ubuntu:        ./gsplus
+
+* Yes, you can drag it into your Applications folder on a Mac, but be aware that it is still meant to be launched from a command line.  If you put it in Applications, you should be able to run it with the terminal command:
+   /Applications/GSplus.app/Contents/MacOS/gsplus
 
 If the config file can’t be found, it will try to create a config.txt file for you, with all of the defaults.
-   1. Note: You can also specify a config file.  This is very useful as you can have specific disks/setting pre-set in a config file and launch directly into your favorite game with that config.  They can be named anything you want, though the officially recognized extensions are .txt and .gsp. 
+         1. Note: You can also specify a config file.  This is very useful as you can have specific disks/setting pre-set in a config file and launch directly into your favorite game with that config.  They can be named anything you want, though the officially recognized extensions are .txt and .gsp. 
 
 Examples:
  Windows:                gsplus32.exe -config arkanoid.gsp
@@ -63,10 +69,10 @@ Shift-F10         - toggle status line *
 Shift-F11         - toggle simulated scanlines *
 * not available on all platforms
 Other Input/Output
-      1. Mouse and keyboard should automatically work
-      2. Joystick with SDL2 driver is known to be working.  It simply uses the “first” joystick and the first analog pad on that stick plus the first two buttons.  The axes and buttons are not yet configurable.  Better info forthcoming.
-      3. There are drivers for serial controller, ImageWriter (II?) printer, and networking.  I may have broken some of this functionality to get builds working.  I’m not currently familiar with the state of these drivers or their usage.  More info will be added as I take time to research more of the modules. 
-      4. You can also drag-and-drop disk images onto the emulator window and it will try to automount the disk!  (SDL versions)
+            1. Mouse and keyboard should automatically work
+            2. Joystick with SDL2 driver is known to be working.  It simply uses the “first” joystick and the first analog pad on that stick plus the first two buttons.  The axes and buttons are not yet configurable.  Better info forthcoming.
+            3. There are drivers for serial controller, ImageWriter (II?) printer, and networking.  I may have broken some of this functionality to get builds working.  I’m not currently familiar with the state of these drivers or their usage.  More info will be added as I take time to research more of the modules. 
+            4. You can also drag-and-drop disk images onto the emulator window and it will try to automount the disk!  (SDL versions)
 Configuration Menu
 Configuration options are loaded from, and saved to, a configuration text file.  The default configuration file is config.txt.  If you are just starting out, it’s recommended to use the configuration menu versus editing the file yourself.
 Enter the configuration menu at any time while running GSplus by hitting <F4>.
