@@ -96,6 +96,7 @@ package-osx:
     - osx
   stage: package
   script:
+    - 'echo "\n\n# CI_BUILD_ID: $CI_BUILD_ID" > doc/README.txt'
     - chmod +x make_dist_mac.sh
     - ./make_dist_mac.sh
     - chmod +x make_dmg_mac.sh
