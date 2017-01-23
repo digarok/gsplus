@@ -22,6 +22,7 @@ package-ubuntu-x:
   stage: package
   script:
     - cp src/config.txt .
+    - echo "\n\n# CI_BUILD_ID: $CI_BUILD_ID" > config.txt
     - cp COPYING.txt doc/
   artifacts:
     paths:
@@ -65,6 +66,7 @@ package-ubuntu-sdl2:
   stage: package
   script:
     - cp src/config.txt .
+    - echo "\n\n# CI_BUILD_ID: $CI_BUILD_ID" > config.txt
     - cp COPYING.txt doc/
   artifacts:
     paths:
@@ -125,6 +127,7 @@ package-win32:
   stage: package
   script:
     - cp src/config.txt .
+    - echo "\n\n# CI_BUILD_ID: $CI_BUILD_ID" > config.txt
     - cp COPYING.txt doc/
     - cp /bin/cyggcc_s-1.dll .
     - cp /bin/cygstdc++-6.dll	.
@@ -164,6 +167,7 @@ package-win-sdl:
   stage: package
   script:
     - cp src/config.txt .
+    - echo "\n\n# CI_BUILD_ID: $CI_BUILD_ID" > config.txt
     - cp COPYING.txt doc/
     - cp /bin/cyggcc_s-1.dll .
     - cp /bin/cygstdc++-6.dll	.
@@ -202,5 +206,5 @@ package-win-sdl:
       - cygjpeg-8.dll
       - cygtiff-6.dll
       - cygjbig-2.dll
-      - cyglzma-5.dll 
-      - cygwebp-5.dll 
+      - cyglzma-5.dll
+      - cygwebp-5.dll
