@@ -22,7 +22,7 @@
 */
 
 #include "defc.h"
-
+#include "glog.h"
 #ifdef __linux__
 # include <linux/joystick.h>
 # include <sys/time.h>
