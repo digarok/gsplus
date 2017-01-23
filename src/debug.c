@@ -153,9 +153,9 @@ do_go_debug()
       clear_halt();
 
 
-      printf("calling run_prog()\n");
+      glog("calling run_prog()");
       run_prog();		// also calls debug_server_poll()
-      printf("left run_prog()\n");
+      glog("left run_prog()");
       step_count++;
 
       // so this is a break...
@@ -187,22 +187,20 @@ void debug_pop_message() {
 
 // adds message to end of queue and ups the counter
 void debug_push_message(G_DBG_COMMANDS msg_type, char *msg_ptr, int msg_len) {
-  printf("GOT: %d\n", (int) msg_type);
+  glogf("debug_push_message() GOT: %d", (int) msg_type);
   dbg_cmd_queue[dbg_cmd_queue_len].command = msg_type;
   memcpy(dbg_cmd_queue[dbg_cmd_queue_len].cdata, msg_ptr, msg_len);  // stripping that first char
   dbg_cmd_queue[dbg_cmd_queue_len].cdata[msg_len+1] = '\0';	// terminator
   dbg_cmd_queue_len++;  // INC POINTER
 }
 
-// this should be sufficient :P
+// this should be sufficient
 int debug_events_waiting() {
-  //printf("dbg_cmd_queue_len: %d\n", dbg_cmd_queue_len);
   return dbg_cmd_queue_len;
 }
 
 // handle event onfront of queue and remove it
-void debug_handle_event()
-{
+void debug_handle_event() {
   while (debug_events_waiting() > 0) {
     switch (dbg_cmd_queue[0].command) {
       case G_DBG_COMMAND_TEST:   //0
@@ -262,28 +260,25 @@ void debug_handle_event()
   }
 }
 
-void push_api_msg(int size, char *msg_str)
-{
+void push_api_msg(int size, char *msg_str) {
   if (dbg_msg_queue_len < DBG_MSG_QUEUE_MAXLEN) {
     dbg_msg_queue[dbg_msg_queue_len].msg_size = size;
     dbg_msg_queue[dbg_msg_queue_len].msg_str = msg_str;
     //printf("Latest message : \n%s\n", dbg_msg_queue[dbg_msg_queue_len].msg_str);
     dbg_msg_queue_len++;  // INC POINTER
   } else {
-    printf("ABORT! MESSAGE QUEUE FULL!\n");
+    glog("ABORT! Message dropped because dbg_msg_queue is full.");
   }
 }
 
-void api_push_memack()
-{
+void api_push_memack() {
   int size = snprintf(tmp_buffer_4k, sizeof(tmp_buffer_4k),"{\"type\":\"memack\"}");
   char *msg = (char*)malloc(sizeof(char) * size);
   strcpy(msg,tmp_buffer_4k);
   push_api_msg(size, msg);
 }
 
-void api_push_cpu()
-{
+void api_push_cpu() {
   Engine_reg *eptr;
   eptr = &engine;
   int	tmp_acc, tmp_x, tmp_y, tmp_psw;
@@ -307,8 +302,7 @@ void api_push_cpu()
   push_api_msg(size, msg);
 }
 
-void api_push_brk()
-{
+void api_push_brk() {
   	int i;
     // build our json array of breakpoints
     tmp_buffer2_4k[0] = '\0'; // start with empty string
@@ -330,8 +324,7 @@ void api_push_brk()
 }
 
 
-void api_push_stack()
-{
+void api_push_stack() {
   Engine_reg *eptr;
   eptr = &engine;
   int	kpc, stack;
@@ -360,8 +353,7 @@ void api_push_stack()
 }
 
 
-void api_push_disassembly_start()
-{
+void api_push_disassembly_start() {
   int size = snprintf(tmp_buffer_4k, sizeof(tmp_buffer_4k),"{\"type\":\"dis0\"}");
   char *msg = (char*)malloc(sizeof(char) * size);
   strcpy(msg,tmp_buffer_4k);
@@ -369,8 +361,7 @@ void api_push_disassembly_start()
 }
 
 
-void api_push_disassembly()
-{
+void api_push_disassembly() {
   int byte_size;
   int size_mem_imm, size_x_imm;
 
@@ -400,8 +391,7 @@ void api_push_disassembly()
   }
 }
 
-void api_push_disassembly_chain()
-{
+void api_push_disassembly_chain() {
   int byte_size;
   int size_mem_imm, size_x_imm;
 
@@ -423,18 +413,7 @@ void api_push_disassembly_chain()
 }
 
 
-void api_push_dump(int bank, int start, int end)
-{
-  // printf("YAY! %s\n",str );
-  // printf("BANK %02X : %04X - %04X\n", bank, start, end);
-  //
-  //  const char foostr[] = "Bleep Blop Bloop!";
-  //  int l = b64encode_len(strlen(foostr));
-  //  char *msg = (char*)malloc(sizeof(char) * l);
-  //  //int b64encode(char *encoded, const char *string, int len)
-  //  int num = b64encode(msg, foostr, l);
-  //  printf("b64: %s\n", msg);
-
+void api_push_dump(int bank, int start, int end) {
   char *post_str = "\"}}";
   int pre_size = snprintf(tmp_buffer_4k, sizeof(tmp_buffer_4k),
     "{\"type\":\"mem\",\"data\":{\"bank\":\"%02X\",\"start\":\"%04X\",\"end\":\"%04X\",\"b64data\":\"",
@@ -466,14 +445,12 @@ void api_push_dump(int bank, int start, int end)
   }
 }
 
-void event_cpu_info()
-{
+void event_cpu_info() {
   api_push_cpu();
   api_write_socket();
 }
 
-void event_pause()
-{
+void event_pause() {
   if (debug_pause) {
     // UNPAUSE
     debug_pause = 0;
@@ -492,8 +469,7 @@ void event_pause()
 
 
 // test command stubs for more interactive testing
-void event_test_command(char *str)
-{
+void event_test_command(char *str) {
   int addr = 0;
   sscanf(str, "%06X", &addr);
   int foo = get_byte_at_address(addr);
@@ -501,15 +477,13 @@ void event_test_command(char *str)
   set_byte_at_address(addr,foo);
 }
 
-void event_test_command_bankptr(char *str)
-{
+void event_test_command_bankptr(char *str) {
   int bank = 0;
   sscanf(str, "%02X", &bank);
   show_bankptrs(bank);
 }
 
-void event_hello()
-{
+void event_hello() {
   api_push_stack();
   api_push_cpu();
   api_push_disassembly();
@@ -518,8 +492,7 @@ void event_hello()
   api_write_socket();
 }
 
-void event_did_step(int step_count)
-{
+void event_did_step(int step_count) {
   api_push_stack();
   api_push_cpu();
   api_push_disassembly();
@@ -530,8 +503,7 @@ void event_did_step(int step_count)
 }
 
 
-void event_get_mem(char *str)
-{
+void event_get_mem(char *str) {
   unsigned int bank = 0;
   unsigned int start = 0;
   unsigned int end = 0;
@@ -547,8 +519,8 @@ void event_get_mem(char *str)
 
 }
 
-void handle_set_bytes(int address, char *bytes_data)
-{
+
+void handle_set_bytes(int address, char *bytes_data) {
   int byte;
   while (sscanf(bytes_data, "%02x", &byte) == 1) {
     printf("$%02x <---- BYTE @ $%06X\n", byte, address );
@@ -559,9 +531,7 @@ void handle_set_bytes(int address, char *bytes_data)
 }
 
 
-///  HERE Zzzzzzzz
-void event_set_mem(char *str)
-{
+void event_set_mem(char *str) {
   int address = 0;
   char *bytes_data = NULL;
 
@@ -584,10 +554,9 @@ void event_set_mem(char *str)
 }
 
 
-void handle_emu_cmd(char cmd_char, char *cmd_data)
-{
+void handle_emu_cmd(char cmd_char, char *cmd_data) {
   int int_value = 0;  // reuseable variable
-  //printf("CMD: %c\tDATA: %s\n", cmd_char, cmd_data);
+
   switch (cmd_char) {
     // f = fullscreen
     case 'f':
@@ -610,8 +579,7 @@ void handle_emu_cmd(char cmd_char, char *cmd_data)
   }
 }
 
-void event_emu_cmd(char *str)
-{
+void event_emu_cmd(char *str) {
   // split our commands on spaces
   char cmd_char = '\0';
   char *cmd_data = NULL;
@@ -634,8 +602,7 @@ void event_emu_cmd(char *str)
 }
 
 
-void event_add_brk(char *str)
-{
+void event_add_brk(char *str) {
   int addr = 0;
   sscanf(str, "%06X", &addr);
   addr = addr & 0xFFFFFF;  // 24 bit KPC address for 65816
@@ -646,8 +613,8 @@ void event_add_brk(char *str)
   return;
 }
 
-void event_del_brk(char *str)
-{
+
+void event_del_brk(char *str) {
   int addr = 0;
   sscanf(str, "%06X", &addr);
   addr = addr & 0xFFFFFF;  // 24 bit KPC address for 65816
@@ -658,8 +625,8 @@ void event_del_brk(char *str)
   return;
 }
 
-void event_get_brk(char *str)
-{
+
+void event_get_brk(char *str) {
   api_push_brk();
   api_write_socket();
 
@@ -667,9 +634,7 @@ void event_get_brk(char *str)
 }
 
 
-
-void handle_cpu_cmd(char cmd_char, char *cmd_data)
-{
+void handle_cpu_cmd(char cmd_char, char *cmd_data) {
   Engine_reg *eptr;
   eptr = &engine;
   int new_acc, new_x, new_y;
@@ -723,16 +688,14 @@ void handle_cpu_cmd(char cmd_char, char *cmd_data)
 }
 
 
-void event_set_cpu(char *str)
-{
+void event_set_cpu(char *str) {
   // split our commands on spaces
   char cmd_char = '\0';
   char *cmd_data = NULL;
 
   char * pch;
   pch = strtok (str," ");
-  while (pch != NULL)
-  {
+  while (pch != NULL) {
       cmd_char = pch[0];
       cmd_data = pch+1;
       if (cmd_data[0] == '\0') {
@@ -753,8 +716,7 @@ void event_set_cpu(char *str)
 
 
 
-void debug_init()
-{
+void debug_init() {
   if (g_dbg_enable_port > 0) {
     // g_dbg_enable_port should be enabled by
     glogf("Debug port enabled on: %d", g_dbg_enable_port);
@@ -769,8 +731,7 @@ void debug_init()
 }
 
 
-void debug_setup_socket()
-{
+void debug_setup_socket() {
   /*************************************************************/
   /* Create an AF_INET stream socket to receive incoming       */
   /* connections on                                            */
@@ -823,8 +784,7 @@ void debug_setup_socket()
   /* Set the listen back log                                   */
   /*************************************************************/
   rc = listen(listen_sd, 32);
-  if (rc < 0)
-  {
+  if (rc < 0) {
     perror("listen() failed");
     close(listen_sd);
     exit(-1);
@@ -850,8 +810,7 @@ void debug_setup_socket()
 }
 
 // builds our big json array of commands eg "[{},{},{},...]"
-void api_write_socket()
-{
+void api_write_socket() {
   const char *comma = ",";
   const char *lbrack = "[";
   const char *rbrack = "]\r\n\r\n";
@@ -882,22 +841,19 @@ void api_write_socket()
   free(message_string); // assuming it was all written :P
 }
 
-void write_array_start()
-{
+void write_array_start() {
   const char *brack = "[";
   write(debugger_sd, brack, strlen(brack));
 }
 
 
-void write_array_end()
-{
+void write_array_end() {
   const char *brack = "]\r\n\r\n";
   write(debugger_sd, brack, strlen(brack));
 }
 
 
-void write_array_next()
-{
+void write_array_next() {
   const char *com = ", "; // i'm so neat
   write(debugger_sd, com, strlen(com));
 }
@@ -905,8 +861,7 @@ void write_array_next()
 //    // write(debugger_sd, buffer, strlen(buffer));
 //also for base 64  http://stackoverflow.com/questions/342409/how-do-i-base64-encode-decode-in-c
 //http://stackoverflow.com/questions/32749925/sending-a-file-over-a-tcp-ip-socket-web-server
-int writeDataToClient(int sckt, const void *data, int datalen)
-{
+int writeDataToClient(int sckt, const void *data, int datalen) {
   const char *pdata = (const char*) data;
 
   while (datalen > 0){
@@ -927,14 +882,12 @@ int writeDataToClient(int sckt, const void *data, int datalen)
 }
 
 
-int writeStrToClient(int sckt, const char *str)
-{
+int writeStrToClient(int sckt, const char *str) {
   return writeDataToClient(sckt, str, strlen(str));
 }
 
 // @todo: probably clean up- this was a hack to allow preloading commands
-void debug_wait_hello()
-{
+void debug_wait_hello() {
   int hello_received = FALSE;
   timeout = 1000; // 1 sec
   while (hello_received == FALSE) {
@@ -951,8 +904,7 @@ void debug_wait_hello()
   timeout = 0; // instantaneous
 }
 
-void debug_server_poll()
-{
+void debug_server_poll() {
   if (end_server == FALSE) {
     /***********************************************************/
     /* Call poll() and wait for it to complete/timeout.        */
@@ -995,7 +947,7 @@ void debug_server_poll()
       /* log and end the server.                               */
       /*********************************************************/
       if(fds[i].revents != POLLIN) {
-        printf("  Error! revents = %d\n", fds[i].revents);
+        glogf("Error! revents = %d", fds[i].revents);
         end_server = TRUE;
         break;
       }
@@ -1004,7 +956,7 @@ void debug_server_poll()
         /*******************************************************/
         /* Listening descriptor is readable.                   */
         /*******************************************************/
-        printf("  Listening socket is readable\n");
+        glog("Listening socket is readable");
 
         /*******************************************************/
         /* Accept all incoming connections that are            */
@@ -1032,7 +984,7 @@ void debug_server_poll()
           /* Add the new incoming connection to the            */
           /* pollfd structure                                  */
           /*****************************************************/
-          glogf("  New incoming connection - %d\n", new_sd);
+          glogf("New incoming connection - %d", new_sd);
           fds[nfds].fd = new_sd;
           fds[nfds].events = POLLIN;
           nfds++;
@@ -1070,8 +1022,7 @@ void debug_server_poll()
           /*****************************************************/
           rc = recv(fds[i].fd, buffer, sizeof(buffer), 0);
           if (rc < 0) {
-            if (errno != EWOULDBLOCK)
-            {
+            if (errno != EWOULDBLOCK) {
               perror("  recv() failed");
               close_conn = TRUE;
             }
@@ -1156,12 +1107,12 @@ void debug_server_poll()
                   break;
 
                 default:
-                  printf("UNKNOWN COMMAND - DISCARDED\n");
+                  glog("UNKNOWN COMMAND - DISCARDED");
               }
 
 
             } else {
-              printf("COMMAND QUEUE FULL!  ABORT!\n");
+              glog("COMMAND QUEUE FULL!  ABORT!");
               // @TODO probably send error response
             }
 
@@ -1237,310 +1188,310 @@ void debug_server_poll()
 
 
 int do_dis_json(char *buf, word32 kpc, int accsize, int xsize, int op_provided, word32 instr, int chain) {
-    char buf_instructions[5*5]; // '["12","DE","AB"]'
-    char buf_disasm[50];
+  char buf_instructions[5*5]; // '["12","DE","AB"]'
+  char buf_disasm[50];
 
 
-    const char *out;
-    int	args, type;
-    int	opcode;
-    word32	val;
-    word32	oldkpc;
-    word32	dtype;
-    int	signed_val;
+  const char *out;
+  int	args, type;
+  int	opcode;
+  word32	val;
+  word32	oldkpc;
+  word32	dtype;
+  int	signed_val;
 
-    oldkpc = kpc;
+  oldkpc = kpc;
+  if(op_provided) {
+    opcode = (instr >> 24) & 0xff;
+  } else {
+    opcode = (int)get_memory_c(kpc, 0) & 0xff;
+  }
+
+  kpc++;
+
+  dtype = disas_types[opcode];
+  out = disas_opcodes[opcode];
+  type = dtype & 0xff;
+  args = dtype >> 8;
+
+  if(args > 3) {
+    if(args == 4) {
+      args = accsize;
+    } else if(args == 5) {
+      args = xsize;
+    }
+  }
+
+  val = -1;
+  switch(args) {
+    case 0:
+    val = 0;
+    break;
+    case 1:
     if(op_provided) {
-      opcode = (instr >> 24) & 0xff;
+      val = instr & 0xff;
     } else {
-      opcode = (int)get_memory_c(kpc, 0) & 0xff;
+      val = get_memory_c(kpc, 0);
     }
-
-    kpc++;
-
-    dtype = disas_types[opcode];
-    out = disas_opcodes[opcode];
-    type = dtype & 0xff;
-    args = dtype >> 8;
-
-    if(args > 3) {
-      if(args == 4) {
-        args = accsize;
-      } else if(args == 5) {
-        args = xsize;
-      }
+    break;
+    case 2:
+    if(op_provided) {
+      val = instr & 0xffff;
+    } else {
+      val = get_memory16_c(kpc, 0);
     }
-
-    val = -1;
-    switch(args) {
-      case 0:
-      val = 0;
-      break;
-      case 1:
-      if(op_provided) {
-        val = instr & 0xff;
-      } else {
-        val = get_memory_c(kpc, 0);
-      }
-      break;
-      case 2:
-      if(op_provided) {
-        val = instr & 0xffff;
-      } else {
-        val = get_memory16_c(kpc, 0);
-      }
-      break;
-      case 3:
-      if(op_provided) {
-        val = instr & 0xffffff;
-      } else {
-        val = get_memory24_c(kpc, 0);
-      }
-      break;
-      default:
-      fprintf(stderr, "args out of range: %d, opcode: %08x\n",
-      args, opcode);
-      break;
+    break;
+    case 3:
+    if(op_provided) {
+      val = instr & 0xffffff;
+    } else {
+      val = get_memory24_c(kpc, 0);
     }
-    kpc += args;
+    break;
+    default:
+    fprintf(stderr, "args out of range: %d, opcode: %08x\n",
+    args, opcode);
+    break;
+  }
+  kpc += args;
 
-    if(!op_provided) {
-      instr = (opcode << 24) | (val & 0xffffff);
+  if(!op_provided) {
+    instr = (opcode << 24) | (val & 0xffffff);
+  }
+
+  switch(type) {
+    case ABS:
+    if(args != 2) {
+      printf("arg # mismatch for opcode %x\n", opcode);
     }
-
-    switch(type) {
-      case ABS:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%04x",out,val);
-      break;
-      case ABSX:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%04x,X",out,val);
-      break;
-      case ABSY:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%04x,Y",out,val);
-      break;
-      case ABSLONG:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%06x",out,val);
-      break;
-      case ABSIND:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%04x)",out,val);
-      break;
-      case ABSXIND:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%04x,X)",out,val);
-      break;
-      case IMPLY:
-      if(args != 0) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s",out);
-      break;
-      case ACCUM:
-      if(args != 0) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s",out);
-      break;
-      case IMMED:
-      if(args == 1) {
-        sprintf(buf_disasm,"%s   #$%02x",out,val);
-      } else if(args == 2) {
-        sprintf(buf_disasm,"%s   #$%04x",out,val);
-      } else {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      break;
-      case JUST8:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%02x",out,val);
-      break;
-      case DLOC:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%02x",out,val);
-      break;
-      case DLOCX:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%02x,X",out,val);
-      break;
-      case DLOCY:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%02x,Y",out,val);
-      break;
-      case LONG:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%06x",out,val);
-      break;
-      case LONGX:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%06x,X",out,val);
-      break;
-      case DLOCIND:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%02x)",out,val);
-      break;
-      case DLOCINDY:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%02x),Y",out,val);
-      break;
-      case DLOCXIND:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%02x,X)",out,val);
-      break;
-      case DLOCBRAK:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   [$%02x]",out,val);
-      break;
-      case DLOCBRAKY:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   [$%02x],y",out,val);
-      break;
-      case DISP8:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      signed_val = (signed char)val;
-      sprintf(buf_disasm,"%s   $%04x",out,
-      (word32)(kpc+(signed_val)) & 0xffff);
-      break;
-      case DISP8S:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%02x,S",out,(word32)(byte)(val));
-      break;
-      case DISP8SINDY:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%02x,S),Y",out,(word32)(byte)(val));
-      break;
-      case DISP16:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%04x", out,
-      (word32)(kpc+(signed)(word16)(val)) & 0xffff);
-      break;
-      case MVPMVN:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%02x,$%02x",out,val&0xff,val>>8);
-      break;
-      case SEPVAL:
-      case REPVAL:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
+    sprintf(buf_disasm,"%s   $%04x",out,val);
+    break;
+    case ABSX:
+    if(args != 2) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%04x,X",out,val);
+    break;
+    case ABSY:
+    if(args != 2) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%04x,Y",out,val);
+    break;
+    case ABSLONG:
+    if(args != 3) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%06x",out,val);
+    break;
+    case ABSIND:
+    if(args != 2) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   ($%04x)",out,val);
+    break;
+    case ABSXIND:
+    if(args != 2) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   ($%04x,X)",out,val);
+    break;
+    case IMPLY:
+    if(args != 0) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s",out);
+    break;
+    case ACCUM:
+    if(args != 0) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s",out);
+    break;
+    case IMMED:
+    if(args == 1) {
       sprintf(buf_disasm,"%s   #$%02x",out,val);
-      break;
-      default:
-      printf("argument type: %d unexpected\n", type);
-      break;
+    } else if(args == 2) {
+      sprintf(buf_disasm,"%s   #$%04x",out,val);
+    } else {
+      printf("arg # mismatch for opcode %x\n", opcode);
     }
-
-
-    // gross
-    word32 operand = instr;
-    opcode = (operand >> 24) & 0xff;
-    switch (args+1) {
-      case 1:
-      snprintf(buf_instructions, sizeof(buf_instructions),"[\"%02X\"]", opcode);
-      break;
-      case 2:
-      snprintf(buf_instructions, sizeof(buf_instructions),"[\"%02X\",\"%02X\"]", opcode, instr & 0xff);
-      break;
-      case 3:
-      snprintf(buf_instructions, sizeof(buf_instructions),"[\"%02X\",\"%02X\",\"%02X\"]", opcode, instr & 0xff, (instr & 0xff00) >> 8);
-      break;
-      case 4:
-      snprintf(buf_instructions, sizeof(buf_instructions),"[\"%02X\",\"%02X\",\"%02X\",\"%02X\"]", opcode, instr & 0xff, (instr & 0xff00) >> 8, (instr & 0xff0000) >> 16);
-      break;
-      default:
-      break;
+    break;
+    case JUST8:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
     }
-
-
-    // @TODO: FIX!!! NEEDS REAL BUFFER SIZE, note magic 1024
-    snprintf(buf, 1024,"{\"type\":\"dis\",\"data\":{\"K\":\"%02X\",\"PC\":\"%04X\",\"bytes\":%s,"\
-    "\"disasm\":\"%s\",\"chain\":\"%d\"}}",
-    oldkpc>>16, oldkpc & 0xffff ,buf_instructions, buf_disasm, chain);
-    return(args+1);
+    sprintf(buf_disasm,"%s   $%02x",out,val);
+    break;
+    case DLOC:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%02x",out,val);
+    break;
+    case DLOCX:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%02x,X",out,val);
+    break;
+    case DLOCY:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%02x,Y",out,val);
+    break;
+    case LONG:
+    if(args != 3) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%06x",out,val);
+    break;
+    case LONGX:
+    if(args != 3) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%06x,X",out,val);
+    break;
+    case DLOCIND:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   ($%02x)",out,val);
+    break;
+    case DLOCINDY:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   ($%02x),Y",out,val);
+    break;
+    case DLOCXIND:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   ($%02x,X)",out,val);
+    break;
+    case DLOCBRAK:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   [$%02x]",out,val);
+    break;
+    case DLOCBRAKY:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   [$%02x],y",out,val);
+    break;
+    case DISP8:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    signed_val = (signed char)val;
+    sprintf(buf_disasm,"%s   $%04x",out,
+    (word32)(kpc+(signed_val)) & 0xffff);
+    break;
+    case DISP8S:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%02x,S",out,(word32)(byte)(val));
+    break;
+    case DISP8SINDY:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   ($%02x,S),Y",out,(word32)(byte)(val));
+    break;
+    case DISP16:
+    if(args != 2) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%04x", out,
+    (word32)(kpc+(signed)(word16)(val)) & 0xffff);
+    break;
+    case MVPMVN:
+    if(args != 2) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   $%02x,$%02x",out,val&0xff,val>>8);
+    break;
+    case SEPVAL:
+    case REPVAL:
+    if(args != 1) {
+      printf("arg # mismatch for opcode %x\n", opcode);
+    }
+    sprintf(buf_disasm,"%s   #$%02x",out,val);
+    break;
+    default:
+    printf("argument type: %d unexpected\n", type);
+    break;
   }
 
-  // BASE 64 ENCODER (FOR MEMORY DUMPS)
-  static const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-  int b64encode_len(int len) {
-    return ((len + 2) / 3 * 4) + 1;
+  // gross
+  word32 operand = instr;
+  opcode = (operand >> 24) & 0xff;
+  switch (args+1) {
+    case 1:
+    snprintf(buf_instructions, sizeof(buf_instructions),"[\"%02X\"]", opcode);
+    break;
+    case 2:
+    snprintf(buf_instructions, sizeof(buf_instructions),"[\"%02X\",\"%02X\"]", opcode, instr & 0xff);
+    break;
+    case 3:
+    snprintf(buf_instructions, sizeof(buf_instructions),"[\"%02X\",\"%02X\",\"%02X\"]", opcode, instr & 0xff, (instr & 0xff00) >> 8);
+    break;
+    case 4:
+    snprintf(buf_instructions, sizeof(buf_instructions),"[\"%02X\",\"%02X\",\"%02X\",\"%02X\"]", opcode, instr & 0xff, (instr & 0xff00) >> 8, (instr & 0xff0000) >> 16);
+    break;
+    default:
+    break;
   }
 
-  int b64encode(char *encoded, const char *string, int len) {
-    int i;
-    char *p;
 
-    p = encoded;
-    // encode a chunk of 4 chars
-    for (i = 0; i < len - 2; i += 3) {
-      *p++ = b64chars[(string[i] >> 2) & 0x3F];
-      *p++ = b64chars[((string[i] & 0x3) << 4) | ((int) (string[i + 1] & 0xF0) >> 4)];
-      *p++ = b64chars[((string[i + 1] & 0xF) << 2) | ((int) (string[i + 2] & 0xC0) >> 6)];
-      *p++ = b64chars[string[i + 2] & 0x3F];
-    }
-    // end chunk
-    if (i < len) {
-      *p++ = b64chars[(string[i] >> 2) & 0x3F];
+  // @TODO: FIX!!! NEEDS REAL BUFFER SIZE, note magic 1024
+  snprintf(buf, 1024,"{\"type\":\"dis\",\"data\":{\"K\":\"%02X\",\"PC\":\"%04X\",\"bytes\":%s,"\
+  "\"disasm\":\"%s\",\"chain\":\"%d\"}}",
+  oldkpc>>16, oldkpc & 0xffff ,buf_instructions, buf_disasm, chain);
+  return(args+1);
+}
 
-      if (i == (len - 1)) {
-        *p++ = b64chars[((string[i] & 0x3) << 4)];
-        *p++ = '=';
-      } else {
-        *p++ = b64chars[((string[i] & 0x3) << 4) |
-        ((int) (string[i + 1] & 0xF0) >> 4)];
-        *p++ = b64chars[((string[i + 1] & 0xF) << 2)];
-      }
+// BASE 64 ENCODER (FOR MEMORY DUMPS)
+static const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+int b64encode_len(int len) {
+  return ((len + 2) / 3 * 4) + 1;
+}
+
+int b64encode(char *encoded, const char *string, int len) {
+  int i;
+  char *p;
+
+  p = encoded;
+  // encode a chunk of 4 chars
+  for (i = 0; i < len - 2; i += 3) {
+    *p++ = b64chars[(string[i] >> 2) & 0x3F];
+    *p++ = b64chars[((string[i] & 0x3) << 4) | ((int) (string[i + 1] & 0xF0) >> 4)];
+    *p++ = b64chars[((string[i + 1] & 0xF) << 2) | ((int) (string[i + 2] & 0xC0) >> 6)];
+    *p++ = b64chars[string[i + 2] & 0x3F];
+  }
+  // end chunk
+  if (i < len) {
+    *p++ = b64chars[(string[i] >> 2) & 0x3F];
+
+    if (i == (len - 1)) {
+      *p++ = b64chars[((string[i] & 0x3) << 4)];
       *p++ = '=';
+    } else {
+      *p++ = b64chars[((string[i] & 0x3) << 4) |
+      ((int) (string[i + 1] & 0xF0) >> 4)];
+      *p++ = b64chars[((string[i + 1] & 0xF) << 2)];
     }
-    // terminator
-    *p++ = '\0';
-    //printf("ENCODED : %d\n", p-encoded);
-    return p - encoded;
+    *p++ = '=';
   }
+  // terminator
+  *p++ = '\0';
+  //printf("ENCODED : %d\n", p-encoded);
+  return p - encoded;
+}
