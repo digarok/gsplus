@@ -380,9 +380,7 @@ void api_push_disassembly() {
   //disassemble chain from now -> to -> future
   int disassemble_next = 10;  // how many instructions
   int kpc = engine.kpc;       // get starting address
-  printf("KPC: %06X", kpc);
   for (int i = 0; i<disassemble_next; i++) {
-
     byte_size = do_dis_json(tmp_buffer_4k, kpc, size_mem_imm, size_x_imm, 0, 0, i);
     char *msg = (char*)malloc(sizeof(char) * (strlen(tmp_buffer_4k)+1));
     strcpy(msg,tmp_buffer_4k);
@@ -459,7 +457,7 @@ void event_pause() {
     timeout = 200;
     debug_pause = 1;
     while (debug_pause) {
-      printf("PAUSED\n");
+      glog("PAUSED");
       debug_handle_event();
       debug_server_poll();
     }
@@ -715,7 +713,6 @@ void event_set_cpu(char *str) {
 }
 
 
-
 void debug_init() {
   if (g_dbg_enable_port > 0) {
     // g_dbg_enable_port should be enabled by
@@ -741,6 +738,7 @@ void debug_setup_socket() {
     perror("socket() failed");
     exit(-1);
   }
+
 
   /*************************************************************/
   /* Allow socket descriptor to be reuseable                   */
@@ -809,6 +807,7 @@ void debug_setup_socket() {
   timeout = (3 * 60 * 1000);
 }
 
+
 // builds our big json array of commands eg "[{},{},{},...]"
 void api_write_socket() {
   const char *comma = ",";
@@ -841,6 +840,7 @@ void api_write_socket() {
   free(message_string); // assuming it was all written :P
 }
 
+
 void write_array_start() {
   const char *brack = "[";
   write(debugger_sd, brack, strlen(brack));
@@ -857,6 +857,7 @@ void write_array_next() {
   const char *com = ", "; // i'm so neat
   write(debugger_sd, com, strlen(com));
 }
+
 
 //    // write(debugger_sd, buffer, strlen(buffer));
 //also for base 64  http://stackoverflow.com/questions/342409/how-do-i-base64-encode-decode-in-c
@@ -886,6 +887,7 @@ int writeStrToClient(int sckt, const char *str) {
   return writeDataToClient(sckt, str, strlen(str));
 }
 
+
 // @todo: probably clean up- this was a hack to allow preloading commands
 void debug_wait_hello() {
   int hello_received = FALSE;
@@ -903,6 +905,7 @@ void debug_wait_hello() {
   }
   timeout = 0; // instantaneous
 }
+
 
 void debug_server_poll() {
   if (end_server == FALSE) {
@@ -1023,7 +1026,7 @@ void debug_server_poll() {
           rc = recv(fds[i].fd, buffer, sizeof(buffer), 0);
           if (rc < 0) {
             if (errno != EWOULDBLOCK) {
-              perror("  recv() failed");
+              perror("recv() failed");
               close_conn = TRUE;
             }
             break;
