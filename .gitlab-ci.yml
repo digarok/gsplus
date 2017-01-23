@@ -22,7 +22,7 @@ package-ubuntu-x:
   stage: package
   script:
     - cp src/config.txt .
-    - echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
+    - echo '"# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
     - cp COPYING.txt doc/
   artifacts:
     paths:
