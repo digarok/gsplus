@@ -22,7 +22,7 @@ package-ubuntu-x:
   stage: package
   script:
     - cp src/config.txt .
-    - 'echo "\n\n# CI_BUILD_ID: $CI_BUILD_ID" > config.txt'
+    - echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
     - cp COPYING.txt doc/
   artifacts:
     paths:
@@ -66,7 +66,7 @@ package-ubuntu-sdl2:
   stage: package
   script:
     - cp src/config.txt .
-    - 'echo "\n\n# CI_BUILD_ID: $CI_BUILD_ID" > config.txt'
+    - echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
     - cp COPYING.txt doc/
   artifacts:
     paths:
@@ -96,7 +96,8 @@ package-osx:
     - osx
   stage: package
   script:
-    - 'echo "\n\n# CI_BUILD_ID: $CI_BUILD_ID" > doc/README.txt'
+    - cp src/config.txt .
+    - echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
     - chmod +x make_dist_mac.sh
     - ./make_dist_mac.sh
     - chmod +x make_dmg_mac.sh
