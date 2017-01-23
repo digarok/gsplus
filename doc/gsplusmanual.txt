@@ -25,18 +25,22 @@ Getting started
 Try: ftp://ftp.apple.asimov.net/pub/apple_II/emulators/rom_images/
    1. Put the ROM image in the same folder where you run the emulator from. 
 It will search for:  "ROM", "ROM.01", "ROM.03"
-If your ROM image is named differently, launch the program from the command line and hit F4 to go to the config menu to choose your ROM location
-      1. Download some Apple IIgs software.
+If your ROM file has some other name, launch gsplus and hit F4 to go to the config menu to choose your ROM under "ROM File Selection"
+    ... or ...
+      1. Edit your config:
+You can manually edit the config.txt file (or use the F4 menu.)
+         1. You can set disks using a slot/number syntax like:
+        s5d1 = images/ArkanoidII.po
+        s6d1 = images/ProDOS_2_4_1.dsk
+        s7d1 = images/gsos.2mg
+         2. You can also manually set your ROM path like:
+        g_cfg_rom_path = ../roms/gsrom03
+            1. Download some Apple IIgs software.
  I recommend the excellent Apple IIgs dedicated site:
    http://www.whatisthe2gs.apple2.org.za/
  If you have a real IIgs, you can transfer your disks using ADTPro
    http://adtpro.sourceforge.net/
-      2. Edit your config:
- You can manually edit the config.txt file
-   .. or while the emulator is running… hit F4 to enter config menu.
- Set it to point to your IIgs ROM file from step 2 if not already configured.
- Set up the slots to point to disks from step 3.
-      3. Boot the Apple IIgs by running the emulator
+            2. Boot the Apple IIgs by running the emulator
  Windows:                gsplus32.exe
  Mac*/Ubuntu:        ./gsplus
 
@@ -44,7 +48,7 @@ If your ROM image is named differently, launch the program from the command line
    /Applications/GSplus.app/Contents/MacOS/gsplus
 
 If the config file can’t be found, it will try to create a config.txt file for you, with all of the defaults.
-         1. Note: You can also specify a config file.  This is very useful as you can have specific disks/setting pre-set in a config file and launch directly into your favorite game with that config.  They can be named anything you want, though the officially recognized extensions are .txt and .gsp. 
+               1. Note: You can also specify a config file.  This is very useful as you can have specific disks/setting pre-set in a config file and launch directly into your favorite game with that config.  They can be named anything you want, though the officially recognized extensions are .txt and .gsp. 
 
 Examples:
  Windows:                gsplus32.exe -config arkanoid.gsp
@@ -69,10 +73,10 @@ Shift-F10         - toggle status line *
 Shift-F11         - toggle simulated scanlines *
 * not available on all platforms
 Other Input/Output
-            1. Mouse and keyboard should automatically work
-            2. Joystick with SDL2 driver is known to be working.  It simply uses the “first” joystick and the first analog pad on that stick plus the first two buttons.  The axes and buttons are not yet configurable.  Better info forthcoming.
-            3. There are drivers for serial controller, ImageWriter (II?) printer, and networking.  I may have broken some of this functionality to get builds working.  I’m not currently familiar with the state of these drivers or their usage.  More info will be added as I take time to research more of the modules. 
-            4. You can also drag-and-drop disk images onto the emulator window and it will try to automount the disk!  (SDL versions)
+                  1. Mouse and keyboard should automatically work
+                  2. Joystick with SDL2 driver is known to be working.  It simply uses the “first” joystick and the first analog pad on that stick plus the first two buttons.  The axes and buttons are not yet configurable.  Better info forthcoming.
+                  3. There are drivers for serial controller, ImageWriter (II?) printer, and networking.  I may have broken some of this functionality to get builds working.  I’m not currently familiar with the state of these drivers or their usage.  More info will be added as I take time to research more of the modules. 
+                  4. You can also drag-and-drop disk images onto the emulator window and it will try to automount the disk!  (SDL versions)
 Configuration Menu
 Configuration options are loaded from, and saved to, a configuration text file.  The default configuration file is config.txt.  If you are just starting out, it’s recommended to use the configuration menu versus editing the file yourself.
 Enter the configuration menu at any time while running GSplus by hitting <F4>.
