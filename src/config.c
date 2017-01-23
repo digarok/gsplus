@@ -979,7 +979,7 @@ config_load_roms()
 		}
 	} else if(g_rom_version == 3) {
 		/* patch ROM 03 */
-		printf("Patching ROM 03 smartport bug\n");
+		glog("Patching ROM 03 smartport bug");
 		/* 1: Patch Smartport code to fix a stupid bug */
 		/*   that causes it to write the IWM status reg into c036, */
 		/*   which is the system speed reg...it's "safe" since */
