@@ -54,7 +54,7 @@ build-ubuntu-sdl2:
     - cd src
     - ln -s vars_x86linux_sdl2 vars
     - make clean ; make
-    - mv gsplus gsplus-ubuntu-sdl
+    - mv ../gsplus ../gsplus-ubuntu-sdl
   artifacts:
     paths:
       - gsplus-ubuntu-sdl
@@ -87,7 +87,7 @@ build-osx:
     - cd src
     - ln -s vars_osx_sdl2 vars
     - make clean ; make
-    - mv gsplus gsplus-osx
+    - mv ../gsplus ../gsplus-osx
   artifacts:
     paths:
       - gsplus-osx
