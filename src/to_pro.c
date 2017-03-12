@@ -43,7 +43,7 @@ int g_crlf = 0;
 
 void make_legal_prodos_name(char *new_name, char *old_name);
 
-static int hex(uint8_t c)
+static int hex(byte c)
 {
 	if (c >= '0' && c <= '9') return c - '0';
 	if (c >= 'a' && c <= 'f') return c + 10 - 'a';
