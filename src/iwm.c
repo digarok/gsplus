@@ -1,27 +1,28 @@
 /*
  GSPLUS - Advanced Apple IIGS Emulator Environment
  Copyright (C) 2016 - Dagen Brock
- 
+
  Copyright (C) 2010 - 2012 by GSport contributors
- 
+
  Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
 
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the
+ Free Software Foundation; either version 2 of the License, or (at your
  option) any later version.
 
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  for more details.
 
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
+ You should have received a copy of the GNU General Public License along
+ with this program; if not, write to the Free Software Foundation, Inc.,
  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
 #include "defc.h"
+#include "glog.h"
 
 extern int Verbose;
 extern word32 g_vbl_count;	// OG change int to word32
@@ -237,7 +238,7 @@ draw_iwm_status(int line, char *buf)
 		flag[apple35_sel][iwm.drive_select] = "*";
 	}
 
-	#ifdef ACTIVEGS	// OG Pass monitoring info 
+	#ifdef ACTIVEGS	// OG Pass monitoring info
 	{
 		extern	 void ki_loading(int _motorOn,int _slot,int _drive, int _curtrack);
 		int curtrack=0;
@@ -245,7 +246,7 @@ draw_iwm_status(int line, char *buf)
 			curtrack = iwm.drive35[iwm.drive_select].cur_qtr_track  ;
 		else
 			curtrack = iwm.drive525[iwm.drive_select].cur_qtr_track >> 2 ;
-	
+
 		 ki_loading(g_iwm_motor_on,apple35_sel?5:6,iwm.drive_select+1,curtrack);
 	}
 	#endif
@@ -350,8 +351,7 @@ iwm_vbl_update(int doit_3_persec)
 
 	if(iwm.motor_on && iwm.motor_off) {
 		if((word32)iwm.motor_off_vbl_count <= g_vbl_count) {
-			printf("Disk timer expired, drive off: %08x\n",
-				g_vbl_count);
+			glogf("Disk timer expired, drive off: %08x\n", g_vbl_count);
 			iwm.motor_on = 0;
 			iwm.motor_off = 0;
 			if (g_temp_boot_slot != 254) {
@@ -895,7 +895,7 @@ read_iwm(int loc, double dcycs)
 			return 0;
 		break;
 		}
-		
+
 	}
 	halt_printf("Got to end of read_iwm, loc: %02x!\n", loc);
 
@@ -1671,7 +1671,7 @@ disk_track_to_unix(Disk *dsk, int qtr_track, byte *outbuf)
 		return -1;
 	}
 
-	if(disk_525) 
+	if(disk_525)
 	{
 		// OG
 		// Add support for .nib file
@@ -1682,7 +1682,7 @@ disk_track_to_unix(Disk *dsk, int qtr_track, byte *outbuf)
 			int	len = trk->track_len;
 			byte* trk_ptr = trk->nib_area+1;
 			byte* nib_ptr = outbuf;
-			for(i = 0; i < len; i += 2) 
+			for(i = 0; i < len; i += 2)
 			{
 				*nib_ptr++ = *trk_ptr;
 				trk_ptr+=2;
@@ -1703,9 +1703,9 @@ show_hex_data(byte *buf, int count)
 	for(i = 0; i < count; i += 16) {
 		printf("%04x: %02x %02x %02x %02x %02x %02x %02x %02x "
 			"%02x %02x %02x %02x %02x %02x %02x %02x\n", i,
-			buf[i+0], buf[i+1], buf[i+2], buf[i+3], 
-			buf[i+4], buf[i+5], buf[i+6], buf[i+7], 
-			buf[i+8], buf[i+9], buf[i+10], buf[i+11], 
+			buf[i+0], buf[i+1], buf[i+2], buf[i+3],
+			buf[i+4], buf[i+5], buf[i+6], buf[i+7],
+			buf[i+8], buf[i+9], buf[i+10], buf[i+11],
 			buf[i+12], buf[i+13], buf[i+14], buf[i+15]);
 	}
 
@@ -1770,7 +1770,7 @@ disk_unix_to_nib(Disk *dsk, int qtr_track, int unix_pos, int unix_len,
 	int	ret;
 	int	len;
 	int	i;
-	
+
 	/* Read track from dsk int track_buf */
 
 	must_clear_track = 0;
@@ -2321,7 +2321,7 @@ iwm_show_track(int slot_drive, int track)
 		drive = slot_drive & 1;
 		sel35 = !((slot_drive >> 1) & 1);
 	}
-	
+
 	if(sel35) {
 		dsk = &(iwm.drive35[drive]);
 	} else {
