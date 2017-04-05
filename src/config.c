@@ -169,10 +169,12 @@ char g_cfg_opts_strvals[CFG_MAX_OPTS][CFG_OPT_MAXSTR];
 char g_cfg_opt_buf[CFG_OPT_MAXSTR];
 
 char *g_cfg_rom_path = "ROM";
-char *g_cfg_file_def_name = "Undefined";
+const char *g_cfg_file_def_name = "Undefined";
 char **g_cfg_file_strptr = 0;
 int g_cfg_file_min_size = 1024;
 int g_cfg_file_max_size = 2047*1024*1024;
+
+int g_cfg_file_dir_only = 0;
 
 #define MAX_PARTITION_BLK_SIZE		65536
 
@@ -240,7 +242,7 @@ Cfg_menu g_cfg_rom_menu[] = {
 
 Cfg_menu g_cfg_host_menu[] = {
 { "Host FST Configuration", g_cfg_host_menu, 0, 0, CFGTYPE_MENU },
-{ "Shared Host Folder", KNMP(g_cfg_host_path), CFGTYPE_STR },
+{ "Shared Host Folder", KNMP(g_cfg_host_path), CFGTYPE_DIR },
 { "Read Only,0,No,1,Yes", KNMP(g_cfg_host_read_only), CFGTYPE_INT },
 { "", 0, 0, 0, 0 },
 { "Back to Main Config", g_cfg_main_menu, 0, 0, CFGTYPE_MENU },
@@ -534,15 +536,8 @@ config_init_menus(Cfg_menu *menuptr)
 				menuptr->defptr = &(defptr->intval);
 				break;
 			case CFGTYPE_STR:
-				str_ptr = (char **)menuptr->ptr;
-				str = *str_ptr;
-				// We need to malloc this string since all
-				//  string values must be dynamically alloced
-				defptr->strval = str;	// this can have a copy
-				*str_ptr = gsplus_malloc_str(str);
-				menuptr->defptr = &(defptr->strval);
-				break;
 			case CFGTYPE_FILE:
+			case CFGTYPE_DIR:
 				str_ptr = (char **)menuptr->ptr;
 				str = *str_ptr;
 				// We need to malloc this string since all
@@ -775,13 +770,8 @@ config_parse_option(char *buf, int pos, int len, int line)
 		*iptr = val;
 		break;
 	case CFGTYPE_STR:
-		strptr = (char **)menuptr->ptr;
-		if(strptr && *strptr) {
-			free(*strptr);
-		}
-		*strptr = gsplus_malloc_str(&buf[pos]);
-		break;
 	case CFGTYPE_FILE:
+	case CFGTYPE_DIR:
 		strptr = (char **)menuptr->ptr;
 		if(strptr && *strptr) {
 			free(*strptr);
@@ -1319,28 +1309,25 @@ config_write_config_gsplus_file()
 		menuptr = defptr->menuptr;
 		defval = defptr->intval;
 		type = menuptr->cfgtype;
-		if(type == CFGTYPE_INT) {
-			curval = *((int *)menuptr->ptr);
-			if(curval != defval) {
-				fprintf(fconf, "%s = %d\n", menuptr->name_str,
-								curval);
-			}
-		}
-		if(type == CFGTYPE_STR) {
-			curstr = *((char **)menuptr->ptr);
-			defstr = *((char **)menuptr->defptr);
-			if(strcmp(curstr, defstr) != 0) {
-				fprintf(fconf, "%s = %s\n", menuptr->name_str,
-								curstr);
-			}
-		}
-		if(type == CFGTYPE_FILE) {
-			curstr = *((char **)menuptr->ptr);
-			defstr = *((char **)menuptr->defptr);
-			if(strcmp(curstr, defstr) != 0) {
-				fprintf(fconf, "%s = %s\n", menuptr->name_str,
-								curstr);
-			}
+
+		switch (type) {
+			case CFGTYPE_INT:
+				curval = *((int *)menuptr->ptr);
+				if(curval != defval) {
+					fprintf(fconf, "%s = %d\n", menuptr->name_str,
+									curval);
+				}
+				break;
+			case CFGTYPE_STR:
+			case CFGTYPE_FILE:
+			case CFGTYPE_DIR:
+				curstr = *((char **)menuptr->ptr);
+				defstr = *((char **)menuptr->defptr);
+				if(strcmp(curstr, defstr) != 0) {
+					fprintf(fconf, "%s = %s\n", menuptr->name_str,
+									curstr);
+				}
+				break;
 		}
 	}
 
@@ -2282,71 +2269,78 @@ cfg_parse_menu(Cfg_menu *menuptr, int menu_pos, int highlight_pos, int change)
 	curval = -1;
 	defval = -1;
 	curstr = 0;
-	if(type == CFGTYPE_INT) {
-		iptr = (int*)menuptr->ptr;	// OG Added cast
-		curval = *iptr;
-		iptr = (int*)menuptr->defptr; // OG Added cast
-		defval = *iptr;
-		if(curval == defval) {
-			g_cfg_opt_buf[3] = 'D';	/* checkmark */
-			g_cfg_opt_buf[4] = '\t';
-		}
-	}
-	if(type == CFGTYPE_STR) {
-		str_ptr = (char **)menuptr->ptr;
-		curstr = *str_ptr;
-		str_ptr = (char **)menuptr->defptr;
-		defstr = *str_ptr;
-		if(strcmp(curstr,defstr) == 0) {
-			g_cfg_opt_buf[3] = 'D';	/* checkmark */
-			g_cfg_opt_buf[4] = '\t';
-		}
-	}
-	if(type == CFGTYPE_FILE) {
-		str_ptr = (char **)menuptr->ptr;
-		curstr = *str_ptr;
-		str_ptr = (char **)menuptr->defptr;
-		defstr = *str_ptr;
-		if(strcmp(curstr,defstr) == 0) {
-			g_cfg_opt_buf[3] = 'D';	/* checkmark */
-			g_cfg_opt_buf[4] = '\t';
-		}
+
+	switch(type) {
+
+		case CFGTYPE_INT:
+			iptr = (int*)menuptr->ptr;	// OG Added cast
+			curval = *iptr;
+			iptr = (int*)menuptr->defptr; // OG Added cast
+			defval = *iptr;
+			if(curval == defval) {
+				g_cfg_opt_buf[3] = 'D';	/* checkmark */
+				g_cfg_opt_buf[4] = '\t';
+			}
+			break;
+		case CFGTYPE_STR:
+		case CFGTYPE_FILE:
+		case CFGTYPE_DIR:
+			str_ptr = (char **)menuptr->ptr;
+			curstr = *str_ptr;
+			str_ptr = (char **)menuptr->defptr;
+			defstr = *str_ptr;
+			if(strcmp(curstr,defstr) == 0) {
+				g_cfg_opt_buf[3] = 'D';	/* checkmark */
+				g_cfg_opt_buf[4] = '\t';
+			}
+			break;
+
+
+
+		// If it's a menu, give it a special menu indicator
+		case CFGTYPE_MENU:
+			g_cfg_opt_buf[1] = '\t';
+			g_cfg_opt_buf[2] = 'M';		/* return-like symbol */
+			g_cfg_opt_buf[3] = '\t';
+			g_cfg_opt_buf[4] = ' ';
+			break;
 	}
 
-	// If it's a menu, give it a special menu indicator
-	if(type == CFGTYPE_MENU) {
-		g_cfg_opt_buf[1] = '\t';
-		g_cfg_opt_buf[2] = 'M';		/* return-like symbol */
-		g_cfg_opt_buf[3] = '\t';
-		g_cfg_opt_buf[4] = ' ';
-	}
+
 
 	// Decide what to display on the "right" side
 	str = 0;
 	opt_num = -1;
-	if(type == CFGTYPE_INT || type == CFGTYPE_FILE) {
-		g_cfg_opt_buf[bufpos++] = ' ';
-		g_cfg_opt_buf[bufpos++] = '=';
-		g_cfg_opt_buf[bufpos++] = ' ';
-		g_cfg_opt_buf[bufpos] = 0;
-		for(i = 0; i < num_opts; i++) {
-			if(curval == g_cfg_opts_vals[i]) {
-				opt_num = i;
-				break;
+
+	switch(type) {
+
+		 case CFGTYPE_INT:
+		 case CFGTYPE_FILE:
+		 case CFGTYPE_DIR:
+			g_cfg_opt_buf[bufpos++] = ' ';
+			g_cfg_opt_buf[bufpos++] = '=';
+			g_cfg_opt_buf[bufpos++] = ' ';
+			g_cfg_opt_buf[bufpos] = 0;
+			for(i = 0; i < num_opts; i++) {
+				if(curval == g_cfg_opts_vals[i]) {
+					opt_num = i;
+					break;
+				}
 			}
-		}
-	}
-	if(type == CFGTYPE_STR) {
-		g_cfg_opt_buf[bufpos++] = ' ';
-		g_cfg_opt_buf[bufpos++] = '=';
-		g_cfg_opt_buf[bufpos++] = ' ';
-		g_cfg_opt_buf[bufpos] = 0;
-		for(i = 0; i < num_opts; i++) {
-			if(!strcmp(curstr,g_cfg_opts_strvals[i])) {
-				opt_num = i;
-				break;
+			break;
+
+		case CFGTYPE_STR:
+			g_cfg_opt_buf[bufpos++] = ' ';
+			g_cfg_opt_buf[bufpos++] = '=';
+			g_cfg_opt_buf[bufpos++] = ' ';
+			g_cfg_opt_buf[bufpos] = 0;
+			for(i = 0; i < num_opts; i++) {
+				if(!strcmp(curstr,g_cfg_opts_strvals[i])) {
+					opt_num = i;
+					break;
+				}
 			}
-		}
+			break;
 	}
 
 	if(change != 0) {
@@ -2396,23 +2390,29 @@ cfg_parse_menu(Cfg_menu *menuptr, int menu_pos, int highlight_pos, int change)
 	if(opt_num >= 0) {
 		str = &(g_cfg_opts_strs[opt_num][0]);
 	} else {
-		if(type == CFGTYPE_INT) {
-			str = &(g_cfg_opts_strs[0][0]);
-			snprintf(str, CFG_OPT_MAXSTR, "%d", curval);
-		} else if (type == CFGTYPE_STR) {
-			str = &(g_cfg_opts_strs[0][0]);
-			printf("curstr is: %s str is: %s\n", curstr,str);
-			snprintf(str, CFG_OPT_MAXSTR, "%s", curstr);
-		} else if (type == CFGTYPE_DISK) {
-			str = &(g_cfg_opts_strs[0][0]),
-			cfg_get_disk_name(str, CFG_OPT_MAXSTR, type_ext, 1);
-			str = cfg_shorten_filename(str, 68);
-		} else if (type == CFGTYPE_FILE) {
-			str = &(g_cfg_opts_strs[0][0]);
-			snprintf(str, CFG_OPT_MAXSTR, "%s", curstr);
-			str = cfg_shorten_filename(str, 68);
-		} else {
-			str = "";
+		switch(type) {
+			case CFGTYPE_INT:
+				str = &(g_cfg_opts_strs[0][0]);
+				snprintf(str, CFG_OPT_MAXSTR, "%d", curval);
+				break;
+			case CFGTYPE_STR:
+				str = &(g_cfg_opts_strs[0][0]);
+				//printf("curstr is: %s str is: %s\n", curstr,str);
+				snprintf(str, CFG_OPT_MAXSTR, "%s", curstr);
+				break;
+			case CFGTYPE_DISK:
+				str = &(g_cfg_opts_strs[0][0]),
+				cfg_get_disk_name(str, CFG_OPT_MAXSTR, type_ext, 1);
+				str = cfg_shorten_filename(str, 68);
+				break;
+			case CFGTYPE_FILE:
+			case CFGTYPE_DIR:
+				str = &(g_cfg_opts_strs[0][0]);
+				snprintf(str, CFG_OPT_MAXSTR, "%s", curstr);
+				str = cfg_shorten_filename(str, 68);
+				break;
+			default:
+				str = "";
 		}
 	}
 
@@ -2778,6 +2778,8 @@ cfg_file_readdir(const char *pathptr)
 				}
 			}
 		}
+		if (g_cfg_file_dir_only && !is_dir) continue;
+
 		cfg_file_add_dirent(&g_cfg_dirlist, direntptr->d_name, is_dir,
 					stat_buf.st_size, -1, -1);
 	}
@@ -2964,8 +2966,8 @@ cfg_file_draw()
 			cfg_shorten_filename(g_cfg_file_def_name, 40));
 	}
 	cfg_htab_vtab(2, 1);
-	cfg_printf("Configuration file path: %-56s",
-			cfg_shorten_filename(&g_config_gsplus_name[0], 56));
+	cfg_printf("Configuration file path: %-40s",
+			cfg_shorten_filename(&g_config_gsplus_name[0], 40));
 	cfg_htab_vtab(2, 2);
 	cfg_printf("Current directory: %-50s",
 			cfg_shorten_filename(&g_cfg_cwd_str[0], 50));
@@ -3084,7 +3086,7 @@ cfg_file_update_ptr(char *str)
 	g_config_gsplus_update_needed = 1;
 }
 void
-cfg_file_selected()
+cfg_file_selected(int select_dir)
 {
 #ifndef __OS2__
 	struct stat stat_buf;
@@ -3113,13 +3115,15 @@ cfg_file_selected()
 	}
 	ret = cfg_stat(&g_cfg_file_path[0], &stat_buf);
 	fmt = stat_buf.st_mode & S_IFMT;
+	#if 0
 	cfg_printf("Stat'ing %s, st_mode is: %08x\n", &g_cfg_file_path[0],
 			(int)stat_buf.st_mode);
+	#endif
 	if(ret != 0) {
 		printf("stat %s returned %d, errno: %d\n", &g_cfg_file_path[0],
 					ret, errno);
 	} else {
-		if(fmt == S_IFDIR) {
+		if(fmt == S_IFDIR && !select_dir) {
 			/* it's a directory */
 			strncpy(&g_cfg_file_curpath[0], &g_cfg_file_path[0],
 						CFG_PATH_MAX);
@@ -3190,8 +3194,8 @@ cfg_file_handle_key(int key)
 		}
 		break;
 	case 0x0d:	/* return */
-		glog("Selected disk image file");
-		cfg_file_selected();
+		//glog("Selected disk image file");
+		cfg_file_selected(0);
 		break;
 	case 0x09:	/* tab */
 		g_cfg_file_pathfield = !g_cfg_file_pathfield;
@@ -3205,6 +3209,9 @@ cfg_file_handle_key(int key)
 				g_cfg_file_curpath[len] = 0;
 			}
 		}
+		break;
+	case 0x20: /* space -- selects file/directory */
+		cfg_file_selected(g_cfg_file_dir_only);
 		break;
 	default:
 		printf("key: %02x\n", key);
@@ -3240,7 +3247,7 @@ config_control_panel()
 			(0xf << BIT_ALL_STAT_TEXT_COLOR) | ALL_STAT_ALTCHARSET;
 	g_a2_new_all_stat[0] = g_cur_a2_stat;
 	g_new_a2_stat_cur_line = 0;
-	cfg_printf("In config_control_panel\n");
+	//cfg_printf("In config_control_panel\n");
 	for(i = 0; i < 20; i++) {
 		// Toss any queued-up keypresses
 		if(adb_read_c000() & 0x80) {
@@ -3385,6 +3392,7 @@ config_control_panel()
 			case 0x0d:
 				type = menuptr[menu_line].cfgtype;
 				ptr = menuptr[menu_line].ptr;
+				str = menuptr[menu_line].str;
 				switch(type & 0xf) {
 				case CFGTYPE_MENU:
 					menuptr = (Cfg_menu *)ptr;
@@ -3392,6 +3400,7 @@ config_control_panel()
 					break;
 				case CFGTYPE_DISK:
 					g_cfg_slotdrive = type >> 4;
+					g_cfg_file_dir_only = 0;
 					cfg_file_init();
 					break;
 				case CFGTYPE_FUNC:
@@ -3401,9 +3410,18 @@ config_control_panel()
 					break;
 				case CFGTYPE_FILE:
 					g_cfg_slotdrive = 0xfff;
-					g_cfg_file_def_name = *((char **)ptr);
+					g_cfg_file_def_name = str /* *((char **)ptr) */; // was ptr
 					g_cfg_file_strptr = (char **)ptr;
+					g_cfg_file_dir_only = 0;
 					cfg_file_init();
+					break;
+				case CFGTYPE_DIR:
+					g_cfg_slotdrive = 0xfff;
+					g_cfg_file_def_name = str /* *((char **)ptr) */; // was ptr
+					g_cfg_file_strptr = (char **)ptr;
+					g_cfg_file_dir_only = 1;
+					cfg_file_init();
+					break;
 				}
 				break;
 			case 0x1b:
