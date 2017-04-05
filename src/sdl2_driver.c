@@ -288,6 +288,11 @@ void do_icon() {
 void dev_video_init_sdl() {
   SDL_Init(SDL_INIT_VIDEO);              // Initialize SDL2
 
+  #if defined __APPLE__
+  extern void fix_mac_menu();
+  fix_mac_menu();
+  #endif
+
   // Create an application window with the following settings:
   char window_title[32];
   sprintf(window_title, "GSplus v%-6s", g_gsplus_version_str),
@@ -439,19 +444,11 @@ void check_input_events_sdl() {
         motion |= handle_sdl_mouse_motion_event(event);
         break;
       case SDL_QUIT:
-        {
-          const Uint8 *state = SDL_GetKeyboardState(NULL);
-          if (state[SDL_SCANCODE_Q]) {
-            glog("Skipping keyboard quit event.  Not allowed.");
-          } else {
-            //quit = 1;     /* SDL_QUIT event (window close) */
-            SDL_DestroyWindow(window);
-            iwm_shut();
-            // Clean up
-            SDL_Quit();
-            my_exit(1);
-          }
-        }
+        SDL_DestroyWindow(window);
+        iwm_shut();
+        // Clean up
+        SDL_Quit();
+        my_exit(1);
         break;
       case SDL_DROPFILE:
       {
