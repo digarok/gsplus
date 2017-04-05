@@ -28,24 +28,96 @@
 
 #include <errno.h>
 
+#if defined(__APPLE__)
+#include <sys/xattr.h>
+#endif
 
 #define DEF_DISK_SIZE	(800*1024)
 #define MAX_FILE_NAMES	51
 
 char out_name[] = "POOF1";
 
-int g_def_file_type = -1;
-int g_def_aux_type = -1;
+int g_def_file_type = 4;
+int g_def_aux_type = 0;
+int g_crlf = 0;
 
 void make_legal_prodos_name(char *new_name, char *old_name);
+
+static int hex(byte c)
+{
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c + 10 - 'a';
+	if (c >= 'A' && c <= 'F') return c + 10 - 'A';
+	return 0;
+}
+
+void get_file_type(const char *name, int *file_type, int *aux_type) {
+#if defined(__APPLE__)
+	unsigned char buffer[32];
+	ssize_t size = getxattr(name, XATTR_FINDERINFO_NAME, buffer, 32, 0, 0);
+	if (size >= 16) {
+
+		if (!memcmp("pdos", buffer + 4, 4))
+		{
+			if (buffer[0] == 'p')
+			{
+				*file_type = buffer[1];
+				*aux_type = (buffer[2] << 8) | buffer[3];
+				return;
+			}
+			if (!memcmp("PSYS", buffer, 4))
+			{
+				*file_type = 0xff;
+				*aux_type = 0x0000;
+				return;
+			}
+			if (!memcmp("PS16", buffer, 4))
+			{
+				*file_type = 0xb3;
+				*aux_type = 0x0000;
+				return;
+			}
+
+			if (!isxdigit(buffer[0]) && isxdigit(buffer[1]) && buffer[2] == ' ' && buffer[3] == ' ')
+			{
+				*file_type = (hex(buffer[0]) << 8) | hex(buffer[1]);
+				*aux_type = 0;
+				return;
+			}
+		}
+		if (!memcmp("TEXT", buffer, 4))
+		{
+			*file_type = 0x04;
+			*aux_type = 0x0000;
+			return;
+		}
+	}
+
+#endif
+
+
+	char *cp = strrchr(name, '.');
+	if (cp) {
+		if (strcasecmp(cp, ".SDK") == 0) {
+			*file_type = 0xe0;
+			*aux_type = 0x8002;
+			return;
+		}
+		if (!strcasecmp(cp, ".SHK")) {
+			*file_type = 0xe0;
+			*aux_type = 0x8002;
+			return;
+		}
+	}
+	*file_type = g_def_file_type;
+	*aux_type = g_def_aux_type;
+}
 
 int
 main(int argc, char **argv)
 {
 	char	*files[MAX_FILE_NAMES];
 	char	*name;
-	char	*new_name_end;
-	int	new_name_len;
 	struct stat stat_buf;
 	int	in;
 	int	in_size;
@@ -72,12 +144,32 @@ main(int argc, char **argv)
 	num_files = 0;
 	for(i = 1; i < argc; i++) {
 		if(argv[i][0] == '-') {
-			/* I smell a -size_in_K */
-			disk_size = strtoul(&(argv[i][1]), 0, 10) * 1024;
-			printf("disk_size: %d, 0x%x\n", disk_size, disk_size);
-			if(disk_size < 40*1024) {
-				printf("Too small!\n");
-				exit(1);
+
+			if(!strcmp(argv[i], "-cr")) {
+				g_crlf = 1;
+			} else if(!strcmp(argv[i], "-txt")) {
+				g_def_file_type = 4;
+				g_def_aux_type = 0;
+			} else if(!strcmp(argv[i], "-bin")) {
+				g_def_file_type = 6;
+				g_def_aux_type = 0;
+			} else {
+				/* I smell a -size_in_K */
+				char *end = NULL;
+				disk_size = strtoul(&(argv[i][1]), &end, 10) * 1024;
+				if (*end) {
+					printf("Invalid size: %s\n", argv[i]+1);
+					exit(1);
+				}
+				printf("disk_size: %d, 0x%x\n", disk_size, disk_size);
+				if(disk_size < 40*1024) {
+					printf("Too small!\n");
+					exit(1);
+				}
+				if(disk_size > 32 * 1024 * 1024) {
+					printf("Too big!\n");
+					exit(1);					
+				}
 			}
 		} else {
 			files[num_files] = argv[i];
@@ -117,29 +209,11 @@ main(int argc, char **argv)
 
 		make_legal_prodos_name(new_name, name);
 
-		new_name_len = strlen(new_name);
-		new_name_end = new_name + new_name_len;
 
-		file_type = g_def_file_type;
-		aux_type = g_def_aux_type;
-		while(g_def_file_type < 0) {
-			/* choose file type */
-			if(new_name_len >= 5) {
-				if(strcmp(new_name_end - 4, ".SHK") == 0) {
-					file_type = 0xe0;
-					aux_type = 0x8002;
-					break;
-				}
-				if(strcmp(new_name_end - 4, ".SDK") == 0) {
-					file_type = 0xe0;
-					aux_type = 0x8002;
-					break;
-				}
-			}
-			file_type = 0x04;	/* TXT */
-			aux_type = 0;
-			break;
-		}
+
+		file_type = 0;
+		aux_type = 0;
+		get_file_type(name, &file_type, &aux_type);
 
 		create_new_file(disk, 2, 1, new_name, file_type,
 			0, 0, 0, 0xc3, aux_type, 0, in_size);
@@ -157,6 +231,12 @@ main(int argc, char **argv)
 				fprintf(stderr, "read returned %d, errno: %d\n",
 					ret, errno);
 				exit(2);
+			}
+			if (file_type == 4 && g_crlf) {
+				int i;
+				for(i = 0; i < size; ++i) {
+					if(in_buf[i] == '\n') in_buf[i] = '\r';
+				}
 			}
 			ret = pro_write_file(disk, in_buf, pos, size);
 			if(ret != 0) {
