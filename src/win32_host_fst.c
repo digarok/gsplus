@@ -1111,9 +1111,19 @@ static word32 fst_create(int class, const char *path) {
 	}
 	int ok;
 
+	if (fi.storage_type == 0 && fi.file_type == 0x0f)
+		fi.storage_type = 0x0d;
+
 	if (fi.storage_type == 0x0d || fi.storage_type == 0x0f) {
 		ok = CreateDirectory(path, NULL);
 		if (!ok) return map_last_error();
+
+		if (class) {
+			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, fi.storage_type, 0);
+		} else {
+			set_memory16_c(pb + CreateRec_storageType, fi.storage_type, 0);
+		}
+
 		return 0;
 	}
 	if (fi.storage_type <= 3 || fi.storage_type == 0x05) {
@@ -1131,10 +1141,12 @@ static word32 fst_create(int class, const char *path) {
 		set_file_info(path, &fi); // set_file_info_handle(...);
 		CloseHandle(h);
 
+		fi.storage_type = 1;
+
 		if (class) {
-			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, 1, 0);
+			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, fi.storage_type, 0);
 		} else {
-			set_memory16_c(pb + CreateRec_storageType, 1, 0);
+			set_memory16_c(pb + CreateRec_storageType, fi.storage_type, 0);
 		}
 
 		return 0;
@@ -2513,10 +2525,11 @@ void host_fst(void) {
 	word32 acc = 0;
 	word16 call = engine.xreg;
 
-	fprintf(stderr, "Host FST: %04x %s\n", call, call_name(call));
+	fprintf(stderr, "Host FST: %04x %s", call, call_name(call));
 
 
 	if (call & 0x8000) {
+		fputs("\n", stderr);
 		// system level.
 		switch(call) {
 			case 0x8001:
@@ -2539,11 +2552,31 @@ void host_fst(void) {
 			engine.acc = invalidClass;
 			return;
 		}
-		char *path1 = get_path1();
-		char *path2 = get_path2();
+		char *path1 = NULL;
+		char *path2 = NULL;
 		char *path3 = NULL;
 		char *path4 = NULL;
 		const char *cp;
+
+		switch(call & 0xff) {
+			case 0x01:
+			case 0x02:
+			case 0x05:
+			case 0x06:
+			case 0x07:
+			case 0x0b:
+			case 0x10:
+				path1 = get_path1();
+				break;
+		case 0x04:
+			path1 = get_path1();
+			path2 = get_path2();
+			break;
+		}
+
+		if (path1) fprintf(stderr, " - %s", path1);
+		if (path2) fprintf(stderr, " - %s", path2);
+		fputs("\n", stderr);
 
 		switch(call & 0xff) {
 			case 0x01:

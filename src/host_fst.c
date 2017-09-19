@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <time.h>
+#include <libgen.h>
 
 #include "defc.h"
 #include "gsos.h"
@@ -204,6 +205,22 @@ static char *gc_strdup(const char *src) {
 	return cp;
 }
 
+static word32 enoent(const char *path) {
+	/*
+		some op on path return ENOENT. check if it's
+		fileNotFound or pathNotFound
+	 */
+	char *p = (char *)path;
+	for(;;) {
+		struct stat st;
+		p = dirname(p);
+		if (p == NULL) break;
+		if (p[0] == '.' && p[1] == 0) break;
+		if (p[0] == '/' && p[1] == 0) break;
+		if (stat(p, &st) < 0) return pathNotFound;
+	}
+	return fileNotFound;
+}
 
 static word32 map_errno() {
 	switch(errno) {
@@ -224,6 +241,11 @@ static word32 map_errno() {
 		default:
 			return drvrIOError;
 	}
+}
+
+static word32 map_errno_path(const char *path) {
+	if (errno == ENOENT) return enoent(path);
+	return map_errno();
 }
 
 
@@ -478,12 +500,12 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	ssize_t tmp;
-	tmp = getxattr(path, "user.apple.ResourceFork", NULL, 0);
+	tmp = getxattr(path, "user.com.apple.ResourceFork", NULL, 0);
 	if (tmp < 0) tmp = 0;
 	fi->resource_eof = tmp;
 	fi->resource_blocks = (tmp + 511) / 512;
 
-	tmp = getxattr(path, "user.apple.FinderInfo", fi->finder_info, 32);
+	tmp = getxattr(path, "user.com.apple.FinderInfo", fi->finder_info, 32);
 	if (tmp == 16 || tmp == 32){
 		fi->has_fi = 1;
 
@@ -1021,24 +1043,38 @@ static word32 fst_create(int class, const char *path) {
 	}
 	int ok;
 
+	if (fi.storage_type == 0 && fi.file_type == 0x0f)
+		fi.storage_type = 0x0d;
+
 	if (fi.storage_type == 0x0d) {
 		ok = mkdir(path, 0777);
-		if (ok < 0) return map_errno();
+		if (ok < 0) {
+			return map_errno_path(path);
+		}
+
+		if (class) {
+			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, fi.storage_type, 0);
+		} else {
+			set_memory16_c(pb + CreateRec_storageType, fi.storage_type, 0);
+		}
+
 		return 0;
 	}
 	if (fi.storage_type <= 3 || fi.storage_type == 0x05) {
 		// normal file.
 		// 0x05 is an extended/resource file but we don't do anything special.
 		ok = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
-		if (ok < 0) return map_errno();
+		if (ok < 0) return map_errno_path(path);
 		// set ftype, auxtype...
 		set_file_info(path, &fi);
 		close(ok);
 
+		fi.storage_type = 1;
+
 		if (class) {
-			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, 1, 0);
+			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, fi.storage_type, 0);
 		} else {
-			set_memory16_c(pb + CreateRec_storageType, 1, 0);
+			set_memory16_c(pb + CreateRec_storageType, fi.storage_type, 0);
 		}
 
 		return 0;
@@ -1067,7 +1103,7 @@ static word32 fst_destroy(int class, const char *path) {
 	if (!path) return badStoreType;
 
 	if (stat(path, &st) < 0) {
-		return map_errno();
+		return map_errno_path(path);
 	}
 
 	// can't delete volume root. 
@@ -1078,7 +1114,7 @@ static word32 fst_destroy(int class, const char *path) {
 	int ok = S_ISDIR(st.st_mode) ? rmdir(path) : unlink(path);
 
 
-	if (ok < 0) return map_errno();
+	if (ok < 0) return map_errno_path(path);
 	return 0;
 }
 
@@ -1295,7 +1331,7 @@ static int open_data_fork(const char *path, word16 *access, word16 *error) {
 		break;
 	}
 	if (fd < 0) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 	}
 
 	return fd;
@@ -1333,7 +1369,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 		break;
 	}
 	if (fd < 0) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 	}
 
 	return fd;
@@ -1345,7 +1381,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	int tmp = open(path, O_RDONLY);
 	if (tmp < 0) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 		return -1;
 	}
 
@@ -1376,7 +1412,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	}
 
 	if (fd < 0) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 		close(tmp);
 		return -1;
 	}
@@ -1879,7 +1915,7 @@ static struct directory *read_directory(const char *path, word16 *error) {
 
 	dirp = opendir(path);
 	if (!dirp) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 		return NULL;
 	}
 
@@ -2046,12 +2082,12 @@ static word32 fst_change_path(int class, const char *path1, const char *path2) {
 
 	/* make sure they're not trying to rename the volume... */
 	struct stat st;
-	if (stat(path1, &st) < 0) return map_errno();
+	if (stat(path1, &st) < 0) return map_errno_path(path1);
 	if (st.st_dev == root_dev && st.st_ino == root_ino)
 		return invalidAccess;
 
 	// rename will delete any previous file.
-	if (rename(path1, path2) < 0) return map_errno();
+	if (rename(path1, path2) < 0) return map_errno_path(path2);
 	return 0;
 }
 
@@ -2365,10 +2401,11 @@ void host_fst(void) {
 	word32 acc = 0;
 	word16 call = engine.xreg;
 
-	fprintf(stderr, "Host FST: %04x %s\n", call, call_name(call));
+	fprintf(stderr, "Host FST: %04x %s", call, call_name(call));
 
 
 	if (call & 0x8000) {
+		fputs("\n", stderr);
 		// system level.
 		switch(call) {
 			case 0x8001:
@@ -2391,11 +2428,32 @@ void host_fst(void) {
 			engine.acc = invalidClass;
 			return;
 		}
-		char *path1 = get_path1();
-		char *path2 = get_path2();
+		char *path1 = NULL;
+		char *path2 = NULL;
 		char *path3 = NULL;
 		char *path4 = NULL;
 		const char *cp;
+
+		switch(call & 0xff) {
+			case 0x01:
+			case 0x02:
+			case 0x05:
+			case 0x06:
+			case 0x07:
+			case 0x0b:
+			case 0x10:
+				path1 = get_path1();
+				break;
+		case 0x04:
+			path1 = get_path1();
+			path2 = get_path2();
+			break;
+
+		}
+
+		if (path1) fprintf(stderr, " - %s", path1);
+		if (path2) fprintf(stderr, " - %s", path2);
+		fputs("\n", stderr);
 
 		switch(call & 0xff) {
 			case 0x01:
