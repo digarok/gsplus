@@ -117,10 +117,7 @@ build-win32:
     - windows
   stage: build
   script:
-    - cd src
-    - ln -s vars_win32 vars
-    - make clean
-    - make
+    - bash -c "cd src; ln -s vars_win32 vars; make clean ; make"
   artifacts:
     paths:
       - gsplus32.exe
