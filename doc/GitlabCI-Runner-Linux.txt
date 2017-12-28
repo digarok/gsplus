@@ -9,14 +9,15 @@ sudo apt-get install -y gitlab-ci-multi-runner
 
 
 ## STEP 2 - Register it with your server
-sudo gitlab-ci-multi-runner register
-gitlab-ci-multi-runner register -n \
-  --url http://yourgitlab.com/ci \
-  --registration-token 5b2f60647cf7fe3eb5c7fa87e59bf7 \
+sudo gitlab-ci-multi-runner register -n \
+  --url http://centralserv.gotgeeks.com/ci \
+  --registration-token UqGC2qvJmvU1QBK3mx4b \
   --executor shell \
   --description "LinBuild" \
   --tag-list "ubuntu"
 
+# or manually
+sudo gitlab-ci-multi-runner register
 # "Please enter the gitlab-ci coordinator URL (e.g. https://gitlab.com/ci )"
 #  https://centralserv.gotgeeks.com/ci
 #

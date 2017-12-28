@@ -4,8 +4,10 @@
 xcode-select --install
 
 # Install 'brew' if you don't already have it installed. 
+/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 # then install dependencies
 brew install sdl2
+brew install sdl2_image
 brew install freetype
 
 # build
@@ -26,5 +28,3 @@ cd freetype-2.6.2
 make
 make install
 ln -s freetype-2.6.2 /usr/local/freetype
-
-
