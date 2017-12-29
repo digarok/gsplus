@@ -53,14 +53,20 @@ int	g_initialized = 0;	// OG To know if the emulator has finalized its initializ
 int	g_accept_events = 0; // OG To know if the emulator is ready to accept external events
 char g_argv0_path[256] = "./";
 
-const char *g_gsplus_default_paths[] = { "", "./", "${HOME}/","${PWD}/",
-#ifdef MAC
-	"${0}/../",
-#endif
-	"${HOME}/Library/GSport/",
-	"${0}/Contents/Resources/", "/usr/local/lib/",
-	"/usr/local/gsport/", "/usr/local/lib/gsport/", "/usr/share/gsport/",
-	"/var/lib/", "/usr/lib/gsport/", "${0}/", 0 };
+const char *g_gsplus_default_paths[] = { // probably overkill on the paths
+  "", 
+  "./", 
+  "${HOME}/",
+  "${PWD}/",
+  "${HOME}/Library/GSplus/",
+  "/usr/local/lib/",
+  "/usr/lib/gsplus/", 
+  "/usr/local/gsplus/", 
+  "/usr/local/lib/gsplus/", 
+  "/usr/share/gsplus/",
+  "/var/lib/",  
+  "${0}/",
+  0 };
 
 #define MAX_EVENTS	64
 
@@ -738,7 +744,7 @@ void my_exit(int ret) {
 	end_screen();
 	imagewriter_close();
 	printer_close();
-	glogf("exiting (ret=%d)",ret);
+	glogf("Exiting (ret=%d)",ret);
 	fatalExit(ret);
 }
 
@@ -878,7 +884,7 @@ void memory_ptr_init() {
 	*/
 	g_memory_ptr = memalloc_align(mem_size, 256, &g_memory_alloc_ptr);
 
-	glogf("RAM size is 0 - %06x (%.2fMB)", mem_size, (double)mem_size/(1024.0*1024.0));
+	glogf("RAM size is %d bytes (%.2fMB)", mem_size, (double)mem_size/(1024.0*1024.0));
 }
 
 // OG Added memory_ptr_shut
@@ -1339,11 +1345,10 @@ void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_cre
 			strcpy(outname, &(local_path[0]));
 			strncat(outname, *cur_name_ptr, 255-strlen(outname));
 			if(!ok_if_missing) { // ??
-				glogf("Trying '%s'", outname);
+				glogf("Trying config file '%s'", outname);
 			}
 			ret = stat(outname, &stat_buf);
 			if(ret == 0) {
-				/* got it! */
 				return;
 			}
 			cur_name_ptr++;
@@ -1356,34 +1361,33 @@ void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_cre
 		return;
 	}
 
-	/* couldn't find it, print out all the attempts */
-  /*
-	path_ptr = save_path_ptr;
-	gloghead(); fatal_printf("Could not find required file \"%s\" in any of these "
-						"directories:\n", *name_ptr);
-	while(*path_ptr) {
-		fatal_printf("  %s\n", *path_ptr++);
-	}
-  */
   glogf("Could not find required file \"%s\" !!!", *name_ptr);
-  if (strcmp(*name_ptr, "ROM")) {
+  // this check is crap
+  if (strcmp(*name_ptr, "ROM") == 0) {
     glog("  IIgs will likely hang now!");
     glog("  Get an Apple IIgs firmware ROM image from somewhere like:");
     glog("    ftp://ftp.apple.asimov.net/pub/apple_II/emulators/rom_images/");
     glog("  ... and rename the file to \"ROM\" and restart");
     glog("  ... or hit <F4> and browse for a valid ROM image.");
   }
-  // if (strcmp(*name_ptr, "config.txt")) {
-  //}
 
 	if(can_create_file) {
-		// If we didn't find a file, pick a place to put it.
-		// Default is the current working directory.
-#ifdef MAC
-		gsport_expand_path(&(local_path[0]), "${0}/../config.txt", 250);
-#else
-		gsport_expand_path(&(local_path[0]), "${PWD}/config.txt", 250);
-#endif
+    // If we didn't find a file, pick a place to put it.
+    // Default is the current working directory.
+    // This is often wrong in OS X. /Applications/GSplus.app is
+    // probably not writable by the default user, and PWD is set
+    // there when launched from an .app structure.
+    // Normally the HOME directory under a *NIX system is probably
+    // a better place for the config file. Ideally a "dotfile"
+    // like most applications, or something under "~/Library".
+    // However, GSplus is promoting a notion of Config-as-a-VM
+    // where we want to encourage many configs.  (See DGB video
+    // on YT regarding the GSVision UI experiment.)
+    
+
+    glogf("Trying to create config (%s)", "${HOME}/.config.gsp");
+    gsport_expand_path(&(local_path[0]), "${HOME}/.config.gsp", 250);
+    
 		strcpy(outname, &(local_path[0]));
 		// Ask user if it's OK to create the file (or just create it)
 		x_dialog_create_gsport_conf(*name_ptr);

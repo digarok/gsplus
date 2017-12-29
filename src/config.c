@@ -140,7 +140,7 @@ int g_config_gsplus_auto_update = 1;
 int g_config_gsplus_update_needed = 0;
 
 const char *g_config_gsplus_name_list[] = {
-		"config.txt", "config.gsp",0
+		"config.txt", "config.gsp", ".config.gsp",0
 };
 
 int	g_highest_smartport_unit = -1;
@@ -879,10 +879,10 @@ config_load_roms()
 		return;
 	}
 
-	glogf("Read: %d bytes of ROM", ret);
+	glogf("Read %d bytes (%dK) of ROM", ret, ret/1024);
 	if(ret != len) {
 		fatal_printf("errno: %d\n", errno);
-		g_config_control_panel = 1;
+		g_config_control_panel = 1;	// THIS DOESN'T DO ANYTHING?
 		return;
 	}
 	fclose(file);
@@ -1039,7 +1039,7 @@ config_parse_config_gsplus_file()
 	int	ret;
 	int	i;
 
-	glog("Parsing configuration file");
+	glogf("Parsing configuration file '%s'", g_config_gsplus_name);
 
 	clk_bram_zero();
 
