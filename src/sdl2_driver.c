@@ -59,7 +59,10 @@ extern char g_config_gsplus_screenshot_dir[];
 int screenshot_index = 0;  // allows us to save time by not scanning from 0 each time
 char screenshot_filename[256];
 
+extern int g_fullscreen;  // only checked at start if set via CLI, otherwise it's set via function call x_full_screen()
 extern int g_scanline_simulator;
+extern int g_startx;
+extern int g_starty;
 extern int g_screen_depth;
 extern int g_quit_sim_now;
 extern int g_border_sides_refresh_needed;
@@ -295,15 +298,27 @@ void dev_video_init_sdl() {
 
   // Create an application window with the following settings:
   char window_title[32];
-  sprintf(window_title, "GSplus v%-6s", g_gsplus_version_str),
+  sprintf(window_title, "GSplus v%-6s", g_gsplus_version_str);
+  int startx,starty = SDL_WINDOWPOS_UNDEFINED;
+  if (g_startx != WINDOWPOS_UNDEFINED) { startx = g_startx; }
+  if (g_starty != WINDOWPOS_UNDEFINED) { starty = g_starty; }
+  int more_flags = 0;
+  // check for CLI fullscreen
+  if (g_fullscreen) {
+    more_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+  }
+
   window = SDL_CreateWindow(
     window_title,											 // window title (GSport vX.X)
-    SDL_WINDOWPOS_UNDEFINED,           // initial x position
-    SDL_WINDOWPOS_UNDEFINED,           // initial y position
+    // SDL_WINDOWPOS_UNDEFINED,           // initial x position
+    // SDL_WINDOWPOS_UNDEFINED,           // initial y position
+    startx, starty,
     BASE_WINDOW_WIDTH,                 // width, in pixels
     X_A2_WINDOW_HEIGHT,                // height, in pixels
     SDL_WINDOW_OPENGL                  // flags - see below
+    | more_flags
   );
+  
 
   // Check that the window was successfully created
   if (window == NULL) {
@@ -337,13 +352,16 @@ void dev_video_init_sdl() {
 
   SDL_SetTextureBlendMode(overlay_texture, SDL_BLENDMODE_BLEND);
   overlay_pixels = malloc(BASE_WINDOW_WIDTH*X_A2_WINDOW_HEIGHT*sizeof(Uint32));
+  Uint32 pixelARGB = 0x33000000;  // default "low grey"
   if (overlay_pixels) {
-
+    if (g_scanline_simulator > 0) {
+      pixelARGB = (int)(g_scanline_simulator*2.56) << 24;
+    }
     for (int y=0; y<X_A2_WINDOW_HEIGHT; y++) {
       for (int x=0; x<BASE_WINDOW_WIDTH; x++) {
 
         if (y%2 == 1) {
-          overlay_pixels[(y*BASE_WINDOW_WIDTH)+x] = 0x30000000;
+          overlay_pixels[(y*BASE_WINDOW_WIDTH)+x] = 0x33000000;
         }
       }
     }
@@ -354,6 +372,7 @@ void dev_video_init_sdl() {
   dstrect.w = BASE_WINDOW_WIDTH;
   dstrect.h = X_A2_WINDOW_HEIGHT;
   int pitch = BASE_WINDOW_WIDTH;
+  
 
   // UPDATE A RECT OF THE APPLE II SCREEN TEXTURE
   SDL_UpdateTexture(overlay_texture, &dstrect, overlay_pixels, pitch*sizeof(Uint32) );

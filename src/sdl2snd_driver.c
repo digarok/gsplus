@@ -178,7 +178,7 @@ sound_init_device_sdl()
         goto snd_error;
     g_playbuf_buffered = 0;
 
-    glogf("Sound shared memory size=%d", SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);
+    glogf("SDL2 sound shared memory size=%d", SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);
 
     g_sound_shm_addr = malloc(SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);
     memset(g_sound_shm_addr,0,SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE);

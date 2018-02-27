@@ -47,9 +47,6 @@ void x_full_screen(int do_full);
 void clipboard_paste(void);
 int clipboard_get_char(void);
 
-/* test65.c */
-void do_gen_test(int got_num, int base_seed);
-
 
 /* engine.s and engine_c.c */
 void fixed_memory_ptrs_init();

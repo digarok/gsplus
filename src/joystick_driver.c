@@ -162,7 +162,7 @@ joystick_init()
 
 	//	Check that there is a joystick device
 	if(joyGetNumDevs() <= 0) {
-		printf("No joystick hardware detected\n");
+		glog("No joystick hardware detected");
 		g_joystick_native_type1 = -1;
 		g_joystick_native_type2 = -1;
 		return;
@@ -190,7 +190,7 @@ joystick_init()
 	}
 
 	if (g_joystick_native_type1<0 && g_joystick_native_type2 <0) {
-		printf ("No joystick is attached\n");
+		glog("No joystick is attached");
 		return;
 	}
 

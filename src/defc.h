@@ -371,3 +371,6 @@ STRUCT(Emustate_word32list) {
 #define JOYSTICK_TYPE_NATIVE_2 3
 #define JOYSTICK_TYPE_NONE 4	// OG Added Joystick None
 #define NB_JOYSTICK_TYPE 5
+
+// starting window x/y position if Undefined
+#define WINDOWPOS_UNDEFINED 0xFFFFFFFF

@@ -103,9 +103,6 @@ int	g_status_refresh_needed = 1;
 int	g_vbl_border_color = 0;
 int	g_border_last_vbl_changes = 0;
 
-int	g_use_dhr140 = 0;
-int	g_use_bw_hires = 0;
-
 int	g_a2_new_all_stat[200];
 int	g_a2_cur_all_stat[200];
 int	g_new_a2_stat_cur_line = 0;

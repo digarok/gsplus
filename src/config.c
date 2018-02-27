@@ -45,6 +45,9 @@
 typedef unsigned int mode_t;
 #endif
 
+static const char parse_log_prefix_file[] = "Option set [file]:";
+
+
 extern int Verbose;
 extern word32 g_vbl_count;
 extern Iwm iwm;
@@ -720,9 +723,7 @@ config_parse_option(char *buf, int pos, int len, int line)
 	}
 
 	// find "name" as first contiguous string
-	glogf("...parse_option: line %d, len:%d  \"%s\"", line, len, &buf[pos]);
-
-	// printf("...parse_option: line %d, %p,%p = %s (%s) len:%d\n", line, &buf[pos], buf, &buf[pos], buf, len);
+	glogf("%s line %d, len:%d  \"%s\"", parse_log_prefix_file, line, len, &buf[pos]);
 
 	nameptr = &buf[pos];
 	while(pos < len) {
@@ -1639,7 +1640,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 			nibs = len;
 		}
 		if(size != 35*len) {
-			glogf("Disk 5.25 error: size is %d, not 140K.  Will try to mount anyway", size, 35*len);
+			glogf("Warning - Disk 5.25 error: size is %d, not 140K.  Will try to mount anyway", size, 35*len);
 		}
 		for(i = 0; i < 35; i++) {
 			iwm_move_to_track(dsk, 4*i);
@@ -1651,8 +1652,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 		unix_pos = dsk->image_start;
 		size = dsk->image_size;
 		if(size != 800*1024) {
-			fatal_printf("Disk 3.5 error: size is %d, not 800K.  "
-				"Will try to mount anyway\n", size);
+			glogf("Warning - Disk 3.5 error: size is %d, not 800K.  Will try to mount anyway", size, 35*len);
 		}
 		disk_set_num_tracks(dsk, 2*80);
 		for(i = 0; i < 2*80; i++) {

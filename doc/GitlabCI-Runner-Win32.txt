@@ -23,9 +23,9 @@ git config --global user.email "dagenbrock@gmail.com"
 
 
 ## SOME NOTES ON SETTING UP GITLAB RUNNER TO BUILD ON WINDOWS
-# Based on: https://gitlab.com/gitlab-org/gitlab-ci-multi-runner/blob/master/docs/install/windows.md
 
 ## STEP 1 - Install Gitlab Runner
+# https://docs.gitlab.com/runner/install/windows.html
 # Download from page above, run CMD prompt as Administrator and then run the runner exe in there
 
 ## STEP 2 - Register it with your server
@@ -36,19 +36,18 @@ gitlab-ci-multi-runner-windows-386.exe register
 # enter gitlab url
 # enter gitlab runner token
 # enter tag of "windows"
-gitlab-runner.exe register -n \
-  --url http://centralserv.gotgeeks.com/ci \
-  --registration-token UqGC2qvJmvU1QBK3mx4b \
+gitlab-runner-windows-386.exe register -n \
+  --url http://yourgitlab.com/ci \
+  --registration-token UqGC2qvJmU1QBK3mx4b \
   --executor shell \
   --description "WinBuild"
   --tag-list "windows"
-
-gitlab-ci-multi-runner-windows-386.exe -n   --url http://centralserv.gotgeeks.com/ci   --registration-token 5a1f60647cf7fe3eb5c7fa87e59bf7   --executor shell   --description "WinDork10" --tag-list "windows,win32"
 
 ## STEP 3 - Install Service
 # Note the use of ".\IEUser" to indicate local account!
 gitlab-ci-multi-runner-windows-386.exe install --user .\IEUser --password Passw0rd!
 gitlab-ci-multi-runner-windows-386.exe install --user .\Builder --password Bu1ld3r!
+gitlab-runner-windows-386.exe install --user .\builder --password builder
 
 ## STEP 4 - Start service
 gitlab-ci-multi-runner-windows-386.exe start

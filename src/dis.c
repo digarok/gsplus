@@ -40,7 +40,6 @@ extern word32 stop_run_at;
 extern int Verbose;
 extern int Halt_on;
 
-extern int g_testing_enabled;
 extern int g_fullscreen;
 extern int g_config_control_panel;
 
@@ -358,11 +357,7 @@ do_debug_intfc()
 				if(got_num) {
 					engine.kpc = (a2bank<<16) + (a2&0xffff);
 				}
-				if(ret_val == 'G' && g_testing_enabled) {
-					do_gen_test(got_num, a2);
-				} else {
-					do_go();
-				}
+				do_go();
 				list_kpc = engine.kpc;
 				break;
 			case 'q':
@@ -481,15 +476,6 @@ show_toolset_tables(word32 a2bank, word32 addr)
 
 	fclose(toolfile);
 }
-
-
-#ifndef TEST65
-void
-do_gen_test(int got_num, int base_seed)
-{
-	/* dummy */
-}
-#endif
 
 void
 set_bp(word32 addr)
