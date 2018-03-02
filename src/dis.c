@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
-
- Copyright (C) 2010 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See COPYING.txt for license (GPL v2)
 */
 
 #include <stdio.h>
@@ -40,7 +24,6 @@ extern word32 stop_run_at;
 extern int Verbose;
 extern int Halt_on;
 
-extern int g_testing_enabled;
 extern int g_fullscreen;
 extern int g_config_control_panel;
 
@@ -358,11 +341,7 @@ do_debug_intfc()
 				if(got_num) {
 					engine.kpc = (a2bank<<16) + (a2&0xffff);
 				}
-				if(ret_val == 'G' && g_testing_enabled) {
-					do_gen_test(got_num, a2);
-				} else {
-					do_go();
-				}
+				do_go();
 				list_kpc = engine.kpc;
 				break;
 			case 'q':
@@ -481,15 +460,6 @@ show_toolset_tables(word32 a2bank, word32 addr)
 
 	fclose(toolfile);
 }
-
-
-#ifndef TEST65
-void
-do_gen_test(int got_num, int base_seed)
-{
-	/* dummy */
-}
-#endif
 
 void
 set_bp(word32 addr)

@@ -1,4 +1,10 @@
-# ubuntu - X11 version
+# This is basically what you need to install to build this yourself,
+# or the pre-requisites of what you need to do to set up a build
+# machine as a gitlab ci runner.
+#
+# All instructions based on a Debian/Ubuntu OS, but should be 
+# relatively straightforward to modify for something like yum
+
 
 # system prep
 sudo apt-get -y update
@@ -6,21 +12,23 @@ sudo apt-get -y upgrade
 sudo apt-get -y install git
 sudo apt-get -y install g++
 sudo apt-get -y install libpcap0.8-dev
+sudo apt-get -y install libfreetype6-dev
+
+# X11 version
 sudo apt-get -y install libx11-dev
 sudo apt-get -y install libxext-dev
 
-# sdl
+# SDL version
 sudo apt-get -y install libsdl1.2-dev
+sudo apt-get -y install libsdl-image1.2-dev
+
+# SDL2 version
 sudo apt-get -y install libsdl2-dev
-sudo apt-get -y install libfreetype6-dev
+sudo apt-get -y install libsdl2-image-dev
 
-# build
-git clone git@github.com:digarok/gsplus.git
+
+# Example build to test out our system
 cd gsplus/src
-ln -s vars_x86linux_x11 vars
+ln -s vars_x86linux_sdl2 vars
 make clean ; make
-
-
-
-
 

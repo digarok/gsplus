@@ -1,7 +1,31 @@
+## PREREQUISITE AKA SETTING UP A FRESH VM OR DEV COMPUTER
+#
+# Install your Win7/Win10 VM
+# Install VirtualBox additions in your VM
+#
+# (optional)  add build user
+# Make user an admin, give it service privs
+#  ... Local Security Policy -> Local Policies -> User Rights Assignment -> Log on as a service
+#
+# install Cygwin
+# add cygwin bin dir to env path
+#
+# install git for windows w/ git bash  http://git-scm.com/download/win
+git config --global user.name "Dagen Brock"
+git config --global user.email "dagenbrock@gmail.com"
+# (set up your key(s))
+# Add your ~/.ssh/id_rsa using git bash (or cygwin) so that
+# gitlab runner can check out your project
+#
+# The project is currently being build in Cygwin.
+# I install Cygwin with all "Devel" and "Perl" packages.
+# I also search for and add any SDL2 or FreeType libs just in case.
+
+
 ## SOME NOTES ON SETTING UP GITLAB RUNNER TO BUILD ON WINDOWS
-# Based on: https://gitlab.com/gitlab-org/gitlab-ci-multi-runner/blob/master/docs/install/windows.md
 
 ## STEP 1 - Install Gitlab Runner
+# https://docs.gitlab.com/runner/install/windows.html
 # Download from page above, run CMD prompt as Administrator and then run the runner exe in there
 
 ## STEP 2 - Register it with your server
@@ -12,19 +36,18 @@ gitlab-ci-multi-runner-windows-386.exe register
 # enter gitlab url
 # enter gitlab runner token
 # enter tag of "windows"
-gitlab-ci-multi-runner register -n \
+gitlab-runner-windows-386.exe register -n \
   --url http://yourgitlab.com/ci \
-  --registration-token 5b2f60647cf7fe3eb5c7fa87e59bf7 \
+  --registration-token UqGC2qvJmU1QBK3mx4b \
   --executor shell \
-  --description "WinDork10" \
-  --tag-list "windows,win32"
-
-gitlab-ci-multi-runner-windows-386.exe -n   --url http://centralserv.gotgeeks.com/ci   --registration-token 5a1f60647cf7fe3eb5c7fa87e59bf7   --executor shell   --description "WinDork10" --tag-list "windows,win32"
+  --description "WinBuild"
+  --tag-list "windows"
 
 ## STEP 3 - Install Service
 # Note the use of ".\IEUser" to indicate local account!
 gitlab-ci-multi-runner-windows-386.exe install --user .\IEUser --password Passw0rd!
 gitlab-ci-multi-runner-windows-386.exe install --user .\Builder --password Bu1ld3r!
+gitlab-runner-windows-386.exe install --user .\builder --password builder
 
 ## STEP 4 - Start service
 gitlab-ci-multi-runner-windows-386.exe start
@@ -39,7 +62,7 @@ gitlab-ci-multi-runner-windows-386.exe start
 # If you have any other problems with the service not starting due to:
 # "Failed to start gitlab-runner: The service did not start due to a logon failure."
 # Try going to Services and edit the properties of the gitlab-runner service.
-# Go to the "Log On" tab and re-enter the password/credentials and see if 
+# Go to the "Log On" tab and re-enter the password/credentials and see if
 # that helps.
 
 
@@ -50,31 +73,6 @@ gitlab-ci-multi-runner-windows-386.exe start
 #       add:  shell = "bash"
 #
 # Also, make sure that if you type "bash" <enter>  from a CMD prompt,
-# that it runs the Cygwin shell.  If it can't find the bash command, 
+# that it runs the Cygwin shell.  If it can't find the bash command,
 # go to the Environment Variables Control Panel for your computer and
 # add "c:\cygwin\bin" to your PATH variable.
-
-
-
-
-
-## PREREQUISITE AKA SETTING UP A FRESH VM OR DEV COMPUTER
-#
-# don't forget guest additions in your VM
-#
-# add user (make it an admin, give it service privs) 
-# Local Security Policy -> Local Policies -> User Rights Assignment -> Log on as a service
-#
-# install Cygwin
-# add cygwin bin dir to env path
-#
-# install git for windows w/ git bash  http://git-scm.com/download/win
-git config --global user.name "Dagen Brock"
-git config --global user.email "dagenbrock@gmail.com"
-# (set up your key(s))
-# Add your ~/.ssh/id_rsa using git bash (or cygwin) so that 
-# gitlab runner can check out your project
-# 
-# The project is currently being build in Cygwin.
-# I install Cygwin with all "Devel" and "Perl" packages.
-# I also search for and add any SDL2 or FreeType libs just in case.

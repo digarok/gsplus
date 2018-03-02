@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
-
- Copyright (C) 2010 - 2014 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See COPYING.txt for license (GPL v2)
 */
 
 #include "defc.h"
@@ -44,6 +28,9 @@
 #define snprintf _snprintf
 typedef unsigned int mode_t;
 #endif
+
+static const char parse_log_prefix_file[] = "Option set [file]:";
+
 
 extern int Verbose;
 extern word32 g_vbl_count;
@@ -140,7 +127,7 @@ int g_config_gsplus_auto_update = 1;
 int g_config_gsplus_update_needed = 0;
 
 const char *g_config_gsplus_name_list[] = {
-		"config.txt", "config.gsp",0
+		"config.txt", "config.gsp", ".config.gsp",0
 };
 
 int	g_highest_smartport_unit = -1;
@@ -720,9 +707,7 @@ config_parse_option(char *buf, int pos, int len, int line)
 	}
 
 	// find "name" as first contiguous string
-	glogf("...parse_option: line %d, len:%d  \"%s\"", line, len, &buf[pos]);
-
-	// printf("...parse_option: line %d, %p,%p = %s (%s) len:%d\n", line, &buf[pos], buf, &buf[pos], buf, len);
+	glogf("%s line %d, len:%d  \"%s\"", parse_log_prefix_file, line, len, &buf[pos]);
 
 	nameptr = &buf[pos];
 	while(pos < len) {
@@ -879,10 +864,10 @@ config_load_roms()
 		return;
 	}
 
-	glogf("Read: %d bytes of ROM", ret);
+	glogf("Read %d bytes (%dK) of ROM", ret, ret/1024);
 	if(ret != len) {
 		fatal_printf("errno: %d\n", errno);
-		g_config_control_panel = 1;
+		g_config_control_panel = 1;	// THIS DOESN'T DO ANYTHING?
 		return;
 	}
 	fclose(file);
@@ -1039,7 +1024,7 @@ config_parse_config_gsplus_file()
 	int	ret;
 	int	i;
 
-	glog("Parsing configuration file");
+	glogf("Parsing configuration file '%s'", g_config_gsplus_name);
 
 	clk_bram_zero();
 
@@ -1639,7 +1624,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 			nibs = len;
 		}
 		if(size != 35*len) {
-			glogf("Disk 5.25 error: size is %d, not 140K.  Will try to mount anyway", size, 35*len);
+			glogf("Warning - Disk 5.25 error: size is %d, not 140K.  Will try to mount anyway", size, 35*len);
 		}
 		for(i = 0; i < 35; i++) {
 			iwm_move_to_track(dsk, 4*i);
@@ -1651,8 +1636,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 		unix_pos = dsk->image_start;
 		size = dsk->image_size;
 		if(size != 800*1024) {
-			fatal_printf("Disk 3.5 error: size is %d, not 800K.  "
-				"Will try to mount anyway\n", size);
+			glogf("Warning - Disk 3.5 error: size is %d, not 800K.  Will try to mount anyway", size, 35*len);
 		}
 		disk_set_num_tracks(dsk, 2*80);
 		for(i = 0; i < 2*80; i++) {
