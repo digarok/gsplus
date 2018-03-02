@@ -7,9 +7,6 @@
 
 #include "defc.h"
 
-
-
-
 // Halts on bad reads.  Sets flags via engine_s.s:set_halt_act() function
 extern int g_halt_on_bad_read;        // defined in sim65816.c
 // Ignore bad memory accesses.  
@@ -76,7 +73,7 @@ extern int g_cur_a2_stat;
 
 void help_exit();       // displays the cli help text and exits with 1
 
-int parse_cli_options(int argc, char **argv) {
+int parse_cli_options(int argc, char **argv) { 
   int	i;
   int tmp1;
   int	skip_amt;

@@ -3,11 +3,8 @@ Modern cross-platform Apple IIgs emulator and tools,
 based on KEGS & GSPort
 
 ________________
- Screenshot.png Manual Revisions: 
-Beta Release: 2017-01-22
-Alpha Release: 2016-11-02
-Alpha Draft: 2016-10-27
-Initial Draft: 2016-05-01
+ Screenshot.png Manual Version: 
+GSplus 0.14  (config release)
 
 
 Downloads: 
@@ -89,31 +86,26 @@ ________________
 Command-line Options
 This is from source, some are experimental and not all may be built on your system.
 -badrd                        Halt on bad reads
--noignbadacc        Don’t ignore bad memory accesses
--noignhalt                Don’t ignore code red halts
--test                        Allow testing
--hpdev                 Use /dev/audio (HP/UX?)
--alib                         Use Aserver audio server
--24                         Use 24-bit display depth
--16                         Use 16-bit display depth
--15                         Use 15-bit display depth
--bw                        Force B/W modes
--joystick                Ignore joystick option
--noshm                Don’t use X shared memory
--dhr140                Use simple double-hires color map
--mem value                Set memory size to value
--skip value                Set skip_amt to value
--audio value                  Set audio enable to value
--arate value                Set preferred audio rate to value
--v value                 Set verbose flags to value
--display value                Set X-Windows DISPLAY=value
--enet value                Set ethernet to value
--config value                Set config file to value
--debugport value        Set debugport to value
--ssdir value                Set screenshot save directory to value
--scanline                Enable scanline simulator
--noscanline                Disable scanline simulator (default)
+        -noignbadacc        Don’t ignore bad memory accesses
+        -noignhalt                 Don’t ignore code red halts
+        -joystick                       Ignore joystick option
+        -bw                           Force B/W hires modes
+        -dhr140                Use simple double-hires color map
+        -fullscreen                Attempt to start emulator in fullscreen
+        -mem value                Set memory size to value
+        -skip value                Set skip_amt to value
+        -audio value                Set audio enable to value
+        -arate value                Set preferred audio rate to value
+        -enet value                Set ethernet to value
+        -config value                Set config file to value
+        -debugport value      Set debugport to value
+        -ssdir value                Set screenshot save directory to value
+        -scanline value        Enable scanline simulator at value %
+        -x value                Open emulator window at x value
+        -y value                Open emulator window at y value
+        -v value                Set verbose flags to value
 Note: The final argument, if not a flag, will be tried as a mountable device.
+________________
 
 
 Debugger Commands  - BROKEN!!!
