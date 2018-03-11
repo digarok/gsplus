@@ -22,6 +22,18 @@ git config --global user.email "dagenbrock@gmail.com"
 # I also search for and add any SDL2 or FreeType libs just in case.
 
 
+# UPDATE FOR PROPER SDL2 BUILDS ON WINDOWS!!!
+# I used to link the libraries that were installed with all this environment,
+# but I had problems with it ever having a working driver.  Now we download
+# the devel libraries for SDL2 and link to them directly. 
+# Latest is something like: SDL2-devel-2.0.8-mingw.tar.gz
+# Unpack that where CI can see it on the builder, our standard is c:\mingw
+# So something like:
+tar -xvzf SDL2-devel-2.0.8-mingw.tar.gz
+cd SDL2-2.0.8
+mkdir /cygdrive/c/mingw
+mv x86_64-w64-mingw32/* /cygdrive/c/mingw/
+
 ## SOME NOTES ON SETTING UP GITLAB RUNNER TO BUILD ON WINDOWS
 
 ## STEP 1 - Install Gitlab Runner

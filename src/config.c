@@ -10,9 +10,7 @@
 #include "config.h"
 #include "glog.h"
 #include "imagewriter.h"
-#if defined(__OS2__)
-#include "arch\os2\src\dirport.h"
-#elif defined(_MSC_VER)
+#if defined(_MSC_VER)
 #include "arch\win32\dirent-win32.h"
 #else
 #include <dirent.h>
@@ -565,7 +563,6 @@ config_init()
 void
 cfg_exit()
 {
-	/* printf("In cfg exit\n"); */
 	if(g_rom_version >= 1) {
 		g_config_control_panel = 0;
 	}
@@ -592,7 +589,7 @@ cfg_text_screen_dump()
 	int	i, j;
 
 	filename = "gsplus.screen.dump";
-	printf("Writing text screen to the file %s\n", filename);
+	glogf("Writing text screen to the file %s\n", filename);
 	ofile = fopen(filename, "w");
 	if(ofile == 0) {
 		fatal_printf("Could not write to file %s, (%d)\n", filename,
@@ -764,8 +761,7 @@ config_parse_option(char *buf, int pos, int len, int line)
 		*strptr = gsplus_malloc_str(&buf[pos]);
 		break;
 	default:
-		printf("Config file variable %s is unknown type: %d\n",
-			nameptr, type);
+		glogf("Config file variable %s is unknown type: %d\n", nameptr, type);
 	}
 
 }
@@ -914,7 +910,7 @@ config_load_roms()
 					"read %d bytes\n", &g_cfg_tmp_path[0], errno, len, ret);
 				continue;
 			}
-			printf("Read: %d bytes of ROM in slot %d from file %s.\n", ret, i, &g_cfg_tmp_path[0]);
+			glogf("Read: %d bytes of ROM in slot %d from file %s.\n", ret, i, &g_cfg_tmp_path[0]);
 			fclose(file);
 		}
 	}
@@ -1037,18 +1033,6 @@ config_parse_config_gsplus_file()
 	// It's possible it was needed for some of the autodiscovery stuff, but I'm
 	// not really a fan of that either and think it should be take out.
 	// Especially now that you can pass a filename.
-
-// #ifndef __OS2__
-// 	if(g_cfg_cwd_str[0] != 0) {
-// 		ret = chdir(&g_cfg_cwd_str[0]);
-// 		if(ret != 0) {
-// 			printf("chdir to %s, errno:%d\n", g_cfg_cwd_str, errno);
-// 		}
-// 	}
-// 	/* In any case, copy the directory path to g_cfg_cwd_str */
-// 	(void)getcwd(&g_cfg_cwd_str[0], CFG_PATH_MAX);
-// #endif
-
 
 	fconf = fopen(g_config_gsplus_name, "r");
 	if(fconf == 0) {
@@ -2652,7 +2636,7 @@ cfg_str_match(const char *str1, const char *str2, int len)
 void
 cfg_file_readdir(const char *pathptr)
 {
-#ifndef __OS2__
+
 	struct dirent *direntptr;
 	struct stat stat_buf;
 	DIR	*dirptr;
@@ -2779,7 +2763,6 @@ cfg_file_readdir(const char *pathptr)
 			g_cfg_dirlist.curent = i;
 		}
 	}
-#endif
 }
 
 void
@@ -3072,7 +3055,6 @@ cfg_file_update_ptr(char *str)
 void
 cfg_file_selected(int select_dir)
 {
-#ifndef __OS2__
 	struct stat stat_buf;
 	char	*str;
 	int	fmt;
@@ -3126,7 +3108,6 @@ cfg_file_selected(int select_dir)
 			}
 		}
 	}
-#endif
 }
 
 void

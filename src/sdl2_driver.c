@@ -44,6 +44,9 @@ int screenshot_index = 0;  // allows us to save time by not scanning from 0 each
 char screenshot_filename[256];
 
 extern int g_fullscreen;  // only checked at start if set via CLI, otherwise it's set via function call x_full_screen()
+extern int g_highdpi;
+extern int g_borderless;
+extern int g_resizeable;
 extern int g_scanline_simulator;
 extern int g_startx;
 extern int g_starty;
@@ -291,6 +294,16 @@ void dev_video_init_sdl() {
   if (g_fullscreen) {
     more_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
   }
+  if (g_highdpi) {
+    more_flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+  }
+  if (g_borderless) {
+    more_flags |= SDL_WINDOW_BORDERLESS;
+  }
+  if (g_resizeable) {
+    more_flags |= SDL_WINDOW_RESIZABLE;
+  }
+  
 
   window = SDL_CreateWindow(
     window_title,											 // window title (GSport vX.X)

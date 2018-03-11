@@ -25,6 +25,12 @@ extern int g_use_bw_hires;            // defined in video.c
 // Set starting X/Y positions
 extern int g_startx;                  // defined in video.c
 extern int g_starty;                  // defined in video.c
+// Use High DPI (Retina) display - SDL2
+extern int g_highdpi;                 // defined in video.c
+// Create borderless window - SDL2
+extern int g_borderless;              // defined in video.c
+// Allow window resizing, dragging to scale - SDL2
+extern int g_resizeable;              // defined in video.c
 // Enable Dagen's scanline simulator (SDL2)
 extern int g_scanline_simulator;      // defined in sim65816.c
 // Ethernet (interface?)
@@ -87,8 +93,17 @@ int parse_cli_options(int argc, char **argv) {
       glogf("%s Halting on bad reads", parse_log_prefix);
       g_halt_on_bad_read = 2;
     } else if(!strcmp("-fullscreen", argv[i])) {
-       glogf("%s Starting emulator in fullscreen", parse_log_prefix);
-       g_fullscreen = 1;
+      glogf("%s Starting emulator in fullscreen", parse_log_prefix);
+      g_fullscreen = 1;
+    } else if(!strcmp("-highdpi", argv[i])) {
+      glogf("%s Creating window in High DPI mode", parse_log_prefix);
+      g_highdpi = 1;
+    } else if(!strcmp("-borderless", argv[i])) {
+      glogf("%s Creating borderless window", parse_log_prefix);
+      g_borderless = 1;
+    } else if(!strcmp("-resizeable", argv[i])) {
+      glogf("%s Window will be resizeable", parse_log_prefix);
+      g_resizeable = 1;
     } else if(!strcmp("-noignbadacc", argv[i])) {
       glogf("%s Not ignoring bad memory accesses", parse_log_prefix);
       g_ignore_bad_acc = 0;
@@ -254,6 +269,9 @@ void help_exit() {
   printf("    -bw                   Force B/W modes\n");
   printf("    -dhr140               Use simple double-hires color map\n");
   printf("    -fullscreen           Attempt to start emulator in fullscreen\n");
+  printf("    -highdpi              Attempt to open window in high DPI\n");
+  printf("    -borderless           Attempt to create borderless window\n");
+  printf("    -resizeable           Allow you to resize window (non-integral scaling to pixel)\n");
   printf("    -mem value            Set memory size to value\n");
   printf("    -skip value           Set skip_amt to value\n");
   printf("    -audio value          Set audio enable to value\n");

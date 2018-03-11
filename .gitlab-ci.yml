@@ -185,6 +185,7 @@ package-win-sdl:
     - cp /bin/cygjbig-2.dll .
     - cp /bin/cyglzma-5.dll .
     - cp /bin/cygwebp-5.dll .
+    - cp /cygdrive/c/mingw/bin/SDL2.dll .
 
 
 

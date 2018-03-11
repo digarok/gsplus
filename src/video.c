@@ -91,6 +91,9 @@ int	g_use_dhr140 = 0;
 int	g_use_bw_hires = 0;
 int g_startx = WINDOWPOS_UNDEFINED;
 int g_starty = WINDOWPOS_UNDEFINED;
+int g_highdpi = 0;
+int g_borderless = 0;
+int g_resizeable = 0;
 
 int	g_a2_new_all_stat[200];
 int	g_a2_cur_all_stat[200];
