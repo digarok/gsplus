@@ -10,7 +10,8 @@ CPPOPTS = -O2 -DGSPLUS_LITTLE_ENDIAN -DHAVE_SDL -DWIN_SDL -DTOGGLE_STATUS -I/usr
 
 SUFFIX = ".exe"
 EXTRA_LIBS = -Larch/win32 -lSDL2main  -lSDL2 -lfreetype -lcomdlg32 -lShlwapi -lIPHlpApi  -lcygwin
-EXTRA_LIBS = -L/usr/local/lib -lcygwin -lSDL2main  -lSDL2 -mwindows -lfreetype -lcomdlg32 -lShlwapi -lIPHlpApi -L/usr/lib -lpthread -lSDL2_image
+EXTRA_LIBS = -L/usr/local/lib -lcygwin -lSDL2main  -lSDL2 -mwindows -lfreetype -lcomdlg32 -lShlwapi -lIPHlpApi -L/usr/lib -lpthread -lSDL2_image -L/cygdrive/c/mingw/lib -I/cygdrive/c/mingw/include/SDL2/
+
 
 
 XOPTS = -Wall -fomit-frame-pointer -march=i686
