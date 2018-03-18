@@ -145,6 +145,7 @@ int	g_cfg_curs_inv = 0;
 int	g_cfg_curs_mousetext = 0;
 int g_cfg_triggeriwreset = 0;
 
+#define CFG_PG_SCROLL_AMT 15
 #define CFG_MAX_OPTS	16
 #define CFG_OPT_MAXSTR	100
 
@@ -427,7 +428,7 @@ Cfg_listhdr g_cfg_partitionlist = { 0 };
 
 int g_cfg_file_pathfield = 0;
 
-const char *g_gsplus_rom_names[] = { "ROM", "ROM", "ROM.01", "ROM.03", 0 };
+const char *g_gsplus_rom_names[] = { "ROM", "ROM", "ROM01", "ROM03", "ROM.01", "ROM.03", 0 };
 	/* First entry is special--it will be overwritten by g_cfg_rom_path */
 
 const char *g_gsplus_c1rom_names[] = { "parallel.rom", 0 };
@@ -435,8 +436,7 @@ const char *g_gsplus_c2rom_names[] = { 0 };
 const char *g_gsplus_c3rom_names[] = { 0 };
 const char *g_gsplus_c4rom_names[] = { 0 };
 const char *g_gsplus_c5rom_names[] = { 0 };
-const char *g_gsplus_c6rom_names[] = { "c600.rom", "controller.rom", "disk.rom",
-				"DISK.ROM", "diskII.prom", 0 };
+const char *g_gsplus_c6rom_names[] = { "c600.rom", "controller.rom", "disk.rom", "DISK.ROM", "diskII.prom", 0 };
 const char *g_gsplus_c7rom_names[] = { 0 };
 
 const char **g_gsplus_rom_card_list[8] = {
@@ -3158,6 +3158,18 @@ cfg_file_handle_key(int key)
 			cfg_fix_topent(listhdrptr);
 		}
 		break;
+	case 0x33: /* pg dn */
+		if(g_cfg_file_pathfield == 0) {
+			listhdrptr->curent += CFG_PG_SCROLL_AMT;
+			cfg_fix_topent(listhdrptr);
+		}
+		break;
+	case 0x39: /* pg up */
+		if(g_cfg_file_pathfield == 0) {
+			listhdrptr->curent -= CFG_PG_SCROLL_AMT;
+			cfg_fix_topent(listhdrptr);
+		}
+		break;
 	case 0x0d:	/* return */
 		//glog("Selected disk image file");
 		cfg_file_selected(0);
@@ -3179,7 +3191,7 @@ cfg_file_handle_key(int key)
 		cfg_file_selected(g_cfg_file_dir_only);
 		break;
 	default:
-		printf("key: %02x\n", key);
+		glogf("Unhandled config key: 0x%02x\n", key);
 	}
 #if 0
 	printf("curent: %d, topent: %d, last: %d\n",
@@ -3348,6 +3360,17 @@ config_control_panel()
 					menu_line = 1;
 				}
 				break;
+			case 0x33: /* pg dn */
+				menu_line += CFG_PG_SCROLL_AMT;
+				menu_inc = 1;
+				break;
+			case 0x39: /* pg up */
+				menu_line -= CFG_PG_SCROLL_AMT;
+				menu_inc = 0;
+				if(menu_line < 1) {
+					menu_line = 1;
+				}
+				break;
 			case 0x15: /* right arrow */
 				cfg_parse_menu(menuptr, menu_line,menu_line,1);
 				break;
@@ -3402,7 +3425,7 @@ config_control_panel()
 				}
 				break;
 			default:
-				printf("key: %02x\n", key);
+				glogf("Unhandled config key: 0x%02x\n", key);
 			}
 		} else if(key >= 0) {
 			cfg_file_handle_key(key);
