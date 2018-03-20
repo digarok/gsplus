@@ -358,7 +358,7 @@ void dev_video_init_sdl() {
       for (int x=0; x<BASE_WINDOW_WIDTH; x++) {
 
         if (y%2 == 1) {
-          overlay_pixels[(y*BASE_WINDOW_WIDTH)+x] = 0x33000000;
+          overlay_pixels[(y*BASE_WINDOW_WIDTH)+x] = pixelARGB;
         }
       }
     }
