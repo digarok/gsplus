@@ -4,8 +4,10 @@
 #include <stdio.h>
 #include "options.h"
 #include "glog.h"
-
 #include "defc.h"
+
+// config is parsed in config.c :: config_parse_config_gsplus_file()
+// cli is parsed here.  would be nice to reuse some code
 
 // Halts on bad reads.  Sets flags via engine_s.s:set_halt_act() function
 extern int g_halt_on_bad_read;        // defined in sim65816.c
@@ -44,6 +46,18 @@ extern int g_audio_enable;            // defined in sound.c
 // Start in fullscreen mode
 extern int g_fullscreen;              // defined in adb.c, because weird driver writing for x
 
+// Specify the joystick - SDL2
+extern int g_joystick_number;         // defined in joystick_driver.c
+extern int g_joystick_x_axis;         // defined in joystick_driver.c
+extern int g_joystick_y_axis;         // defined in joystick_driver.c
+extern int g_joystick_x2_axis;        // defined in joystick_driver.c
+extern int g_joystick_y2_axis;        // defined in joystick_driver.c
+extern int g_joystick_button_0;       // defined in joystick_driver.c
+extern int g_joystick_button_1;       // defined in joystick_driver.c
+extern int g_joystick_button_2;       // defined in joystick_driver.c
+extern int g_joystick_button_3;       // defined in joystick_driver.c
+
+
 // DEPRECATED: force bit depth (15/16/24) for X-Windows, might still work.
 extern int g_force_depth;             // defined in sim65816.c
 // DEPRECATED: Use X shared memory (MIT-SHM)
@@ -79,6 +93,15 @@ extern int g_cur_a2_stat;
 
 void help_exit();       // displays the cli help text and exits with 1
 
+int parse_int(const char *str1, int min, int max)
+{
+  int tmp;
+  tmp = strtol(str1, 0, 0);
+  if (tmp > max) { tmp = max; }
+  if (tmp < min) { tmp = min; }
+  printf ( "TMP %d\n", tmp);
+  return tmp;
+}
 int parse_cli_options(int argc, char **argv) { 
   int	i;
   int tmp1;
@@ -167,7 +190,86 @@ int parse_cli_options(int argc, char **argv) {
       glogf("%s Not using X shared memory", parse_log_prefix);
       g_use_shmem = 0;
     } else if(!strcmp("-joystick", argv[i])) {
-      glogf("%s Ignoring -joystick option", parse_log_prefix);
+      if((i+1) >= argc) {
+        glogf("%s Error, option '-joy' missing argument", parse_log_prefix);
+        exit(1);
+      }
+      tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
+      glogf("%s Setting joystick number %d", parse_log_prefix, tmp1);
+      g_joystick_number = tmp1;
+      i++;
+    } else if(!strcmp("-joy_x", argv[i])) {
+      if((i+1) >= argc) {
+        glogf("%s Error, option '-joy_x' missing argument", parse_log_prefix);
+        exit(1);
+      }
+      tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
+      glogf("%s Setting joystick X axis %d", parse_log_prefix, tmp1);
+      g_joystick_x_axis = tmp1;
+      i++;  
+    } else if(!strcmp("-joy_y", argv[i])) {
+      if((i+1) >= argc) {
+        glogf("%s Error, option '-joy_y' missing argument", parse_log_prefix);
+        exit(1);
+      }
+      tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
+      glogf("%s Setting joystick Y axis %d", parse_log_prefix, tmp1);
+      g_joystick_y_axis = tmp1;
+      i++;
+    } else if(!strcmp("-joy_x2", argv[i])) {
+        if((i+1) >= argc) {
+          glogf("%s Error, option '-joy_x2' missing argument", parse_log_prefix);
+          exit(1);
+        }
+        tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
+        glogf("%s Setting joystick X2 axis %d", parse_log_prefix, tmp1);
+        g_joystick_x2_axis = tmp1;
+        i++;  
+    } else if(!strcmp("-joy_y2", argv[i])) {
+        if((i+1) >= argc) {
+          glogf("%s Error, option '-joy_y2' missing argument", parse_log_prefix);
+          exit(1);
+        }
+        tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
+        glogf("%s Setting joystick Y2 axis %d", parse_log_prefix, tmp1);
+        g_joystick_y2_axis = tmp1;
+        i++;
+    } else if(!strcmp("-joy_b0", argv[i])) {
+        if((i+1) >= argc) {
+          glogf("%s Error, option '-joy_b0' missing argument", parse_log_prefix);
+          exit(1);
+        }
+        tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
+        glogf("%s Setting joystick Button 0 to Gamepad %d", parse_log_prefix, tmp1);
+        g_joystick_button_0 = tmp1;
+        i++;
+    } else if(!strcmp("-joy_b1", argv[i])) {
+        if((i+1) >= argc) {
+          glogf("%s Error, option '-joy_b1' missing argument", parse_log_prefix);
+          exit(1);
+        }
+        tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
+        glogf("%s Setting joystick Button 1 to Gamepad %d", parse_log_prefix, tmp1);
+        g_joystick_button_1 = tmp1;
+        i++;
+    } else if(!strcmp("-joy_b2", argv[i])) {
+        if((i+1) >= argc) {
+          glogf("%s Error, option '-joy_b2' missing argument", parse_log_prefix);
+          exit(1);
+        }
+        tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
+        glogf("%s Setting joystick Button 2 to Gamepad %d", parse_log_prefix, tmp1);
+        g_joystick_button_2 = tmp1;
+        i++;
+    } else if(!strcmp("-joy_b3", argv[i])) {
+        if((i+1) >= argc) {
+          glogf("%s Error, option '-joy_b3' missing argument", parse_log_prefix);
+          exit(1);
+        }
+        tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
+        glogf("%s Setting joystick Button 3 to Gamepad %d", parse_log_prefix, tmp1);
+        g_joystick_button_3 = tmp1;
+        i++;
     } else if(!strcmp("-dhr140", argv[i])) {
       glogf("%s Using simple dhires color map", parse_log_prefix);
       g_use_dhr140 = 1;
@@ -181,9 +283,7 @@ int parse_cli_options(int argc, char **argv) {
         glogf("%s Error, option '-scanline' missing argument", parse_log_prefix);
         exit(1);
       }
-      tmp1 = strtol(argv[i+1], 0, 0);
-      if (tmp1 > 100) { tmp1 = 100; }
-      if (tmp1 < 0) { tmp1 = 0; }
+      tmp1 = parse_int(argv[i+1], 0, 100);
       glogf("%s Setting scanline simulator darkness to %d%%", parse_log_prefix, tmp1);
       g_scanline_simulator = tmp1;
       i++;

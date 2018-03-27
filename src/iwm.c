@@ -263,7 +263,7 @@ iwm_flush_disk_to_unix(Disk *dsk)
 		return;
 	}
 
-	printf("Writing disk %s to Unix\n", dsk->name_ptr);
+	glogf("Writing disk %s to Unix\n", dsk->name_ptr);
 	dsk->disk_dirty = 0;
 	num_dirty = 0;
 
@@ -273,8 +273,7 @@ iwm_flush_disk_to_unix(Disk *dsk)
 		ret = disk_track_to_unix(dsk, j, &(buffer[0]));
 
 		if(ret != 1 && ret != 0) {
-			printf("iwm_flush_disk_to_unix ret: %d, cannot write "
-				"image to unix\n", ret);
+			glogf("iwm_flush_disk_to_unix ret: %d, cannot write image to unix\n", ret);
 			halt_printf("Adjusting image not to write through!\n");
 			dsk->write_through_to_unix = 0;
 			break;
@@ -307,8 +306,7 @@ iwm_flush_disk_to_unix(Disk *dsk)
 
 		ret = fwrite(&(buffer[0]), 1, unix_len, dsk->file);
 		if(ret != unix_len) {
-			printf("fwrite: %08x, errno:%d, qtrk: %02x, disk: %s\n",
-				ret, errno, j, dsk->name_ptr);
+			glogf("fwrite: %08x, errno:%d, qtrk: %02x, disk: %s\n", ret, errno, j, dsk->name_ptr);
 		}
 	}
 
@@ -383,17 +381,16 @@ iwm_vbl_update(int doit_3_persec)
 void
 iwm_show_stats()
 {
-	printf("IWM stats: q7,q6: %d, %d, reset,enable2: %d,%d, mode: %02x\n",
+	glogf("IWM stats: q7,q6: %d, %d, reset,enable2: %d,%d, mode: %02x\n",
 		iwm.q7, iwm.q6, iwm.reset, iwm.enable2, iwm.iwm_mode);
-	printf("motor: %d,%d, motor35:%d drive: %d, c031:%02x "
-		"phs: %d %d %d %d\n",
+	glogf("motor: %d,%d, motor35:%d drive: %d, c031:%02x phs: %d %d %d %d\n",
 		iwm.motor_on, iwm.motor_off, g_iwm_motor_on,
 		iwm.drive_select, g_c031_disk35,
 		iwm.iwm_phase[0], iwm.iwm_phase[1], iwm.iwm_phase[2],
 		iwm.iwm_phase[3]);
-	printf("iwm.drive525[0].file: %p, [1].file: %p\n",
+	glogf("iwm.drive525[0].file: %p, [1].file: %p\n",
 		iwm.drive525[0].file, iwm.drive525[1].file);
-	printf("iwm.drive525[0].last_phase: %d, [1].last_phase: %d\n",
+	glogf("iwm.drive525[0].last_phase: %d, [1].last_phase: %d\n",
 		iwm.drive525[0].last_phase, iwm.drive525[1].last_phase);
 }
 
@@ -574,11 +571,15 @@ iwm525_phase_change(int drive, int phase)
 
 	qtr_track += delta;
 	if(qtr_track < 0) {
-		printf("GRIND...");
+#if 1
+		printf("💾  ");
+#else
+	  printf("GRIND...");
+#endif
 		qtr_track = 0;
 	}
 	if(qtr_track > 4*34) {
-		printf("Disk arm moved past track 34, moving it back\n");
+		glogf("Disk arm moved past track 34, moving it back\n");
 		qtr_track = 4*34;
 	}
 

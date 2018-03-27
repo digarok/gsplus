@@ -1691,10 +1691,6 @@ adb_physical_key_update(int a2code, int is_up)
 			a2code = 0x3a;
 			special = 0;
 			break;
-		case 0x03: /* F3 - remap to escape for OS/2 */
-			a2code = 0x35;
-			special = 0;
-			break;
 		case 0x0c: /* F12 - remap to reset */
 			a2code = 0x7f;
 			special = 0;
@@ -1719,6 +1715,9 @@ adb_physical_key_update(int a2code, int is_up)
 
 	if(special && !is_up) {
 		switch(special) {
+		case 0x03: /* F3 - screenshot */
+			g_screenshot_requested = 1;
+			break;
 		case 0x04: /* F4 - emulator config panel */
       if (CMD_DOWN) {
           glog("Quit!");
@@ -1732,7 +1731,7 @@ adb_physical_key_update(int a2code, int is_up)
 			break;
 		case 0x05: /* F5 - emulator clipboard paste */
 			if (SHIFT_DOWN) {
-				g_screenshot_requested = 1;
+				// reserved
 			} else {
 				clipboard_paste();
 			}

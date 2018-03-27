@@ -7,6 +7,7 @@
 
 #include "defc.h"
 #include "glog.h"
+
 #ifdef __linux__
 # include <linux/joystick.h>
 # include <sys/time.h>
@@ -25,6 +26,8 @@
 SDL_Joystick *gGameController = NULL;
 #endif
 
+
+
 extern int g_joystick_native_type1;		/* in paddles.c */
 extern int g_joystick_native_type2;		/* in paddles.c */
 extern int g_joystick_native_type;		/* in paddles.c */
@@ -39,6 +42,99 @@ const char *g_joystick_dev = "/dev/input/js0";	/* default joystick dev file */
 int	g_joystick_native_fd = -1;
 int	g_joystick_num_axes = 0;
 int	g_joystick_num_buttons = 0;
+int g_joystick_number = 0;				// SDL2
+int g_joystick_x_axis = 0; 				// SDL2
+int g_joystick_y_axis = 1; 				// SDL2
+int g_joystick_button_0 = 0; 		 	// SDL2
+int g_joystick_button_1 = 1; 	  	// SDL2
+
+int g_joystick_x2_axis = 2; 				// SDL2
+int g_joystick_y2_axis = 3; 				// SDL2
+int g_joystick_button_2 = 2; 		 	// SDL2
+int g_joystick_button_3 = 3; 	  	// SDL2
+#define JOY2SUPPORT
+
+
+#if defined(HAVE_SDL) && !defined(JOYSTICK_DEFINED)
+# define JOYSTICK_DEFINED
+void
+joystick_init()
+{
+  int i;
+  if( SDL_Init( SDL_INIT_JOYSTICK ) < 0 ) {
+      glogf( "SDL could not initialize joystick! SDL Error: %s", SDL_GetError() );
+  } else {
+    glog("SDL2 joystick initialized");
+  }
+  if (SDL_NumJoysticks()<1) {
+    glog("No joysticks detected");
+    SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+  } else {
+		// @todo: make controller configurable
+		// @todo: add multiple controller support
+	  gGameController = SDL_JoystickOpen( g_joystick_number );
+	  if( gGameController == NULL ) {
+	    glogf( "Warning: Unable to open game controller! SDL Error: %s", SDL_GetError() );
+	  }
+	}
+  g_joystick_native_type = 2;
+  g_joystick_native_type1 = 2;
+	g_joystick_native_type2 = -1;
+  for(i = 0; i < 4; i++) {
+    g_paddle_val[i] = 180;
+  }
+  g_joystick_type = JOYSTICK_TYPE_NATIVE_1;
+  SDL_JoystickUpdate();
+  joystick_update(0.0);
+}
+
+void
+joystick_update(double dcycs)
+{
+  if (gGameController) {
+    SDL_JoystickUpdate();
+    g_paddle_val[0] = (int)SDL_JoystickGetAxis(gGameController, g_joystick_x_axis);   // default is 0
+    g_paddle_val[1] = (int)SDL_JoystickGetAxis(gGameController, g_joystick_y_axis);   // default is 1
+    g_paddle_val[2] = (int)SDL_JoystickGetAxis(gGameController, g_joystick_x2_axis);  // default is 2
+    g_paddle_val[3] = (int)SDL_JoystickGetAxis(gGameController, g_joystick_y2_axis);  // default is 3
+  
+    if (SDL_JoystickGetButton(gGameController, g_joystick_button_0)) {
+			g_paddle_buttons = g_paddle_buttons | 1;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~1);
+		}
+    if (SDL_JoystickGetButton(gGameController, g_joystick_button_1)) {
+			g_paddle_buttons = g_paddle_buttons | 2;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~2);
+		}
+    if (SDL_JoystickGetButton(gGameController, g_joystick_button_2)) {
+			g_paddle_buttons = g_paddle_buttons | 4;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~4);
+		}
+    if (SDL_JoystickGetButton(gGameController, g_joystick_button_3)) {
+			g_paddle_buttons = g_paddle_buttons | 8;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~8);
+		}
+    paddle_update_trigger_dcycs(dcycs);
+  }
+}
+
+void
+joystick_update_buttons()
+{
+}
+
+void joystick_shut() {
+  SDL_JoystickClose( gGameController );
+  gGameController = NULL;
+}
+#endif
+
+
+
 
 
 #if defined(__linux__) && !defined(JOYSTICK_DEFINED)
@@ -243,72 +339,6 @@ joystick_update_buttons()
 #endif
 
 
-#if defined(HAVE_SDL) && !defined(JOYSTICK_DEFINED)
-# define JOYSTICK_DEFINED
-void
-joystick_init()
-{
-  int i;
-  if( SDL_Init( SDL_INIT_JOYSTICK ) < 0 ) {
-      glogf( "SDL could not initialize joystick! SDL Error: %s", SDL_GetError() );
-  } else {
-    glog("SDL2 joystick initialized");
-  }
-  if (SDL_NumJoysticks()<1) {
-    glog("No joysticks detected");
-    SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-  } else {
-		// @todo: make controller configurable
-		// @todo: add multiple controller support
-	  gGameController = SDL_JoystickOpen( 0 );
-	  if( gGameController == NULL ) {
-	    glogf( "Warning: Unable to open game controller! SDL Error: %s", SDL_GetError() );
-	  }
-	}
-  g_joystick_native_type = 2;
-  g_joystick_native_type1 = 2;
-	g_joystick_native_type2 = -1;
-  for(i = 0; i < 4; i++) {
-    g_paddle_val[i] = 180;
-  }
-  g_joystick_type = JOYSTICK_TYPE_NATIVE_1;
-  SDL_JoystickUpdate();
-  joystick_update(0.0);
-}
-
-void
-joystick_update(double dcycs)
-{
-  if (gGameController) {
-    SDL_JoystickUpdate();
-    g_paddle_val[0] = (int)SDL_JoystickGetAxis(gGameController, 0);
-    g_paddle_val[1] = (int)SDL_JoystickGetAxis(gGameController, 1);
-    if (SDL_JoystickGetButton(gGameController, 0)) {
-			g_paddle_buttons = g_paddle_buttons | 1;
-		} else {
-			g_paddle_buttons = g_paddle_buttons & (~1);
-		}
-    if (SDL_JoystickGetButton(gGameController, 1)) {
-			g_paddle_buttons = g_paddle_buttons | 2;
-		} else {
-			g_paddle_buttons = g_paddle_buttons & (~2);
-		}
-    paddle_update_trigger_dcycs(dcycs);
-  }
-
-}
-
-void
-joystick_update_buttons()
-{
-}
-
-void joystick_shut() {
-  SDL_JoystickClose( gGameController );
-  gGameController = NULL;
-}
-#endif
-
 
 
 
@@ -338,7 +368,6 @@ joystick_update_buttons()
 {
 }
 
-// OG
 void joystick_shut()
 {
 }

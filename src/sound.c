@@ -252,7 +252,7 @@ sound_init_general()
 {
 
 /* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__) && !defined(HAVE_SDL)
+#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(HAVE_SDL)
 	int	pid;
 	int	shmid;
 	int	tmp;
@@ -264,7 +264,7 @@ sound_init_general()
 	int	ret;
 
 /* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__) && !defined(HAVE_SDL)
+#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(HAVE_SDL)
 	if(!g_use_shmem) {
 		if(g_audio_enable < 0) {
 			printf("Defaulting audio off for slow X display\n");
@@ -282,7 +282,7 @@ sound_init_general()
 
 	size = SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE;
 /* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__)	&& !defined(HAVE_SDL)
+#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(HAVE_SDL)
 	shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0777);
 	if(shmid < 0) {
 		printf("sound_init: shmget ret: %d, errno: %d\n", shmid, errno);
@@ -312,7 +312,7 @@ sound_init_general()
 
 	fflush(stdout);
 /* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(MAC) && !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(__OS2__) && !defined(HAVE_SDL)
+#if !defined(MAC) && !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(HAVE_SDL)
 	/* prepare pipe so parent can signal child each other */
 	/*  pipe[0] = read side, pipe[1] = write end */
 	ret = pipe(&g_pipe_fd[0]);
@@ -368,7 +368,6 @@ sound_init_general()
 	win32snd_init(shmaddr);
 # elif defined (MAC) && !defined(HAVE_SDL)
   macsnd_init(shmaddr);
-# elif defined (__OS2__)
 # endif
 #endif
 
@@ -377,7 +376,6 @@ sound_init_general()
 void
 parent_sound_get_sample_rate(int read_fd)
 {
-#ifndef __OS2__
 	word32	tmp;
 	int	ret;
 
@@ -390,7 +388,6 @@ parent_sound_get_sample_rate(int read_fd)
 	close(read_fd);
 
 	set_audio_rate(tmp);
-#endif
 }
 
 void
@@ -440,7 +437,6 @@ sound_shutdown()
 
 #ifdef WIN_SOUND	/* Workaround - gcc in cygwin wasn't defining _WIN32 */
 	win32snd_shutdown();
-#elif defined(__OS2__)
 #elif defined(HAVE_SDL)
   if((g_audio_enable != 0)) {
     //sdlsnd_shutdown();
@@ -644,8 +640,6 @@ send_sound(int real_samps, int size)
 	child_sound_playit(tmp);
 #elif defined(HAVE_SDL)
 	sound_write_sdl( real_samps,  size);
-#elif defined(__OS2__)
-
 #else
 	/* Although this looks like a big/little-endian issue, since the */
 	/*  child is also reading an int, it just works with no byte swap */

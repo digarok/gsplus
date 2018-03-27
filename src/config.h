@@ -5,16 +5,14 @@
 	See COPYING.txt for license (GPL v2)
 */
 
-#define CONF_BUF_LEN		1024
-#define COPY_BUF_SIZE		4096
+#define CONF_BUF_LEN				1024
+#define COPY_BUF_SIZE				4096
 #define CFG_PRINTF_BUFSIZE	2048
-
-#define CFG_PATH_MAX		1024
-
-#define CFG_NUM_SHOWENTS	16
+#define CFG_PATH_MAX				1024
+#define CFG_NUM_SHOWENTS		16
 
 #define CFGTYPE_MENU		1
-#define CFGTYPE_INT		2
+#define CFGTYPE_INT		  2
 #define CFGTYPE_DISK		3
 #define CFGTYPE_FUNC		4
 #define CFGTYPE_FILE		5

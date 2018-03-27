@@ -1231,9 +1231,6 @@ io_read(word32 loc, double *cyc_ptr)
 {
 	double	dcycs;
 	word64	word64_tmp;
-#if 0
-	double	fcyc, new_fcyc;
-#endif
 	word32	mask;
 	int new_lcbank2;
 	int new_wrdefram;
@@ -1746,9 +1743,6 @@ void
 io_write(word32 loc, int val, double *cyc_ptr)
 {
 	double	dcycs;
-#if 0
-	double	fcyc, new_fcyc;
-#endif
 	int	new_tmp;
 	int	new_lcbank2;
 	int	new_wrdefram;

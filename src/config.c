@@ -48,6 +48,33 @@ extern int g_fatal_log;
 
 extern word32 g_adb_repeat_vbl;
 
+extern int g_audio_enable;
+extern int g_preferred_rate;
+extern int g_fullscreen;
+extern int g_highdpi;
+extern int g_borderless;
+extern int g_resizeable;
+extern int g_screen_redraw_skip_amt;
+extern int g_use_dhr140;
+extern int g_use_bw_hires;
+extern int g_scanline_simulator;
+extern int g_startx;
+extern int g_starty;
+extern int g_joystick_number;
+extern int g_joystick_x_axis;
+extern int g_joystick_y_axis;
+extern int g_joystick_x2_axis;
+extern int g_joystick_y2_axis;
+extern int g_joystick_button_0;
+extern int g_joystick_button_1;
+extern int g_joystick_button_2;
+extern int g_joystick_button_3;
+extern int g_ethernet;
+extern int g_halt_on_bad_read;
+extern int g_ignore_bad_acc;
+extern int g_ignore_halts;
+extern int g_dbg_enable_port;
+
 extern int halt_sim;
 extern int g_limit_speed;
 extern int g_force_depth;
@@ -167,6 +194,37 @@ int g_cfg_file_dir_only = 0;
 extern Cfg_menu g_cfg_main_menu[];
 
 #define KNMP(a)		&a, #a, 0
+
+// This first menu is not a menu, but a list of config options that are 
+// represented here so they will be parsed correctly out of the config files.
+Cfg_menu g_cfg_uiless_menu[] = {
+	{ "", KNMP(g_audio_enable), CFGTYPE_INT },
+	{ "", KNMP(g_preferred_rate), CFGTYPE_INT },
+	{ "", KNMP(g_fullscreen), CFGTYPE_INT },
+	{ "", KNMP(g_highdpi), CFGTYPE_INT },
+	{ "", KNMP(g_borderless), CFGTYPE_INT },
+	{ "", KNMP(g_resizeable), CFGTYPE_INT },
+	{ "", KNMP(g_screen_redraw_skip_amt), CFGTYPE_INT },
+	{ "", KNMP(g_use_dhr140), CFGTYPE_INT },
+	{ "", KNMP(g_use_bw_hires), CFGTYPE_INT },
+	{ "", KNMP(g_scanline_simulator), CFGTYPE_INT },
+	{ "", KNMP(g_startx), CFGTYPE_INT },
+	{ "", KNMP(g_starty), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_number), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_x_axis), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_y_axis), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_x2_axis), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_y2_axis), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_button_0), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_button_1), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_button_2), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_button_3), CFGTYPE_INT },
+	{ "", KNMP(g_ethernet), CFGTYPE_INT },
+	{ "", KNMP(g_halt_on_bad_read), CFGTYPE_INT },
+	{ "", KNMP(g_ignore_bad_acc), CFGTYPE_INT },
+	{ "", KNMP(g_ignore_halts), CFGTYPE_INT }
+};
+
 
 Cfg_menu g_cfg_disk_menu[] = {
 { "Disk Configuration", g_cfg_disk_menu, 0, 0, CFGTYPE_MENU },
@@ -389,10 +447,8 @@ Cfg_menu g_cfg_main_menu[] = {
 { "Virtual ImageWriter Configuration", g_cfg_imagewriter_menu, 0, 0, CFGTYPE_MENU },
 #endif
 { "Developer Options", g_cfg_devel_menu, 0, 0, CFGTYPE_MENU },
-{ "Auto-update configuration file,0,Manual,1,Immediately",
-		KNMP(g_config_gsplus_auto_update), CFGTYPE_INT },
-{ "Speed,0,Unlimited,1,1.0MHz,2,2.8MHz,3,8.0MHz (Zip)",
-		KNMP(g_limit_speed), CFGTYPE_INT },
+{ "Auto-update configuration file,0,Manual,1,Immediately", KNMP(g_config_gsplus_auto_update), CFGTYPE_INT },
+{ "Speed,0,Unlimited,1,1.0MHz,2,2.8MHz,3,8.0MHz (Zip)", KNMP(g_limit_speed), CFGTYPE_INT },
 { "Expansion Mem Size,0,0MB,0x100000,1MB,0x200000,2MB,0x300000,3MB,"
 	"0x400000,4MB,0x600000,6MB,0x800000,8MB,0xa00000,10MB,0xc00000,12MB,"
 	"0xe00000,14MB", KNMP(g_mem_size_exp), CFGTYPE_INT },
@@ -551,6 +607,7 @@ config_init()
 	int	can_create;
 
 	config_init_menus(g_cfg_main_menu);
+	config_init_menus(g_cfg_uiless_menu);
 
 	// Find the configuration file
 	g_config_gsplus_name[0] = 0;
@@ -1037,8 +1094,7 @@ config_parse_config_gsplus_file()
 	fconf = fopen(g_config_gsplus_name, "r");
 	if(fconf == 0) {
 		perror("ERROR");
-		fatal_printf("Cannot open configuration file at %s!  Stopping!\n",
-				g_config_gsplus_name);
+		fatal_printf("Cannot open configuration file at %s!  Stopping!\n",g_config_gsplus_name);
 		my_exit(3);
 	}
 
@@ -1324,7 +1380,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 	int	cmp_o, cmp_p, cmp_dot;
 	int	cmp_b, cmp_i, cmp_n;
 	int	can_write;
-	int	len;
+	int	len = 0;
 	int	nibs;
 	int	unix_pos;
 	int	name_len;
