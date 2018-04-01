@@ -1,4 +1,4 @@
-TARGET = gsplus
+TARGET = GSplus.app
 NAME = gsplus
 PERL = perl
 CC = clang
