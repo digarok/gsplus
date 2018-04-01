@@ -23,7 +23,7 @@ all: $(TARGET)
 
 clean:
 	- rm -f $(OBJECTS)
-	- rm -f $(TARGET)
+	- rm -rf $(TARGET)
 	- rm -f compile_time.o
 	- rm -f 8inst_c.h
 	- rm -f 16inst_c.h
@@ -81,32 +81,14 @@ gsplus.exe: $(OBJECTS) compile_time.o
 	#cp -f ../COPYING.txt ../GSplus.app
 	cp gsplus.exe ..
 
-# NOT CURRENTLY SUPPORTED
-# Mac build - old style (deprecated)
-gsportmac: $(OBJECTS) compile_time.o
-	$(CC) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o gsport $(EXTRA_LIBS)
-	mkdir -p ../GSport.app/Contents/Resources/English.lproj/main.nib
-	mkdir -p ../GSport.app/Contents/MacOS
-	mv gsport ../GSport.app/Contents/MacOS/GSport
-	echo "APPL????" > ../GSport.app/Contents/PkgInfo
-	cp -f arch/mac/Info.plist ../GSport.app/Contents/
-	cp -f arch/mac/info.nib ../GSport.app/Contents/Resources/English.lproj/main.nib
-	cp -f arch/mac/classes.nib ../GSport.app/Contents/Resources/English.lproj/main.nib
-	cp -f arch/mac/objects.xib ../GSport.app/Contents/Resources/English.lproj/main.nib
-	cp -f arch/mac/gsporticon.icns ../GSport.app/Contents/Resources/
-	cp -f arch/mac/525.icns ../GSport.app/Contents/Resources/
-	cp -f arch/mac/2mg.icns ../GSport.app/Contents/Resources/
-	touch '../GSport.app/Icon?'
-	rm -rf ../GSportDmg
-	mkdir ../GSportDmg
-	mkdir ../GSportDmg/GSport
-	cp ../COPYING.txt ../GSportDmg/GSport
-	cp -f parallel.rom ../GSportDmg/GSport
-	cp -f ../lib/NoBoot.po ../GSportDmg/GSport
-	mv ../GSport.app ../GSportDmg/GSport
-	cp -f ../config.template ../GSportDmg/GSport/config.txt
-	cp ../GSport.html ../GSportDmg/GSport/GSport.html
-	arch/mac/makedmg.sh .. GSportDmg GSport GSport 7
+# macOS application package
+GSplus.app: gsplus
+	mkdir -p GSplus.app/Contents/Resources
+	mkdir -p GSplus.app/Contents/MacOS
+	cp gsplus GSplus.app/Contents/MacOS
+	cp -f ../assets/Info.plist GSplus.app/Contents/
+	cp -f ../assets/gsp-icons.icns ../assets/gsp-dmg-icons.icns GSplus.app/Contents/Resources/
+	cp -r GSplus.app ../
 
 8inst_c.h: instable.h
 	$(PERL) make_inst c 8 instable.h > 8inst_c.h
