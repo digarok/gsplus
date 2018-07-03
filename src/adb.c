@@ -32,6 +32,7 @@ extern word32 g_vbl_count;
 extern int g_num_lines_prev_superhires640;
 extern int g_num_lines_prev_superhires;
 extern int g_rom_version;
+extern int g_a2rom_version;
 extern int g_fast_disk_emul;
 extern int g_limit_speed;
 extern int g_irq_pending;
@@ -1257,7 +1258,10 @@ update_mouse(int x, int y, int button_states, int buttons_valid)
 		if( (g_mouse_ctl_addr == g_mouse_dev_addr) &&
 						((g_adb_mode & 0x2) == 0)) {
 			g_adb_mouse_valid_data = 1;
-			adb_add_mouse_int();
+			if (mouse_moved || g_a2rom_version == 'g')
+				/* A2C only interrupts on mouse move
+				   and Prodos8 does not like unexplained interrupts */
+				adb_add_mouse_int();
 		}
 	}
 
@@ -1267,6 +1271,13 @@ update_mouse(int x, int y, int button_states, int buttons_valid)
 int
 mouse_read_c024(double dcycs)
 {
+	return mouse_read_c024_clamp(dcycs, 0x3f);
+}
+
+int
+mouse_read_c024_clamp(double dcycs, int clamp)
+{
+
 	word32	ret;
 	word32	tool_start;
 	int	em_active;
@@ -1294,18 +1305,18 @@ mouse_read_c024(double dcycs)
 	delta_y = target_y - g_mouse_a2_y;
 
 	clamped = 0;
-	if(delta_x > 0x3f) {
-		delta_x = 0x3f;
+	if(delta_x > clamp) {
+		delta_x = clamp;
 		clamped = 1;
-	} else if(delta_x < -0x3f) {
-		delta_x = -0x3f;
+	} else if(delta_x < -clamp) {
+		delta_x = -clamp;
 		clamped = 1;
 	}
-	if(delta_y > 0x3f) {
-		delta_y = 0x3f;
+	if(delta_y > clamp) {
+		delta_y = clamp;
 		clamped = 1;
-	} else if(delta_y < -0x3f) {
-		delta_y = -0x3f;
+	} else if(delta_y < -clamp) {
+		delta_y = -clamp;
 		clamped = 1;
 	}
 

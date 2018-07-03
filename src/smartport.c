@@ -461,6 +461,7 @@ void
 do_c70a(word32 arg0)
 {
 	int	cmd, unit;
+	int     rts_lo, rts_hi;
 	int	buf_lo, buf_hi;
 	int	blk_lo, blk_hi;
 	int	blk, buf;
@@ -494,11 +495,11 @@ do_c70a(word32 arg0)
 	smartport_log(0xc70a, cmd, blk, buf);
 
 	engine.psr &= ~1;	/* clear carry */
-	if(g_rom_version >= 3) {
-		engine.kpc = 0xc764;
-	} else {
-		engine.kpc = 0xc765;
-	}
+	engine.stack = ((engine.stack + 1) & 0xff) + 0x100;
+	rts_lo = get_memory_c(engine.stack, 0);
+	engine.stack = ((engine.stack + 1) & 0xff) + 0x100;
+	rts_hi = get_memory_c(engine.stack, 0);
+	engine.kpc = ((rts_hi << 8) + rts_lo + 1) & 0xffff;
 
 	ret = 0x27;	/* I/O error */
 	if(cmd == 0x00) {
@@ -786,6 +787,12 @@ do_c700(word32 ret)
 
 	if(ret != 0) {
 		printf("Failure reading boot disk in s7d1!\n");
-		engine.kpc = 0xff59;	/* Jump to monitor, fix $36-$39 */
+                if (get_memory16_c(0x00,0) == 0xc700) {
+			/* Try next slot if we're processing a cold reset */
+			set_memory16_c(0x00,0xc600,0);
+			engine.kpc = 0xc600;
+		} else {
+			engine.kpc = 0xff59;	/* Jump to monitor, fix $36-$39 */
+		}
 	}
 }

@@ -124,6 +124,7 @@ void write_adb_ram(word32 addr, int val);
 int adb_get_keypad_xy(int get_y);
 int update_mouse(int x, int y, int button_states, int buttons_valid);
 int mouse_read_c024(double dcycs);
+int mouse_read_c024_clamp(double dcycs, int clamp);
 void mouse_compress_fifo(double dcycs);
 void adb_key_event(int a2code, int is_up);
 word32 adb_read_c000(void);
@@ -350,6 +351,9 @@ void iwm_show_a_track(Trk *trk);
 
 /* moremem.c */
 void moremem_init(); // OG Added moremem_init()
+int mig_changedrive(int);
+void mig_checkwhead(Disk*,int);
+void fixup_mig(void);
 void fixup_brks(void);
 void fixup_hires_on(void);
 void fixup_bank0_2000_4000(void);

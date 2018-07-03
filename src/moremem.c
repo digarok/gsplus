@@ -47,6 +47,7 @@ extern Page_info page_info_rd_wr[];
 
 extern int Verbose;
 extern int g_rom_version;
+extern int g_a2rom_version;
 extern int g_user_page2_shadow;
 extern int g_parallel;
 
@@ -55,7 +56,6 @@ char c;
 int	g_num_shadow_all_banks = 0;
 
 #define IOR(val) ( (val) ? 0x80 : 0x00 )
-
 
 extern int g_cur_a2_stat;
 
@@ -76,8 +76,9 @@ int	g_c03ef_doc_ptr = 0;
 int	g_c041_val = 0;		/* C041_EN_25SEC_INTS, C041_EN_MOVE_INTS */
 int	g_c046_val = 0;
 int	g_c05x_annuncs = 0;
-int	g_c068_statereg = 0;
+int	g_c068_statereg = 0x0c;
 int	g_c08x_wrdefram = 0;
+int	g_c08x_q3defram = 0;
 int	g_zipgs_unlock = 0;
 int	g_zipgs_reg_c059 = 0x5f;
 	// 7=LC cache dis, 6==5ms paddle del en, 5==5ms ext del en,
@@ -138,6 +139,256 @@ Emustate_word32list g_emustate_word32list[] = {
 	EMUSTATE(g_mem_size_total),
 	{ 0, 0, }
 };
+
+
+/* ============================================================ 
+ * APPLE 2C STUFF
+ * The Apple 2c and 2e ensure compatibility with the older models in
+ * sometimes different ways. In this respect, the 2gs descends from
+ * the 2e. Running the Apple 2c roms therefore was much more of a
+ * challenge. The io_read()/io_write() routines handle the differences
+ * using the contents of g_a2rom_version variable which detects the
+ * type of the loaded rom, "c" for the 2c, and "C" for the 2c+.  When
+ * using an Apple 2c rom that supports a ram extension card, the ram
+ * pages 02 to 0A (1MB max) are allocated to the extension card.
+ * Under prodos8, they appear as a RAM disk.
+ */
+
+#define A2CROM ((g_a2rom_version | 0x20) == 'c')
+
+int	g_slinky_addr = 0; /* ram extension virtual drive */
+int	g_a2c_ioudis = 1;  /* gates access to the iou */
+
+
+/* ============================================================ 
+ * APPLE 2C MOUSE EMULATION
+ * The Apple 2c mouse is not very smart. The following routine is
+ * called by io_read/io_write() when one reads or writes the 2c mouse
+ * registers. It pumps the mouse state from the kegs adb emulation.
+ * It depends on a new entry point in the adb code,
+ * mouse_read_c024_clamp(), and also on a change that only emits mouse
+ * interrupts when the mouse is moved but not when the button is
+ * pressed.
+ */
+
+int	g_a2c_mouse = 0; /* BUTTON 0 DIRX DIRY XINT YINT XEDGE YEDGE */
+double	g_a2c_mousdcycs = 0;
+
+int
+emulate_a2c_mouse(double dcycs)
+{
+	int astatus;
+
+	if ((g_a2c_mouse & 0xc) && (dcycs < g_a2c_mousdcycs))
+		return g_a2c_mouse;
+
+	astatus = adb_read_c027();
+	if (astatus & 0x80) {
+		int i,xflag,delta[2];
+		g_a2c_mousdcycs = dcycs + 2000; 
+		g_a2c_mouse &= 0xf;
+		delta[0] = delta[1] = 0;
+		xflag = (astatus & 0x2) ? 1 : 0;
+		for (i=0; i<2 ;i++) {
+			int amouse = mouse_read_c024_clamp(dcycs, 1);
+			delta[xflag] = (amouse & 0x7f);
+			if (xflag) { g_a2c_mouse |= ((~amouse) & 0x80); }
+			xflag ^= 1;
+		}
+		if (delta[0] & 0x3f)
+			g_a2c_mouse |= ((delta[0] & 0x40) ? 0x08 : 0x28);
+		if (delta[1] & 0x3f)
+			g_a2c_mouse |= ((delta[1] & 0x40) ? 0x14 : 0x04);
+	}
+	return g_a2c_mouse; // BUTTON 0 DIRX DIRY XINT YINT XEDGE YEDGE 
+}
+
+
+/* ============================================================ 
+ * APPLE 2C PLUS MIG CHIP
+ * Although the Apple 2c plus uses the same Apple 3.5" drives as the
+ * 2gs, they are accessed through the MIG chip and a 2K static ram
+ * cache.  This was an interesting challenge because the MIG is very
+ * poorly documented. According to some sources, the MIG was designed
+ * to allow a 1Mhz 65c02 to keep up with the 3.5" drive timing
+ * requirements. Although the self-incrementing bank register might
+ * help a bit, I remain unconvinced. On the other hand, the MIG also
+ * manages a complex bus with one internal apple 3.5" drive, up to two
+ * external apple 3.5" drives (yes that makes three on slot 5), many
+ * smartport bus devices such as the Unidrive 3.5", and two disk ][
+ * compatible drives assigned to slot 6.  Besides understanding how
+ * the MIG does it, we need to map the internal drive (technically a
+ * d2) on s5d1, map the first external drive (technically a d1) to
+ * s5d2, and cause the firmware to decide that there is no third
+ * external drive (technically a d2.)
+ */
+
+int	g_mig_bank = 0x00;
+int	g_mig_state = 0x00; /* 000000 INTEN 35SEL */  
+
+void
+mig_changedisk35(int disk35)
+{
+	int n_c031_disk35 = g_c031_disk35 & ~0x40;
+	n_c031_disk35 |= (disk35) ? 0x40 : 0x00;
+	n_c031_disk35 ^= g_c031_disk35;
+	g_c031_disk35 ^= n_c031_disk35;
+	if (n_c031_disk35 & 0x40)
+		set_halt(HALT_EVENT);
+}
+
+void
+mig_changestate(int n_mig_state)
+{
+	/* Invariants:
+           1) When (g_mig_state && g_iwm_motor_on), 
+              variable iwm.drive_select is inverted 
+              relative to the c0ea/c0eb iwm switches.
+	   2) Outside of io_read/io_write(), the 2gs bit
+	      c031.35sel remains equal to g_mig_state && 
+	      g_iwm_motor_on && (inten != drive_select) */
+	extern Iwm iwm;
+	extern int g_iwm_motor_on;
+	if (g_a2rom_version == 'C') {
+		int invert = n_mig_state && g_iwm_motor_on;
+		int oldinvert = g_mig_state && g_iwm_motor_on;
+		int inten = (n_mig_state & 0x2) ? 1 : 0;
+		if (invert != oldinvert)
+			iwm.drive_select ^= 1;
+		mig_changedisk35(invert && (iwm.drive_select != inten));
+	}
+	g_mig_state = n_mig_state;
+}
+
+void
+mig_changemotor(int motor)
+{
+	/* Same invariants. Called before iwm on c0e8/c0e9 */
+	extern Iwm iwm;
+	extern int g_iwm_motor_on;
+	if (g_a2rom_version == 'C') {
+		int invert = g_mig_state && motor;
+		int oldinvert = g_mig_state && g_iwm_motor_on;
+		int inten = (g_mig_state & 0x2) ? 1 : 0;
+		if (invert != oldinvert)
+			iwm.drive_select ^= 1;
+		mig_changedisk35(invert && (iwm.drive_select != inten));
+	}
+}
+
+int
+mig_changedrive(int drive)
+{
+	/* Same invariants. Called from iwm_touch_switches() in iwm.c */
+	extern int g_iwm_motor_on;
+	if (g_a2rom_version == 'C') {
+		int invert = g_mig_state && g_iwm_motor_on;
+		int inten = (g_mig_state & 0x2) ? 1 : 0;
+		drive ^= invert;
+		mig_changedisk35(invert && (drive != inten));
+	}
+	return drive;
+}
+
+void
+mig_checkwhead(Disk *dsk, int newq7)
+{
+	/* The 2c+ floppy formatting code apparently switches the
+	   writing head without hitting iwm_read_status35(). Merely
+	   changing the HDSEL line seems enough. These 3.5 drives
+	   still have some secrets. This function is called from
+	   iwm_touch_switches() to patch the active head. under narrow
+	   conditions that are sufficient for the formatting code. */
+	extern Iwm iwm;
+	extern int g_iwm_motor_on;
+	if (g_a2rom_version == 'C' && g_iwm_motor_on) {
+		int head35 = (g_c031_disk35 & 0x80) ? 1 : 0;
+		if (iwm.q6 && !iwm.q7 && newq7	/* 10>11 q6q7 transition */
+		    && dsk->disk_525 == 0	/* 3.5 drive */
+		    && head35 != iwm.head35 ) {	/* head changed */
+			iwm.head35 = head35;
+			iwm_move_to_track(dsk, ((dsk->cur_qtr_track&~1)|head35));
+		}
+	}
+}
+
+void
+fixup_mig(void)
+{
+	/* This is called when rombank changes.
+	   The mig RESET and IOSEL inputs are both tied to ROM's A14 line */
+	if (g_a2rom_version == 'C') 
+		if (! (g_c068_statereg & 0x02)) { 
+			g_mig_bank = 0;        
+			mig_changestate(0);
+		}
+}
+
+
+int
+mig_read(int loc)
+{
+        /* We use e0/1000-1800 for the mig ram. */
+	int ret = g_slow_memory_ptr[0x1000+g_mig_bank+(loc&0x1f)];
+	switch (loc & 0xfe0) {
+	case 0xe20:             /* Shift memory bank */
+		g_mig_bank = (g_mig_bank + 0x20) & 0xfff;
+		break;
+	case 0xe40:             /* Reset pin hdsel */
+		g_c031_disk35 &= ~0x80;
+		break;
+	case 0xe60:             /* Set pin hdsel */
+		g_c031_disk35 |= 0x80;
+		break;
+	case 0xea0:             /* Clear bank pointer */
+		g_mig_bank = 0;
+		break;
+	default:
+		break;
+	}
+	return ret;
+}
+		
+void
+mig_write(int loc, int val)
+{
+	switch (loc & 0xfe0) {
+	case 0xc40:             /* IWM reset (guess) */
+		if (g_c031_disk35 & 0x40)
+			set_halt(HALT_EVENT);
+		mig_changemotor(0);
+		iwm_reset();
+		break;;
+	case 0xc80:             /* IWM dr2 goes to internal disk */
+		mig_changestate(g_mig_state | 2);
+		break;
+	case 0xcc0:             /* IWM dr2 goes to db19 connector */
+		mig_changestate(g_mig_state & ~2);
+		break;
+	case 0xe00:
+		g_slow_memory_ptr[0x1000+g_mig_bank+(loc&0x1f)] = val;
+		break;;
+	case 0xe20:
+		g_slow_memory_ptr[0x1000+g_mig_bank+(loc&0x1f)] = val;
+		g_mig_bank = (g_mig_bank + 0x20) & 0xfff;
+		break;;
+	case 0xe40:             /* Set 3.5 signal on db19 connector */
+		mig_changestate(g_mig_state | 1);
+		break;
+	case 0xe60:             /* Reset 3.5 signal on db19 connector */
+		mig_changestate(g_mig_state & ~1);
+		break;
+	case 0xea0:
+		g_mig_bank = 0;
+		break;
+	default:
+		break;
+	}
+}
+
+
+/* ============================================================ */
+
 
 
 #define UNIMPL_READ	\
@@ -413,6 +664,8 @@ fixup_intcx()
 				rom_inc = SET_BANK_IO;
 				if(((g_c02d_int_crom & mask) == 0) || INTCX) {
 					rom_inc = rom10000 + (j << 8);
+					if((g_c068_statereg & 0x02) && A2CROM)
+						rom_inc -= 0x10000;
 				} else {
 					// User-slot rom
 					rom_inc = &(g_rom_cards_ptr[0]) +
@@ -427,6 +680,12 @@ fixup_intcx()
 			if(((g_c02d_int_crom & (1 << 3)) == 0) || INTCX) 
 			{				
 				rom_inc = rom10000 + (j << 8);
+ 				if(g_c068_statereg & 0x02) {
+ 					if((g_a2rom_version == 'C') && (j >= 0xce))
+ 						rom_inc = SET_BANK_IO; /* mig */
+ 					else
+ 						rom_inc -= 0x10000;
+ 				}
 			}
 			else 	
 			{
@@ -441,9 +700,12 @@ fixup_intcx()
 		}
 	}
 	if(!no_io_shadow) {
-		SET_PAGE_INFO_RD(0xc7, SET_BANK_IO);		/* smartport */
-	}
-	fixup_brks();
+ 		if ((g_c02d_int_crom & 0x80) && !INTCX) {
+ 			SET_PAGE_INFO_RD(0xc7, SET_BANK_IO); /* smartport */
+ 		}
+  	}
+  	fixup_brks();
+ 	fixup_mig();
 }
 
 void
@@ -571,6 +833,8 @@ fixup_altzp()
 		}
 		if(rdrom) {
 			mem0rd = &(g_rom_fc_ff_ptr[0x3d000]);
+			if((g_c068_statereg & 0x02) && A2CROM)
+				mem0rd -= 0x10000;
 		}
 		fixup_any_bank_any_page(0xd0, 0x10, mem0rd, mem0wr);
 	}
@@ -586,6 +850,8 @@ fixup_altzp()
 	}
 	if(rdrom) {
 		mem0rd = &(g_rom_fc_ff_ptr[0x3e000]);
+		if((g_c068_statereg & 0x02) && A2CROM)
+			mem0rd -= 0x10000;
 	}
 	fixup_any_bank_any_page(0xe0, 0x20, mem0rd, mem0wr);
 
@@ -754,6 +1020,8 @@ fixup_lcbank2()
 		}
 		if((k < 2) && rdrom) {
 			mem0rd = &(g_rom_fc_ff_ptr[0x30000]);
+			if((g_c068_statereg & 0x02) && A2CROM)
+				mem0rd -= 0x10000;
 		}
 		fixup_any_bank_any_page(off*0x100 + 0xd0, 0x10,
 					mem0rd + 0xd000, mem0wr + 0xd000);
@@ -781,6 +1049,8 @@ fixup_rdrom()
 		if((g_c035_shadow_reg & 0x40) == 0) {
 			if(RDROM) {
 				mem0rd = &(g_rom_fc_ff_ptr[0x30000]);
+				if((g_c068_statereg & 0x02) && A2CROM)
+					mem0rd -= 0x10000;
 			}
 		}
 		for(j = 0xe0; j < 0x100; j++) {
@@ -835,11 +1105,17 @@ set_statereg(double dcycs, int val)
 
 	if(_xor & 0x02) {
 		/* ROMBANK */
-		halt_printf("Just set rombank = %d\n", ROMB);
+ 		fixup_rdrom();
+ 		fixup_intcx();
 	}
 
 	if(_xor & 0x01) {
-		fixup_intcx();
+ 		if (A2CROM)
+ 			/* The Prodos relocation code clears this bit */
+ 			/* This is bad on a 2c because it has no slots, */
+ 			g_c068_statereg |= 0x1;
+ 		else
+ 			fixup_intcx();
 	}
 
 	if(_xor) {
@@ -1231,9 +1507,16 @@ io_read(word32 loc, double *cyc_ptr)
 		case 0x00: case 0x01: case 0x02: case 0x03:
 		case 0x04: case 0x05: case 0x06: case 0x07:
 		case 0x08: case 0x09: case 0x0a: case 0x0b:
-		case 0x0c: case 0x0d: case 0x0e: case 0x0f:
-			return(adb_read_c000());
-
+		case 0x0c: case 0x0d: case 0x0e: case 0x0f: {
+			int c = adb_read_c000();
+			if (g_a2rom_version == '2') {
+				if ((c & 0x60) == 0x60)
+					c &= ~0x20;
+				if ((c & 0x7f) == 0x7f)
+					c ^= 0x77;
+			}
+			return c;
+		}
 		/* 0xc010 - 0xc01f */
 		case 0x10: /* c010 */
 			return(adb_access_c010());
@@ -1246,15 +1529,27 @@ io_read(word32 loc, double *cyc_ptr)
 		case 0x14: /* c014=rdramwrt */
 			return IOR(RAMWRT);
 		case 0x15: /* c015 = INTCX */
-			return IOR(INTCX);
+			if (A2CROM)
+				return IOR(emulate_a2c_mouse(dcycs) & 0x8);
+			else
+				return IOR(INTCX);
 		case 0x16: /* c016: ALTZP */
 			return IOR(ALTZP);
 		case 0x17: /* c017: rdc3rom */
-			return IOR(g_c02d_int_crom & (1 << 3));
+			if (A2CROM)
+				return IOR(emulate_a2c_mouse(dcycs) & 0x4);
+			else
+				return IOR(g_c02d_int_crom & (1 << 3));
 		case 0x18: /* c018: rd80c0l */
 			return IOR((g_cur_a2_stat & ALL_STAT_ST80));
 		case 0x19: /* c019: rdvblbar */
-			tmp = in_vblank(dcycs);
+			if (A2CROM) {
+				tmp = g_c046_val & 0x8;
+				g_c046_val &= 0xf7;
+				remove_irq(IRQ_PENDING_C046_VBL);
+			} else {
+				tmp = in_vblank(dcycs);
+			}
 			return IOR(tmp);
 		case 0x1a: /* c01a: rdtext */
 			return IOR(g_cur_a2_stat & ALL_STAT_TEXT);
@@ -1289,18 +1584,15 @@ io_read(word32 loc, double *cyc_ptr)
 		case 0x27: /* 0xc027 */
 			return adb_read_c027();
 		case 0x28: /* 0xc028 */
-			UNIMPL_READ;
+			set_statereg(dcycs, g_c068_statereg ^ 0x02);
+			return IOR(g_c068_statereg & 0x2);
 		case 0x29: /* 0xc029 */
 			return((g_cur_a2_stat & 0xa0) | g_c029_val_some);
 		case 0x2a: /* 0xc02a */
-#if 0
-			printf("Reading c02a...returning 0\n");
-#endif
 			return 0;
 		case 0x2b: /* 0xc02b */
 			return g_c02b_val;
 		case 0x2c: /* 0xc02c */
-			/* printf("reading c02c, returning 0\n"); */
 			return 0;
 		case 0x2d: /* 0xc02d */
 			tmp = g_c02d_int_crom;
@@ -1351,10 +1643,18 @@ io_read(word32 loc, double *cyc_ptr)
 		/* 0xc040 - 0xc04f */
 		case 0x40: /* 0xc040 */
 			/* cassette */
-			return 0;
-		case 0x41: /* 0xc041 */
+ 			if (A2CROM)
+ 				return IOR((adb_read_c027() & 0x40) == 0);
+  			return 0;
+  		case 0x41: /* 0xc041 */
+ 			if (A2CROM)
+ 				return IOR((g_c041_val & C041_EN_VBL_INTS) == 0);
 			return g_c041_val;
-		case 0x44: /* 0xc044 */
+ 		case 0x42: /* 0xc042 */
+ 			return IOR(g_a2c_mouse & 0x2);
+ 		case 0x43: /* 0xc043 */
+ 			return IOR(g_a2c_mouse & 0x1);
+ 		case 0x44: /* 0xc044 */
 			// SCC LAD A
 			return scc_read_lad(0);
 		case 0x45: /* 0xc045 */
@@ -1369,8 +1669,14 @@ io_read(word32 loc, double *cyc_ptr)
 							IRQ_PENDING_C046_VBL);
 			g_c046_val &= 0xe7;	/* clear vbl_int, 1/4sec int*/
 			return 0;
-		case 0x42: /* 0xc042 */
-		case 0x43: /* 0xc043 */
+		case 0x48: /* 0xc048 */
+		case 0x49: /* 0xc049 */
+		case 0x4a: /* 0xc04a */
+		case 0x4b: /* 0xc04b */
+		case 0x4c: /* 0xc04c */
+		case 0x4d: /* 0xc04d */
+		case 0x4e: /* 0xc04e */
+			g_a2c_mouse &= 0xf3;
 			return 0;
 		case 0x4f: /* 0xc04f */
 			/* for information on c04f, see: */
@@ -1391,13 +1697,6 @@ io_read(word32 loc, double *cyc_ptr)
 				g_em_emubyte_cnt = 0;
 				return 0;
 			}
-		case 0x48: /* 0xc048 */
-		case 0x49: /* 0xc049 */
-		case 0x4a: /* 0xc04a */
-		case 0x4b: /* 0xc04b */
-		case 0x4c: /* 0xc04c */
-		case 0x4d: /* 0xc04d */
-		case 0x4e: /* 0xc04e */
 			UNIMPL_READ;
 
 		/* 0xc050 - 0xc05f */
@@ -1446,22 +1745,31 @@ io_read(word32 loc, double *cyc_ptr)
 			}
 			return float_bus(dcycs);
 		case 0x58: /* 0xc058 */
-			if(g_zipgs_unlock < 4) {
+			if(g_zipgs_unlock >= 4) {
+				/* nothing */
+			} else if(g_a2c_ioudis) {
 				g_c05x_annuncs &= (~1);
+			} else {
+				adb_write_c027(adb_read_c027() & ~0x40);
 			}
 			return 0;
 		case 0x59: /* 0xc059 */
 			if(g_zipgs_unlock >= 4) {
 				return g_zipgs_reg_c059;
-			} else {
+			} else if(g_a2c_ioudis) {
 				g_c05x_annuncs |= 1;
+			} else {
+				adb_write_c027(adb_read_c027() | 0x40);
 			}
 			return 0;
 		case 0x5a: /* 0xc05a */
 			if(g_zipgs_unlock >= 4) {
 				return g_zipgs_reg_c05a;
-			} else {
+			} else if(g_a2c_ioudis) {
 				g_c05x_annuncs &= (~2);
+			} else {
+				g_c041_val &= ~C041_EN_VBL_INTS;
+				remove_irq(IRQ_PENDING_C046_VBL);
 			}
 			return 0;
 		case 0x5b: /* 0xc05b */
@@ -1469,61 +1777,87 @@ io_read(word32 loc, double *cyc_ptr)
 				word64_tmp = (word64)dcycs;
 				tmp = (word64_tmp >> 9) & 1;
 				return (tmp << 7) + (g_zipgs_reg_c05b & 0x7f);
-			} else {
+			} else if(g_a2c_ioudis) {
 				g_c05x_annuncs |= 2;
+			} else {
+				g_c041_val |= C041_EN_VBL_INTS;
 			}
 			return 0;
 		case 0x5c: /* 0xc05c */
 			if(g_zipgs_unlock >= 4) {
 				return g_zipgs_reg_c05c;
-			} else {
+			} else if(g_a2c_ioudis) {
 				g_c05x_annuncs &= (~4);
+			} else {
+				g_a2c_mouse &= ~0x2;
 			}
 			return 0;
 		case 0x5d: /* 0xc05d */
 			if(g_zipgs_unlock >= 4) {
 				halt_printf("Reading ZipGS $c05d!\n");
-			} else {
+			} else if(g_a2c_ioudis) {
 				g_c05x_annuncs |= 4;
+			} else {
+				g_a2c_mouse |= 0x2;
 			}
 			return 0;
 		case 0x5e: /* 0xc05e */
 			if(g_zipgs_unlock >= 4) {
 				halt_printf("Reading ZipGS $c05e!\n");
-			} else if(g_cur_a2_stat & ALL_STAT_ANNUNC3) {
+			} else if(g_a2c_ioudis) {
+				int oldstat = g_cur_a2_stat;
 				g_cur_a2_stat &= (~ALL_STAT_ANNUNC3);
-				change_display_mode(dcycs);
+				if (oldstat ^ g_cur_a2_stat)	
+					change_display_mode(dcycs);
+			} else {
+				g_a2c_mouse &= ~0x1;
 			}
 			return 0;
 		case 0x5f: /* 0xc05f */
 			if(g_zipgs_unlock >= 4) {
-				halt_printf("Reading ZipGS $c05f!\n");
-			} else if((g_cur_a2_stat & ALL_STAT_ANNUNC3) == 0) {
+				if (g_a2rom_version != 'C')
+					halt_printf("Reading ZipGS $c05f!\n");
+			} else  if(g_a2c_ioudis) {
+				int oldstat = g_cur_a2_stat;
 				g_cur_a2_stat |= (ALL_STAT_ANNUNC3);
-				change_display_mode(dcycs);
+				if (oldstat ^ g_cur_a2_stat)	
+					change_display_mode(dcycs);
+			} else {
+				g_a2c_mouse |= 0x1;
 			}
 			return 0;
 
-
 		/* 0xc060 - 0xc06f */
 		case 0x60: /* 0xc060 */
+			if (A2CROM)
+				return 0; /* 80/40 cols button */
 			return IOR(g_paddle_buttons & 8);
 		case 0x61: /* 0xc061 */
+			if (A2CROM && (emulate_a2c_mouse(dcycs) & 0x80))
+				return 0x80;
 			return IOR(adb_is_cmd_key_down() ||
 							g_paddle_buttons & 1);
 		case 0x62: /* 0xc062 */
 			return IOR(adb_is_option_key_down() ||
 							g_paddle_buttons & 2);
 		case 0x63: /* 0xc063 */
+			if (A2CROM)
+				return IOR((emulate_a2c_mouse(dcycs) & 0x80) == 0);
 			return IOR(g_paddle_buttons & 4);
 		case 0x64: /* 0xc064 */
 			return read_paddles(dcycs, 0);
 		case 0x65: /* 0xc065 */
 			return read_paddles(dcycs, 1);
 		case 0x66: /* 0xc066 */
-			return read_paddles(dcycs, 2);
+			if (A2CROM)
+				return IOR(emulate_a2c_mouse(dcycs) & 0x20);
+			else
+				return read_paddles(dcycs, 2);
 		case 0x67: /* 0xc067 */
-			return read_paddles(dcycs, 3);
+			if (A2CROM)
+				return IOR(emulate_a2c_mouse(dcycs) & 0x10);
+			else
+				return read_paddles(dcycs, 3);
 		case 0x68: /* 0xc068 = STATEREG */
 			return g_c068_statereg;
 		case 0x69: /* 0xc069 */
@@ -1561,38 +1895,47 @@ io_read(word32 loc, double *cyc_ptr)
 		/* 0xc070 - 0xc07f */
 		case 0x70: /* c070 */
 			paddle_trigger(dcycs);
+			if (A2CROM) {
+				g_c046_val &= 0xf7;
+				remove_irq(IRQ_PENDING_C046_VBL);
+			}				
 			return 0;
 		case 0x71:	/* 0xc071 */
 		case 0x72: case 0x73:
 		case 0x74: case 0x75: case 0x76: case 0x77:
 		case 0x78: case 0x79: case 0x7a: case 0x7b:
-		case 0x7c: case 0x7d: case 0x7e: case 0x7f:
-			return g_rom_fc_ff_ptr[3*65536 + 0xc000 + (loc & 0xff)];
-
+		case 0x7c: case 0x7d: 
+			if (g_a2rom_version == 'g')
+				return g_rom_fc_ff_ptr[3*65536 + 0xc000 + (loc & 0xff)];
+			else if (g_a2rom_version != 'c')
+				paddle_trigger(dcycs);
+			return 0;
+		case 0x7e:
+			if (g_a2rom_version == 'g')
+				return g_rom_fc_ff_ptr[3*65536 + 0xc000 + (loc & 0xff)];
+			else if (g_a2rom_version != 'c')
+				paddle_trigger(dcycs);
+			return IOR(g_a2c_ioudis);
+		case 0x7f:
+			if (g_a2rom_version == 'g')
+				return g_rom_fc_ff_ptr[3*65536 + 0xc000 + (loc & 0xff)];
+			else if (g_a2rom_version != 'c')
+				paddle_trigger(dcycs);
+			return IOR(g_cur_a2_stat & ALL_STAT_ANNUNC3);
+			
 		/* 0xc080 - 0xc08f */
 		case 0x80: case 0x81: case 0x82: case 0x83:
 		case 0x84: case 0x85: case 0x86: case 0x87:
 		case 0x88: case 0x89: case 0x8a: case 0x8b:
 		case 0x8c: case 0x8d: case 0x8e: case 0x8f:
+			/* After checkingthe Language Card schematics */
 			new_lcbank2 = ((loc & 0x8) >> 1) ^ 0x4;
-			new_wrdefram = (loc & 1);
-			if(new_wrdefram != g_c08x_wrdefram) {
+			new_wrdefram = (loc & 1) && (g_c08x_q3defram || g_c08x_wrdefram);
+			g_c08x_q3defram = (loc & 1);
+			tmp = ((loc ^ (loc>>1)) & 0x1) << 3;
+			set_statereg(dcycs, (g_c068_statereg & ~0xc) | new_lcbank2 | tmp);
+			if(new_wrdefram != g_c08x_wrdefram)
 				fixup_wrdefram(new_wrdefram);
-			}
-			switch(loc & 0x3) {
-			case 0x1: /* 0xc081 */
-			case 0x2: /* 0xc082 */
-				/* Read rom, set lcbank2 */
-				set_statereg(dcycs, (g_c068_statereg & ~(0x04))|
-					(new_lcbank2 | 0x08));
-				break;
-			case 0x0: /* 0xc080 */
-			case 0x3: /* 0xc083 */
-				/* Read ram (clear RDROM), set lcbank2 */
-				set_statereg(dcycs, (g_c068_statereg & ~(0x0c))|
-					(new_lcbank2));
-				break;
-			}
 			return float_bus(dcycs);
 		/* 0xc090 - 0xc09f */
 		case 0x90: case 0x91: case 0x92: case 0x93:
@@ -1656,7 +1999,20 @@ io_read(word32 loc, double *cyc_ptr)
 #endif
 
 		/* 0xc0c0 - 0xc0cf */
-		case 0xc0: case 0xc1: case 0xc2: case 0xc3:
+		case 0xc0: case 0xc1: case 0xc2:
+			if (A2CROM) {
+				int shift = (loc & 0x3) << 3;
+				return ((g_slinky_addr | 0xf00000) >> shift) & 0xff;
+			}
+			return 0;
+		case 0xc3:
+			if (A2CROM) {
+				int slptr = 0x20000 + g_slinky_addr;
+				g_slinky_addr = (g_slinky_addr + 1) & 0xffffff;
+				if (slptr < g_mem_size_total)
+					return g_memory_ptr[slptr];
+			}
+			return 0;
 		case 0xc4: case 0xc5: case 0xc6: case 0xc7:
 		case 0xc8: case 0xc9: case 0xca: case 0xcb:
 		case 0xcc: case 0xcd: case 0xce: case 0xcf:
@@ -1668,10 +2024,13 @@ io_read(word32 loc, double *cyc_ptr)
 		case 0xdc: case 0xdd: case 0xde: case 0xdf:
 			return 0;
 		/* 0xc0e0 - 0xc0ef */
+		case 0xe8: case 0xe9:
+			if (g_a2rom_version == 'C')
+				mig_changemotor(loc & 1);
 		case 0xe0: case 0xe1: case 0xe2: case 0xe3:
 		case 0xe4: case 0xe5: case 0xe6: case 0xe7:
-		case 0xe8: case 0xe9: case 0xea: case 0xeb:
-		          case 0xed: case 0xee: case 0xef:
+		case 0xea: case 0xeb:
+		case 0xed: case 0xee: case 0xef:
 			return read_iwm(loc, dcycs);
 		case 0xec:
 			return iwm_read_c0ec(dcycs);
@@ -1694,19 +2053,17 @@ io_read(word32 loc, double *cyc_ptr)
 		}
 		return float_bus(dcycs);
 	case 7:
-		/* c700 */
-		if(INTCX || ((g_c02d_int_crom & (1 << 7)) == 0)) {
-			return(g_rom_fc_ff_ptr[0x3c000 + (loc & 0xfff)]);
+		if(!INTCX && ((g_c02d_int_crom & (1 << 7)))) {
+			/* Since smartport hook needs SET_BANK_IO, 
+			   we must read the slot rom here */
+			return g_rom_cards_ptr[loc & 0x7ff];
 		}
-		tmp = g_rom_fc_ff_ptr[0x3c500 + (loc & 0xff)];
-		if((loc & 0xff) == 0xfb) {
-			tmp = tmp & 0xbf;	/* clear bit 6 for ROM 03 */
-		}
-		return tmp;
-	case 8: case 9: case 0xa: case 0xb: case 0xc: case 0xd: case 0xe:
-		if(INTCX || ((g_c02d_int_crom & (1 << 3)) == 0)) {
-			return(g_rom_fc_ff_ptr[0x3c000 + (loc & 0xfff)]);
-		}
+	case 8: case 9: case 0xa: case 0xb: case 0xc: case 0xd:
+		UNIMPL_READ;
+	case 0xe:
+		if ((g_a2rom_version == 'C') && (g_c068_statereg & 0x02))
+			if(((g_c02d_int_crom & (1 << 3)) == 0) || INTCX)
+				return mig_read(loc);
 		UNIMPL_READ;
 	case 0xf:
 		if(INTCX || ((g_c02d_int_crom & (1 << 3)) == 0)) {
@@ -1881,6 +2238,9 @@ io_write(word32 loc, int val, double *cyc_ptr)
 		case 0x27: /* 0xc027 */
 			adb_write_c027(val);
 			return;
+		case 0x28: /* 0xc028 */
+			set_statereg(dcycs, g_c068_statereg ^ 0x02);
+			return;
 		case 0x29: /* 0xc029 */
 			g_c029_val_some = val & 0x41;
 			if((val & 1) == 0) {
@@ -1915,7 +2275,6 @@ io_write(word32 loc, int val, double *cyc_ptr)
 				fixup_intcx();
 			}
 			return;
-		case 0x28: /* 0xc028 */
 		case 0x2c: /* 0xc02c */
 			UNIMPL_WRITE;
 		case 0x25: /* 0xc025 */
@@ -2036,6 +2395,8 @@ io_write(word32 loc, int val, double *cyc_ptr)
 			return;
 
 		/* 0xc040 - 0xc04f */
+		case 0x40: /* c040 */
+			return;
 		case 0x41: /* c041 */
 			g_c041_val = val & 0x1f;
 			if((val & 0xe6) != 0) {
@@ -2055,8 +2416,11 @@ io_write(word32 loc, int val, double *cyc_ptr)
 				remove_irq(IRQ_PENDING_C046_25SEC);
 			}
 			return;
+		case 0x42: /* c042 */
+		case 0x43: /* c043 */
+		case 0x44: /* c044 */
+		case 0x45: /* c045 */
 		case 0x46: /* c046 */
-			/* ignore writes to c046 */
 			return;
 		case 0x47: /* c047 */
 			remove_irq(IRQ_PENDING_C046_VBL |
@@ -2064,25 +2428,18 @@ io_write(word32 loc, int val, double *cyc_ptr)
 			g_c046_val &= 0xe7;	/* clear vblint, 1/4sec int*/
 			return;
 		case 0x48: /* c048 */
-			/* diversitune writes this--ignore it */
-			return;
-		case 0x42: /* c042 */
-		case 0x43: /* c043 */
-			return;
-		case 0x4f: /* c04f */
-			g_em_emubyte_cnt = 1;
-			return;
-		case 0x40: /* c040 */
-		case 0x44: /* c044 */
-		case 0x45: /* c045 */
 		case 0x49: /* c049 */
 		case 0x4a: /* c04a */
 		case 0x4b: /* c04b */
 		case 0x4c: /* c04c */
 		case 0x4d: /* c04d */
 		case 0x4e: /* c04e */
-			UNIMPL_WRITE;
-
+			g_a2c_mouse &= 0xf3;
+			return;
+		case 0x4f: /* c04f */
+			g_em_emubyte_cnt = 1;
+			return;
+			
 		/* 0xc050 - 0xc05f */
 		case 0x50: /* 0xc050 */
 			if(g_cur_a2_stat & ALL_STAT_TEXT) {
@@ -2131,20 +2488,22 @@ io_write(word32 loc, int val, double *cyc_ptr)
 		case 0x58: /* 0xc058 */
 			if(g_zipgs_unlock >= 4) {
 				g_zipgs_reg_c059 &= 0x4;  /* last reset cold */
-			} else {
+			} else if (g_a2c_ioudis) {
 				g_c05x_annuncs &= (~1);
+			} else {
+				adb_write_c027(adb_read_c027() & ~0x40);
 			}
 			return;
 		case 0x59: /* 0xc059 */
 			if(g_zipgs_unlock >= 4) {
-				g_zipgs_reg_c059 = (val & 0xf8) |
-						(g_zipgs_reg_c059 & 0x7);
-			} else {
+				g_zipgs_reg_c059 = (val & 0xf8)|(g_zipgs_reg_c059 & 0x7);
+			} else if (g_a2c_ioudis) {
 				g_c05x_annuncs |= 1;
+			} else {
+				adb_write_c027(adb_read_c027() | 0x40);
 			}
 			return;
 		case 0x5a: /* 0xc05a */
-			g_c05x_annuncs &= (~2);
 			if((val & 0xf0) == 0x50) {
 				g_zipgs_unlock++;
 			} else if((val & 0xf0) == 0xa0) {
@@ -2155,6 +2514,13 @@ io_write(word32 loc, int val, double *cyc_ptr)
 					set_halt(HALT_EVENT);
 				}
 				g_zipgs_reg_c05b |= 0x10;	// disable
+				return;
+			}
+			if (g_a2c_ioudis) {
+				g_c05x_annuncs &= (~2);
+			} else {
+				g_c041_val &= ~C041_EN_VBL_INTS;
+				remove_irq(IRQ_PENDING_C046_VBL);
 			}
 			return;
 		case 0x5b: /* 0xc05b */
@@ -2164,15 +2530,19 @@ io_write(word32 loc, int val, double *cyc_ptr)
 					set_halt(HALT_EVENT);
 				}
 				g_zipgs_reg_c05b &= (~0x10);	// enable
-			} else {
+			} else if (g_a2c_ioudis) {
 				g_c05x_annuncs |= 2;
+			} else {
+				g_c041_val |= C041_EN_VBL_INTS;
 			}
 			return;
 		case 0x5c: /* 0xc05c */
 			if(g_zipgs_unlock >= 4) {
 				g_zipgs_reg_c05c = val;
-			} else {
+			} else if (g_a2c_ioudis) {
 				g_c05x_annuncs &= (~4);
+			} else {
+				g_a2c_mouse &= 0xfe;
 			}
 			return;
 		case 0x5d: /* 0xc05d */
@@ -2182,24 +2552,34 @@ io_write(word32 loc, int val, double *cyc_ptr)
 					set_halt(HALT_EVENT);
 				}
 				g_zipgs_reg_c05a = val | 0xf;
-			} else {
+			} else if (g_a2c_ioudis) {
 				g_c05x_annuncs |= 4;
+			} else {
+				g_a2c_mouse |= 0x2;
 			}
 			return;
 		case 0x5e: /* 0xc05e */
 			if(g_zipgs_unlock >= 4) {
 				/* Zippy writes 0x80 and 0x00 here... */
-			} else if(g_cur_a2_stat & ALL_STAT_ANNUNC3) {
+			} else if (g_a2c_ioudis) {
+				int oldstat = g_cur_a2_stat;
 				g_cur_a2_stat &= (~ALL_STAT_ANNUNC3);
-				change_display_mode(dcycs);
+				if (oldstat ^ g_cur_a2_stat)	
+					change_display_mode(dcycs);
+			} else {
+				g_a2c_mouse &= 0xff;
 			}
 			return;
 		case 0x5f: /* 0xc05f */
 			if(g_zipgs_unlock >= 4) {
 				halt_printf("Wrote ZipGS $c05f: %02x\n", val);
-			} else if((g_cur_a2_stat & ALL_STAT_ANNUNC3) == 0) {
+			} else if (g_a2c_ioudis) {
+				int oldstat = g_cur_a2_stat;
 				g_cur_a2_stat |= (ALL_STAT_ANNUNC3);
-				change_display_mode(dcycs);
+				if (oldstat ^ g_cur_a2_stat)	
+					change_display_mode(dcycs);
+			} else {
+				g_a2c_mouse |= 0x1;
 			}
 			return;
 
@@ -2276,62 +2656,52 @@ io_write(word32 loc, int val, double *cyc_ptr)
 		/* 0xc070 - 0xc07f */
 		case 0x70: /* 0xc070 = Trigger paddles */
 			paddle_trigger(dcycs);
-			return;
-		case 0x73: /* 0xc073 = multibank ram card bank addr? */
+			if (A2CROM) {
+				g_c046_val &= 0xf7;
+				remove_irq(IRQ_PENDING_C046_VBL);
+			}				
 			return;
 		case 0x71: /* 0xc071 = another multibank ram card enable? */
-		case 0x7e: /* 0xc07e */
-		case 0x7f: /* 0xc07f */
-			return;
-		case 0x72: /* 0xc072 */
+		case 0x72:
+		case 0x73: /* 0xc073 = multibank ram card bank addr? */
 		case 0x74: /* 0xc074 */
 		case 0x75: /* 0xc075 */
 		case 0x76: /* 0xc076 */
 		case 0x77: /* 0xc077 */
-		case 0x78: /* 0xc078 */
-		case 0x79: /* 0xc079 */
 		case 0x7a: /* 0xc07a */
 		case 0x7b: /* 0xc07b */
 		case 0x7c: /* 0xc07c */
 		case 0x7d: /* 0xc07d */
-			UNIMPL_WRITE;
-
+			paddle_trigger(dcycs);
+			return;
+		case 0x78: /* 0xc078 */
+		case 0x7e: /* 0xc07e */
+			if (A2CROM)
+				g_a2c_ioudis = 1;
+			else
+				paddle_trigger(dcycs);
+			return;
+		case 0x79: /* 0xc079 */
+		case 0x7f: /* 0xc07f */
+			if (A2CROM)
+				g_a2c_ioudis = 0;
+			else
+				paddle_trigger(dcycs);
+			return;
 		/* 0xc080 - 0xc08f */
 		case 0x80: case 0x81: case 0x82: case 0x83:
 		case 0x84: case 0x85: case 0x86: case 0x87:
 		case 0x88: case 0x89: case 0x8a: case 0x8b:
 		case 0x8c: case 0x8d: case 0x8e: case 0x8f:
-			new_lcbank2 = ((loc >> 1) & 0x4) ^ 0x4;
-			new_wrdefram = (loc & 1);
-			if(new_wrdefram != g_c08x_wrdefram) {
+			/* After checking the Language Card schematics 
+			   Note that writing is not the same as reading! */
+			new_lcbank2 = ((loc & 0x8) >> 1) ^ 0x4;
+			new_wrdefram = (loc & 1) && g_c08x_wrdefram;
+			g_c08x_q3defram = 0;
+			tmp = ((loc ^ (loc>>1)) & 0x1) << 3;
+			set_statereg(dcycs, (g_c068_statereg & ~0xc) | new_lcbank2 | tmp);
+			if(new_wrdefram != g_c08x_wrdefram)
 				fixup_wrdefram(new_wrdefram);
-			}
-			switch(loc & 0xf) {
-			case 0x1: /* 0xc081 */
-			case 0x2: /* 0xc082 */
-			case 0x5: /* 0xc085 */
-			case 0x6: /* 0xc086 */
-			case 0x9: /* 0xc089 */
-			case 0xa: /* 0xc08a */
-			case 0xd: /* 0xc08d */
-			case 0xe: /* 0xc08e */
-				/* Read rom, set lcbank2 */
-				set_statereg(dcycs, (g_c068_statereg & ~(0x04))|
-					(new_lcbank2 | 0x08));
-				break;
-			case 0x0: /* 0xc080 */
-			case 0x3: /* 0xc083 */
-			case 0x4: /* 0xc084 */
-			case 0x7: /* 0xc087 */
-			case 0x8: /* 0xc088 */
-			case 0xb: /* 0xc08b */
-			case 0xc: /* 0xc08c */
-			case 0xf: /* 0xc08f */
-				/* Read ram (clear RDROM), set lcbank2 */
-				set_statereg(dcycs, (g_c068_statereg & ~(0x0c))|
-					(new_lcbank2));
-				break;
-			}
 			return;
 
 		/* 0xc090 - 0xc09f */
@@ -2400,7 +2770,24 @@ io_write(word32 loc, int val, double *cyc_ptr)
 #endif
 
 		/* 0xc0c0 - 0xc0cf */
-		case 0xc0: case 0xc1: case 0xc2: case 0xc3:
+		case 0xc0: case 0xc1: case 0xc2:
+			if (A2CROM) {
+				int shift = (loc & 0x3) << 3;
+				g_slinky_addr &= ~(0xff << shift);
+				g_slinky_addr |= (val << shift);
+				g_slinky_addr &= 0xffffff;
+				return;
+			}
+			UNIMPL_WRITE;
+		case 0xc3:
+			if (A2CROM) {
+				int slptr = 0x20000 + g_slinky_addr;
+				g_slinky_addr = (g_slinky_addr + 1) & 0xffffff;
+				if (slptr < g_mem_size_total)
+					g_memory_ptr[slptr] = val;
+				return;
+			}
+			UNIMPL_WRITE;
 		case 0xc4: case 0xc5: case 0xc6: case 0xc7:
 		case 0xc8: case 0xc9: case 0xca: case 0xcb:
 		case 0xcc: case 0xcd: case 0xce: case 0xcf:
@@ -2414,9 +2801,12 @@ io_write(word32 loc, int val, double *cyc_ptr)
 			UNIMPL_WRITE;
 
 		/* 0xc0e0 - 0xc0ef */
+		case 0xe8: case 0xe9: 
+			if (g_a2rom_version == 'C')
+				mig_changemotor(loc & 1);
 		case 0xe0: case 0xe1: case 0xe2: case 0xe3:
 		case 0xe4: case 0xe5: case 0xe6: case 0xe7:
-		case 0xe8: case 0xe9: case 0xea: case 0xeb:
+		case 0xea: case 0xeb:
 		case 0xec: case 0xed: case 0xee: case 0xef:
 			write_iwm(loc, val, dcycs);
 			return;
@@ -2435,7 +2825,14 @@ io_write(word32 loc, int val, double *cyc_ptr)
 	case 1: case 2: case 3: case 4: case 5: case 6: case 7:
 		/* c1000 - c7ff */
 		UNIMPL_WRITE;
-	case 8: case 9: case 0xa: case 0xb: case 0xc: case 0xd: case 0xe:
+	case 9: case 0xa: case 0xb: case 0xd: 
+		UNIMPL_WRITE;
+	case 0x8: case 0xc: case 0xe:
+		if ((g_a2rom_version == 'C') && (g_c068_statereg & 0x02))
+			if(((g_c02d_int_crom & (1 << 6)) == 0) || INTCX) {
+				mig_write(loc, val);
+				return;
+			}
 		UNIMPL_WRITE;
 	case 0xf:
 		if((loc & 0xfff) == 0xfff) {

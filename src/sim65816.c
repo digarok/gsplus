@@ -78,6 +78,7 @@ extern int g_c068_statereg;
 extern int g_cur_a2_stat;
 
 extern int g_c08x_wrdefram;
+extern int g_c08x_q3defram;
 extern int g_c02d_int_crom;
 
 extern int g_c035_shadow_reg;
@@ -120,6 +121,7 @@ double	g_fcycles_stop = 0.0;
 int	halt_sim = 0;
 int	enter_debug = 0;
 int	g_rom_version = -1;
+int	g_a2rom_version = 0;
 int	g_user_halt_bad = 0;
 int	g_halt_on_bad_read = 0;
 int	g_ignore_bad_acc = 1;
@@ -756,11 +758,31 @@ do_reset()
 	extern	int g_scan_int_events ;
 	extern int g_c023_val;
 
-	g_c068_statereg = 0x08 + 0x04 + 0x01; /* rdrom, lcbank2, intcx */
-	g_c035_shadow_reg = 0;
+ 	switch (g_a2rom_version) {
+ 	case '2': /* apple II,II+ */
+ 		g_c02d_int_crom = 0xfe;
+ 		g_c068_statereg &= 0xc;
+ 		g_c036_val_speed = (g_c036_val_speed & 0x40) | 0x84;
+ 		break;
+ 	case 'e': /* apple IIe */
+ 		g_c02d_int_crom = 0xf6;
+ 		g_c068_statereg = 0xc;
+ 		g_c036_val_speed = (g_c036_val_speed & 0x40) | 0x84;
+ 		break;
+ 	case 'c': case 'C': /* apple IIc */
+ 		g_c036_val_speed = (g_c036_val_speed & 0x40) | 0x84;
+ 		g_c02d_int_crom = 0;
+ 		g_c068_statereg = 0xd;
+ 		break;
+	default:
+ 		g_c02d_int_crom = 0;
+ 		g_c068_statereg = 0xd;
+ 		break;
+         }	
 
 	g_c08x_wrdefram = 1;
-	g_c02d_int_crom = 0;
+ 	g_c08x_q3defram = 0;	
+ 	g_c035_shadow_reg = 0;
 	g_c023_val = 0;
 	g_c041_val = 0;
 
@@ -1704,7 +1726,8 @@ run_prog()
 			setup_zip_speeds();
 		}
 
-		iwm_1 = motor_on && !apple35_sel &&
+		iwm_1 = motor_on &&
+				(g_a2rom_version != 'g' || !apple35_sel) &&
 				(g_c036_val_speed & 0x4) &&
 				(g_slow_525_emul_wr || !g_fast_disk_emul);
 		iwm_25 = (motor_on && apple35_sel) && !g_fast_disk_emul;
@@ -1922,11 +1945,7 @@ take_irq(int is_it_brk)
 			/* Clear B bit in psr on stack */
 		engine.stack = ((engine.stack -1) & 0xff) + 0x100;
 
-		va = 0xfffffe;
-		if(g_c035_shadow_reg & 0x40) {
-			/* I/O shadowing off...use ram locs */
-			va = 0x00fffe;
-		}
+		va = 0xfffe;
 
 	} else {
 		/* native */
@@ -1944,20 +1963,19 @@ take_irq(int is_it_brk)
 
 		if(is_it_brk) {
 			/* break */
-			va = 0xffffe6;
-			if(g_c035_shadow_reg & 0x40) {
-				va = 0xffe6;
-			}
+			va = 0xffe6;
 		} else {
 			/* irq */
-			va = 0xffffee;
-			if(g_c035_shadow_reg & 0x40) {
-				va = 0xffee;
-			}
+			va = 0xffee;
 		}
-
 	}
-
+	
+	if(g_a2rom_version == 'g' && !(g_c035_shadow_reg & 0x40)) {
+		/* GS has circuitry that causes the 65816 to
+		   read irq vectors from the rom when I/O shadowing is on. */
+		va |= 0xff0000;
+	}
+	
 	new_kpc = get_memory_c(va, 0);
 	new_kpc = new_kpc + (get_memory_c(va+1, 0) << 8);
 

@@ -637,9 +637,12 @@ defs_instr_start_16	.word	0
 #  define GET_ABS_X_RD_WR()					\
 	GET_2BYTE_ARG;						\
 	INC_KPC_3;						\
-	CYCLES_PLUS_2;						\
+	CYCLES_PLUS_1;						\
+	tmp1 = (dbank<<16)+(arg&0xff00)+((arg+xreg)&0xff);	\
+	GET_MEMORY8(tmp1, tmp1);  /* popular double read */	\
+	CYCLES_PLUS_1;						\
 	arg = (dbank << 16) + ((arg + xreg) & 0xffff);		\
-	GET_MEMORY8(arg, arg);
+	GET_MEMORY8(arg, arg);		 
 # else
 #  define GET_ABS_X_RD()					\
 	GET_ABS_INDEX_ADDR_FOR_RD(xreg);			\
@@ -648,7 +651,10 @@ defs_instr_start_16	.word	0
 #  define GET_ABS_X_RD_WR()					\
 	GET_2BYTE_ARG;						\
 	INC_KPC_3;						\
-	CYCLES_PLUS_2;						\
+	CYCLES_PLUS_1;						\
+	tmp1 = (dbank<<16)+(arg&0xff00)+((arg+xreg)&0xff);	\
+	GET_MEMORY8(tmp1, tmp1);  /* popular double read */	\
+	CYCLES_PLUS_1;						\
 	arg = (dbank << 16) + ((arg + xreg) & 0xffff);		\
 	GET_MEMORY16(arg, arg, 0);
 # endif
