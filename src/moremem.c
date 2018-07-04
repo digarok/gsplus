@@ -493,8 +493,9 @@ void moremem_init()
 	g_c041_val = 0;		/* C041_EN_25SEC_INTS, C041_EN_MOVE_INTS */
 	g_c046_val = 0;
 	g_c05x_annuncs = 0;
-	g_c068_statereg = 0;
+	g_c068_statereg = 0x0c;
 	g_c08x_wrdefram = 0;
+	g_c08x_q3defram = 0;
 	g_zipgs_unlock = 0;
 	g_zipgs_reg_c059 = 0x5f;
 	g_zipgs_reg_c05a = 0x0f;
