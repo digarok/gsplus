@@ -166,7 +166,8 @@ char g_cfg_opts_strvals[CFG_MAX_OPTS][CFG_OPT_MAXSTR];
 char g_cfg_opt_buf[CFG_OPT_MAXSTR];
 
 char *g_cfg_rom_path = "ROM";
-char *g_cfg_c6rom_path = "c600.rom";
+char *g_cfg_c1rom_path = "parallel.rom";
+char *g_cfg_c6rom_path = "disk2.rom";
 char *g_cfg_file_def_name = "Undefined";
 char **g_cfg_file_strptr = 0;
 int g_cfg_file_min_size = 256;
@@ -230,6 +231,7 @@ Cfg_menu g_cfg_joystick_menu[] = {
 Cfg_menu g_cfg_rom_menu[] = {
 { "ROM File Selection", g_cfg_rom_menu, 0, 0, CFGTYPE_MENU },
 { "ROM File", KNMP(g_cfg_rom_path), CFGTYPE_FILE },
+{ "C100 ROM File", KNMP(g_cfg_c1rom_path), CFGTYPE_FILE },
 { "C600 ROM File", KNMP(g_cfg_c6rom_path), CFGTYPE_FILE },
 { "", 0, 0, 0, 0 },
 { "Back to Main Config", g_cfg_main_menu, 0, 0, CFGTYPE_MENU },
@@ -428,12 +430,12 @@ int g_cfg_file_pathfield = 0;
 const char *g_gsplus_rom_names[] = { "ROM", "ROM", "ROM.01", "ROM.03", 0 };
 	/* First entry is special--it will be overwritten by g_cfg_rom_path */
 
-const char *g_gsplus_c1rom_names[] = { "parallel.rom", 0 };
+const char *g_gsplus_c1rom_names[] = { "parallel.rom", "parallel.rom", 0 };
 const char *g_gsplus_c2rom_names[] = { 0 };
 const char *g_gsplus_c3rom_names[] = { 0 };
 const char *g_gsplus_c4rom_names[] = { 0 };
 const char *g_gsplus_c5rom_names[] = { 0 };
-const char *g_gsplus_c6rom_names[] = { "c600.rom", "c600.rom", "controller.rom", "disk.rom",
+const char *g_gsplus_c6rom_names[] = { "disk2.rom", "c600.rom", "controller.rom", "disk.rom",
 				"DISK.ROM", "diskII.prom", 0 };
 const char *g_gsplus_c7rom_names[] = { 0 };
 
@@ -832,6 +834,7 @@ config_load_roms()
 	/* set first entry of g_gsplus_rom_names[] to g_cfg_rom_path so that */
 	/*  it becomes the first place searched. */
 	g_gsplus_rom_names[0] = g_cfg_rom_path;
+	g_gsplus_rom_card_list[1][0] = g_cfg_c1rom_path;
 	g_gsplus_rom_card_list[6][0] = g_cfg_c6rom_path;
 	setup_gsplus_file(&g_cfg_tmp_path[0], CFG_PATH_MAX, -1, 0,
 							&g_gsplus_rom_names[0]);
