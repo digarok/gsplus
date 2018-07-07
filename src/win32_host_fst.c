@@ -36,6 +36,11 @@ enum {
 	directory_file,
 };
 
+enum {
+	translate_none,
+	translate_crlf,
+	translate_merlin,
+};
 
 struct directory {
 	int displacement;
@@ -50,6 +55,7 @@ struct fd_entry {
 	int type;
 	int access;
 	HANDLE handle;
+	int translate;
 	struct directory *dir;
 };
 
@@ -171,6 +177,8 @@ static int read_only = 0;
 
 char *g_cfg_host_path = ""; // must not be null.
 int g_cfg_host_read_only = 0;
+int g_cfg_host_crlf = 1;
+int g_cfg_host_merlin = 0;
 
 
 /*
@@ -341,6 +349,42 @@ static word32 remove_fd(int cookie) {
 	return rv;
 }
 
+
+static void cr_to_lf(byte *buffer, size_t size) {
+	size_t i;
+	for (i = 0; i < size; ++i) {
+		if (buffer[i] == '\r') buffer[i] = '\n';
+	}
+}
+
+static void lf_to_cr(byte *buffer, size_t size) {
+	size_t i;
+	for (i = 0; i < size; ++i) {
+		if (buffer[i] == '\n') buffer[i] = '\r';
+	}
+}
+
+static void merlin_to_text(byte *buffer, size_t size) {
+	size_t i;
+	for (i = 0; i < size; ++i) {
+		byte b = buffer[i];
+		if (b == 0xa0) b = '\t';
+		b &= 0x7f;
+		if (b == '\r') b = '\n';
+		buffer[i] = b;
+	}
+}
+
+static void text_to_merlin(byte *buffer, size_t size) {
+	size_t i;
+	for (i = 0; i < size; ++i) {
+		byte b = buffer[i];
+		if (b == '\t') b = 0xa0;
+		if (b == '\n') b = '\r';
+		if (b != ' ') b |= 0x80;
+		buffer[i] = b;
+	}	
+}
 
 struct file_info {
 
@@ -542,6 +586,39 @@ static word16 map_attributes(DWORD dwFileAttributes) {
 	return access;
 }
 
+#undef _
+#define _(a, b, c) { a, sizeof(a) - 1, b, c }
+struct ftype_entry {
+	char *ext;
+	unsigned length;
+	unsigned file_type;
+	unsigned aux_type;
+};
+
+static struct ftype_entry suffixes[] = {
+	_("c",    0xb0, 0x0008),
+	_("cc",   0xb0, 0x0008),
+	_("h",    0xb0, 0x0008),
+	_("rez",  0xb0, 0x0015),
+	_("asm",  0xb0, 0x0003),
+	_("mac",  0xb0, 0x0003),
+	_("pas",  0xb0, 0x0005),
+	_("txt",  0x04, 0x0000),
+	_("text", 0x04, 0x0000),
+	_("s",    0x04, 0x0000),
+	{ 0, 0, 0, 0}
+};
+
+static struct ftype_entry prefixes[] = {
+	_("m16.",  0xb0, 0x0003),
+	_("e16.",  0xb0, 0x0003),
+	{ 0, 0, 0, 0}
+};
+
+#undef _
+
+
+
 static word32 get_file_info(const char *path, struct file_info *fi) {
 
 
@@ -587,7 +664,33 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 		get_file_xinfo(path, fi);
 		if (fi->resource_eof) fi->storage_type = extendedFile;
+
+		if (!fi->has_fi) {
+			/* guess the file type / auxtype based on extension */
+			int n;
+			const char *dot = NULL;
+			const char *slash = NULL;
+
+			for(n = 0; ; ++n) {
+				char c = path[n];
+				if (c == 0) break;
+				else if (c == '/') { slash = path + n + 1; dot = NULL; }
+				else if (c == '.') dot = path + n + 1;
+			}
+
+			if (dot && *dot) {
+				for (n = 0; n < sizeof(suffixes) / sizeof(suffixes[0]); ++n) {
+					if (!suffixes[n].ext) break;
+					if (!strcasecmp(dot, suffixes[n].ext)) {
+						fi->file_type = suffixes[n].file_type;
+						fi->aux_type = suffixes[n].aux_type;
+						break;
+					}
+				}
+			}
+		}
 	}
+
 	// 0x01 = read enable
 	// 0x02 = write enable
 	// 0x04 = invisible
@@ -1092,8 +1195,7 @@ static word32 fst_create(int class, const char *path) {
 
 
 		if (pcount >= 4) {
-			afp_init
-		(&fi.afp, fi.file_type, fi.aux_type);
+			afp_init(&fi.afp, fi.file_type, fi.aux_type);
 			fi.has_fi = 1;
 		}
 
@@ -1105,8 +1207,7 @@ static word32 fst_create(int class, const char *path) {
 		fi.storage_type = get_memory16_c(pb + CreateRec_storageType, 0);
 		fi.create_date = get_date_time(pb + CreateRec_createDate);
 
-		afp_init
-	(&fi.afp, fi.file_type, fi.aux_type);
+		afp_init(&fi.afp, fi.file_type, fi.aux_type);
 		fi.has_fi = 1;
 	}
 	int ok;
@@ -1114,7 +1215,7 @@ static word32 fst_create(int class, const char *path) {
 	if (fi.storage_type == 0 && fi.file_type == 0x0f)
 		fi.storage_type = 0x0d;
 
-	if (fi.storage_type == 0x0d || fi.storage_type == 0x0f) {
+	if (fi.storage_type == 0x0d) {
 		ok = CreateDirectory(path, NULL);
 		if (!ok) return map_last_error();
 
@@ -1720,6 +1821,22 @@ static word32 fst_open(int class, const char *path) {
 		return tooManyFilesOpen;
 	}
 
+	if (type == regular_file){
+
+		if (g_cfg_host_crlf) {
+			if (fi.file_type == 0x04 || fi.file_type == 0xb0)
+				e->translate = translate_crlf;
+		}
+
+		if (g_cfg_host_merlin && fi.file_type == 0x04) {
+			int n = strlen(path);
+			if (n >= 3 && path[n-1] == 'S' && path[n-2] == '.')
+				e->translate = translate_merlin;
+		}
+	}
+
+
+
 	e->access = access;
 	e->path = strdup(path);
 	e->type = type;
@@ -1787,6 +1904,16 @@ static word32 fst_read(int class) {
 			if (!ok) return map_last_error();
 			if (read_count == 0) break;
 			transfer_count++;
+
+			switch(e->translate) {
+				case translate_crlf:
+					lf_to_cr(&b, 1);
+					break;
+				case translate_merlin:
+					text_to_merlin(&b, 1);
+					break;
+			}
+
 			set_memory_c(data_buffer++, b, 0);
 			if (newline_table[b & newline_mask]) break;
 		}
@@ -1802,6 +1929,14 @@ static word32 fst_read(int class) {
 		else if (read_count == 0) rv = eofEncountered;
 		if (read_count > 0) {
 			transfer_count = read_count;
+			switch(e->translate) {
+				case translate_crlf:
+					lf_to_cr(data, transfer_count);
+					break;
+				case translate_merlin:
+					text_to_merlin(data, transfer_count);
+					break;
+			}
 			for (size_t i = 0; i < transfer_count; ++i) {
 				set_memory_c(data_buffer + i, data[i], 0);
 			}
@@ -1858,6 +1993,14 @@ static word32 fst_write(int class) {
 		data[i] = get_memory_c(data_buffer + i,0);
 	}
 
+	switch (e->translate) {
+		case translate_crlf:
+			cr_to_lf(data, request_count);
+			break;
+		case translate_merlin:
+			merlin_to_text(data, request_count);
+			break;
+	}
 	word32 rv = 0;
 	DWORD write_count = 0;
 	int ok = WriteFile(e->handle, data, request_count, &write_count, NULL);
@@ -2128,6 +2271,7 @@ static word32 fst_get_dir_entry(int class) {
 	struct 	file_info fi;
 	rv = get_file_info(fullpath, &fi);
 
+	if (dname) fprintf(stderr, " - %s", dname);
 
 	// p16 and gs/os both use truncating c1 output string.
 	rv = set_gsstr_truncate(name, dname);
@@ -2527,9 +2671,7 @@ void host_fst(void) {
 
 	fprintf(stderr, "Host FST: %04x %s", call, call_name(call));
 
-
 	if (call & 0x8000) {
-		fputs("\n", stderr);
 		// system level.
 		switch(call) {
 			case 0x8001:
@@ -2568,15 +2710,15 @@ void host_fst(void) {
 			case 0x10:
 				path1 = get_path1();
 				break;
-		case 0x04:
-			path1 = get_path1();
-			path2 = get_path2();
-			break;
+			case 0x04:
+				path1 = get_path1();
+				path2 = get_path2();
+				break;
 		}
 
 		if (path1) fprintf(stderr, " - %s", path1);
 		if (path2) fprintf(stderr, " - %s", path2);
-		fputs("\n", stderr);
+
 
 		switch(call & 0xff) {
 			case 0x01:
@@ -2693,8 +2835,7 @@ void host_fst(void) {
 				acc = invalidFSTop;
 				break;
 		}
-
-
+		fputs("\n", stderr);
 	}
 
  	if (acc) fprintf(stderr, "          %02x   %s\n", acc, error_name(acc));
