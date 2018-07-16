@@ -2558,6 +2558,7 @@ void host_fst(void) {
 
 	fprintf(stderr, "Host FST: %04x %s", call, call_name(call));
 
+
 	if (call & 0x8000) {
 		fputs("\n", stderr);
 		// system level.
@@ -2574,14 +2575,27 @@ void host_fst(void) {
 		}
 	} else {
 
+		if (!root) {
+			acc = networkError;
+			engine.acc =  acc;
+			SEC();
+ 			fprintf(stderr, "          %02x   %s\n", acc, error_name(acc));
+
+			return;
+		}
+
 		int class = call >> 13;
 		call &= 0x1fff;
 
 		if (class > 1) {
+			acc = invalidClass;
+			engine.acc = acc;
 			SEC();
-			engine.acc = invalidClass;
+ 			fprintf(stderr, "          %02x   %s\n", acc, error_name(acc));
+
 			return;
 		}
+
 		char *path1 = NULL;
 		char *path2 = NULL;
 		char *path3 = NULL;
