@@ -222,7 +222,8 @@ Cfg_menu g_cfg_uiless_menu[] = {
 	{ "", KNMP(g_ethernet), CFGTYPE_INT },
 	{ "", KNMP(g_halt_on_bad_read), CFGTYPE_INT },
 	{ "", KNMP(g_ignore_bad_acc), CFGTYPE_INT },
-	{ "", KNMP(g_ignore_halts), CFGTYPE_INT }
+	{ "", KNMP(g_ignore_halts), CFGTYPE_INT },
+	{ 0, 0, 0, 0, 0 },
 };
 
 
