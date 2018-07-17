@@ -2,7 +2,7 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
 /* adb_mode bit 3 and bit 2 (faster repeats for arrows and space/del) not done*/
@@ -1452,7 +1452,7 @@ adb_key_event(int a2code, int is_up)
 		/* ESC pressed, see if ctrl & cmd key down */
 		if(CTRL_DOWN && CMD_DOWN) {
 			/* Desk mgr int */
-			printf("Desk mgr int!\n");
+			glog("Desk mgr int!");
 
 			g_adb_interrupt_byte |= 0x20;
 			adb_add_data_int();
@@ -1491,7 +1491,7 @@ adb_key_event(int a2code, int is_up)
 
 	special = (ascii >> 8) & 0xff;
 	if(ascii < 0) {
-		printf("ascii1: %d, a2code: %02x, pos: %d\n", ascii,a2code,pos);
+		glogf("ascii1: %d, a2code: %02x, pos: %d", ascii,a2code,pos);
 		ascii = 0;
 		special = 0;
 	}

@@ -2,7 +2,7 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include <stdio.h>
@@ -654,7 +654,7 @@ read_line(char *buf, int len)
 {
 	int	space_left;
 	int	ret;
-#if !defined(_WIN32) && !defined (__OS2__)
+#if !defined(_WIN32)
 	int	flags, flags_save;
 
 	/* Unix */
@@ -675,7 +675,6 @@ read_line(char *buf, int len)
 	while(space_left > 0) {
 #ifdef _WIN32
 		ret = win_nonblock_read_stdin(0, buf, 1);
-#elif defined(__OS2__)
 #else
 		/* Unix */
 		ret = read(0, buf, 1);
@@ -701,7 +700,7 @@ read_line(char *buf, int len)
 		}
 		buf = &buf[ret];
 	}
-#if !defined(_WIN32) && !defined (__OS2__)
+#if !defined(_WIN32)
 	(void)fcntl(0, F_SETFL, flags_save);
 #endif
 
@@ -780,7 +779,6 @@ dis_do_compare()
 void
 do_debug_unix()
 {
-#ifndef __OS2__
 	char	localbuf[LINE_SIZE];
 	word32	offset, len;
 	int	fd, ret;
@@ -855,7 +853,6 @@ do_debug_unix()
 		printf("errno: %d\n", errno);
 	}
 	a1 = a1 + ret;
-#endif
 }
 
 void

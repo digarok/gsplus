@@ -2,6 +2,8 @@ stages:
   - build
   - package
 
+
+
 build-ubuntu-x:
   tags:
     - ubuntu
@@ -23,14 +25,14 @@ package-ubuntu-x:
   script:
     - cp src/config.txt .
     - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
-    - cp COPYING.txt doc/
+    - cp LICENSE.txt doc/
   artifacts:
     paths:
       - gsplusx
       - config.txt
-      - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
-      - doc/COPYING.txt
+      - doc/LICENSE.txt
+
 
 
 
@@ -43,6 +45,9 @@ build-ubuntu-sdl:
     - cd src
     - ln -s vars_x86linux_sdl vars
     - make clean ; make
+
+
+
 
 
 build-ubuntu-sdl2:
@@ -67,16 +72,17 @@ package-ubuntu-sdl2:
   script:
     - cp src/config.txt .
     - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
-    - cp COPYING.txt doc/
+    - cp LICENSE.txt doc/
     - mv gsplus-ubuntu-sdl gsplus
   artifacts:
     paths:
       - gsplus
       - config.txt
       - doc/README.txt
-      - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
-      - doc/COPYING.txt
+      - doc/LICENSE.txt
+
+
 
 
 build-osx:
@@ -130,7 +136,7 @@ package-win32:
   script:
     - cp src/config.txt .
     - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
-    - cp COPYING.txt doc/
+    - cp LICENSE.txt doc/
     - cp /bin/cyggcc_s-1.dll .
     - cp /bin/cygstdc++-6.dll	.
     - cp /bin/cygwin1.dll .
@@ -140,74 +146,87 @@ package-win32:
     paths:
       - gsplus32.exe
       - config.txt
-      - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
       - doc/README.txt
-      - doc/COPYING.txt
+      - doc/LICENSE.txt
       - cyggcc_s-1.dll
       - cygstdc++-6.dll
       - cygwin1.dll
       - cygfreetype-6.dll
 
-build-win-sdl:
+
+
+
+
+build-win-sdl2:
   tags:
     - windows
   stage: build
   script:
     - cd src
-    - ln -s vars_win32_sdl vars
+    - ln -s vars_win32_sdl2 vars
     - make clean
     - make
+    - cp parallel.rom ..
+    - cp /cygdrive/c/cygwin/bin/cygbz2-1.dll ..
+    - cp /cygdrive/c/cygwin/bin/cygfreetype-6.dll ..
+    - cp /cygdrive/c/cygwin/bin/cyggcc_s-1.dll ..
+    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll ..
+    - cp /cygdrive/c/cygwin/bin/cygpng16-16.dll ..
+    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll ..
+    - cp /cygdrive/c/cygwin/bin/cygstdc++-6.dll ..
+    - cp /cygdrive/c/cygwin/bin/cygwin1.dll ..
+    - cp /cygdrive/c/cygwin/bin/cygz.dll ..
+    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2.dll ..
+    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2_image.dll ..
+
+
   artifacts:
     paths:
       - gsplus.exe
+      - parallel.rom
+      - cygbz2-1.dll
+      - cygfreetype-6.dll
+      - cyggcc_s-1.dll
+      - cygjpeg-8.dll
+      - cygpng16-16.dll
+      - cygjpeg-8.dll
+      - cygstdc++-6.dll
+      - cygwin1.dll
+      - cygz.dll
+      - SDL2.dll
+      - SDL2_image.dll
+
     expire_in: 5 minutes
 
-package-win-sdl:
+
+package-win-sdl2:
   tags:
     - windows
   stage: package
   script:
+    - pwd
+    - ls -al
     - cp src/config.txt .
     - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
-    - cp COPYING.txt doc/
-    - cp /bin/cyggcc_s-1.dll .
-    - cp /bin/cygstdc++-6.dll	.
-    - cp /bin/cygwin1.dll .
-    - cp /bin/cygfreetype-6.dll .
-    - cp /bin/cygbz2-1.dll .
-    - cp /bin/cygpng16-16.dll .
-    - cp /bin/cygz.dll .
-    - cp /bin/cygSDL2-2-0-0.dll .
-    - cp /bin/cygSDL2_image-2-0-0.dll .
-    - cp /bin/cygjpeg-8.dll .
-    - cp /bin/cygtiff-6.dll .
-    - cp /bin/cygjbig-2.dll .
-    - cp /bin/cyglzma-5.dll .
-    - cp /bin/cygwebp-5.dll .
-    - cp /cygdrive/c/mingw/bin/SDL2.dll .
-
-
+    - cp LICENSE.txt doc/
 
   artifacts:
     paths:
       - gsplus.exe
       - config.txt
-      - doc/gsplusmanual.txt
       - doc/gsplusmanual.pdf
-      - doc/COPYING.txt
+      - doc/LICENSE.txt
       - doc/README.txt
+      - parallel.rom
+      - cygbz2-1.dll
+      - cygfreetype-6.dll
       - cyggcc_s-1.dll
+      - cygjpeg-8.dll
+      - cygpng16-16.dll
+      - cygjpeg-8.dll
       - cygstdc++-6.dll
       - cygwin1.dll
-      - cygfreetype-6.dll
-      - cygbz2-1.dll
-      - cygpng16-16.dll
       - cygz.dll
-      - cygSDL2-2-0-0.dll
-      - cygSDL2_image-2-0-0.dll
-      - cygjpeg-8.dll
-      - cygtiff-6.dll
-      - cygjbig-2.dll
-      - cyglzma-5.dll
-      - cygwebp-5.dll
+      - SDL2.dll
+      - SDL2_image.dll

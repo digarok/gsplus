@@ -2,7 +2,7 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include "defcomm.h"
@@ -63,7 +63,7 @@ void U_STACK_TRACE();
 # include <libc.h>
 #endif
 
-#if !defined(_WIN32) && !defined (__OS2__) && !defined(UNDER_CE)	// OG
+#if !defined(_WIN32) && !defined(UNDER_CE)	// OG
 # include <unistd.h>
 # include <sys/ioctl.h>
 # include <sys/wait.h>

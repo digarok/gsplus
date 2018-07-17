@@ -2,7 +2,7 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include "defc.h"
@@ -195,7 +195,7 @@ extern Cfg_menu g_cfg_main_menu[];
 
 #define KNMP(a)		&a, #a, 0
 
-// This first menu is not a menu, but a list of config options that are 
+// This first menu is not a menu, but a list of config options that are
 // represented here so they will be parsed correctly out of the config files.
 Cfg_menu g_cfg_uiless_menu[] = {
 	{ "", KNMP(g_audio_enable), CFGTYPE_INT },
@@ -647,11 +647,10 @@ cfg_text_screen_dump()
 	int	i, j;
 
 	filename = "gsplus.screen.dump";
-	glogf("Writing text screen to the file %s\n", filename);
+	glogf("Writing text screen to the file %s", filename);
 	ofile = fopen(filename, "w");
 	if(ofile == 0) {
-		fatal_printf("Could not write to file %s, (%d)\n", filename,
-				errno);
+		fatal_printf("Could not write to file %s, (%d)\n", filename, errno);
 		return;
 	}
 
@@ -819,7 +818,7 @@ config_parse_option(char *buf, int pos, int len, int line)
 		*strptr = gsplus_malloc_str(&buf[pos]);
 		break;
 	default:
-		glogf("Config file variable %s is unknown type: %d\n", nameptr, type);
+		glogf("Config file variable %s is unknown type: %d", nameptr, type);
 	}
 
 }
@@ -968,7 +967,7 @@ config_load_roms()
 					"read %d bytes\n", &g_cfg_tmp_path[0], errno, len, ret);
 				continue;
 			}
-			glogf("Read: %d bytes of ROM in slot %d from file %s.\n", ret, i, &g_cfg_tmp_path[0]);
+			glogf("Read: %d bytes of ROM in slot %d from file %s.", ret, i, &g_cfg_tmp_path[0]);
 			fclose(file);
 		}
 	}
@@ -2844,14 +2843,14 @@ Optionally boot from that slot.
 	if (slot > 0)
 	{
 		insert_disk(slot,0,filename,0,0,0,-1);
-		printf("Inserted disk in slot %d, drive 1.  Filename: %s\n", slot, filename);
+		glogf("Inserted disk in slot %d, drive 1.  Filename: %s", slot, filename);
 		if (should_boot) {
 			g_temp_boot_slot = slot;
-			printf("That slot has been set to boot.\n");
+			glog("That slot has been set to boot.");
 		}
 	}
 	else
-		printf("Unable to determine appropriate place to insert file %s.\n",filename);
+		glogf("Unable to determine appropriate place to insert file %s.",filename);
 }
 
 int
@@ -2871,28 +2870,25 @@ Guess the image size.  Return values:
 	rc = stat(filename, &stat_buf);
 	if(rc < 0)
 	{
-		printf("Can't get statistics on file %s; errno: %d\n",
-			filename, errno);
+		glogf("Can't get statistics on file %s; errno: %d",	filename, errno);
 		rc = -1;
 	} else {
 		len = stat_buf.st_size;
-		printf("Found file %s, size %d; guessing ",
-			filename, len);
 		if (len <  140 * 1024) {
 			/* Not enough for a 140k image */
-			printf("small ProDOS image.\n");
+			glogf("Found file %s, size %d; guessing small ProDOS image.",	filename, len);
 			rc = 0;
 		} else if (len <  140 * 1024 + 256 + 1) {
 			/* Reasonable size for 140k image, maybe in 2mg format */
-			printf("a 5-1/4\" image.\n");
+			glogf("Found file %s, size %d; guessing a 5-1/4\" image.",	filename, len);
 			rc = 1;
 		} else if (len < 800 * 1024 + 256 + 1) {
 			/* Reasonable size for 800k image, maybe in 2mg format */
-			printf("a 3-1/2\" image.\n");
+			glogf("Found file %s, size %d; guessing a 3-1/2\" image.",	filename, len);
 			rc = 2;
 		} else {
 			/* Let's pretend it's an HDV image */
-			printf("a hard drive image.\n");
+			glogf("Found file %s, size %d; guessing a hard drive image.",	filename, len);
 			rc = 3;
 		}
 	}
@@ -3104,7 +3100,7 @@ cfg_file_update_ptr(char *str)
 	}
 	*g_cfg_file_strptr = newstr;
 	if(g_cfg_file_strptr == &(g_cfg_rom_path)) {
-		printf("Updated ROM file\n");
+		glog("Updated ROM file");
 		load_roms_init_memory();
 	}
 	g_config_gsplus_update_needed = 1;
@@ -3143,8 +3139,7 @@ cfg_file_selected(int select_dir)
 			(int)stat_buf.st_mode);
 	#endif
 	if(ret != 0) {
-		printf("stat %s returned %d, errno: %d\n", &g_cfg_file_path[0],
-					ret, errno);
+		glogf("stat %s returned %d, errno: %d", &g_cfg_file_path[0], ret, errno);
 	} else {
 		if(fmt == S_IFDIR && !select_dir) {
 			/* it's a directory */
@@ -3228,7 +3223,6 @@ cfg_file_handle_key(int key)
 		}
 		break;
 	case 0x0d:	/* return */
-		//glog("Selected disk image file");
 		cfg_file_selected(0);
 		break;
 	case 0x09:	/* tab */
@@ -3237,7 +3231,6 @@ cfg_file_handle_key(int key)
 	case 0x08:	/* left arrow */
 	case 0x7f:	/* delete key */
 		if(g_cfg_file_pathfield) {
-			// printf("left arrow/delete\n");
 			len = strlen(&g_cfg_file_curpath[0]) - 1;
 			if(len >= 0) {
 				g_cfg_file_curpath[len] = 0;
@@ -3248,13 +3241,10 @@ cfg_file_handle_key(int key)
 		cfg_file_selected(g_cfg_file_dir_only);
 		break;
 	default:
-		glogf("Unhandled config key: 0x%02x\n", key);
+		glogf("Unhandled config key: 0x%02x", key);
 	}
-#if 0
-	printf("curent: %d, topent: %d, last: %d\n",
-		g_cfg_dirlist.curent, g_cfg_dirlist.topent, g_cfg_dirlist.last);
-#endif
 }
+
 void
 config_control_panel()
 {
@@ -3281,7 +3271,6 @@ config_control_panel()
 			(0xf << BIT_ALL_STAT_TEXT_COLOR) | ALL_STAT_ALTCHARSET;
 	g_a2_new_all_stat[0] = g_cur_a2_stat;
 	g_new_a2_stat_cur_line = 0;
-	//cfg_printf("In config_control_panel\n");
 	for(i = 0; i < 20; i++) {
 		// Toss any queued-up keypresses
 		if(adb_read_c000() & 0x80) {
@@ -3482,7 +3471,7 @@ config_control_panel()
 				}
 				break;
 			default:
-				glogf("Unhandled config key: 0x%02x\n", key);
+				glogf("Unhandled config key: 0x%02x", key);
 			}
 		} else if(key >= 0) {
 			cfg_file_handle_key(key);

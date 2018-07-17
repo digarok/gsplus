@@ -2,7 +2,7 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
 // $KmKId: protos_windriver.h,v 1.4 2004-03-23 17:27:26-05 kentd Exp $

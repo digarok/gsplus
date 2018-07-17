@@ -2,7 +2,7 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include "SDL.h"
@@ -24,6 +24,10 @@ static /* volatile */ int snd_read = 0;
 static int g_sound_paused;
 static int g_zeroes_buffered;
 static int g_zeroes_seen;
+// newer SDL allows you to specify devices.  for now, we use what it gives us,
+// but this can be made configurable in the future
+SDL_AudioDeviceID dev = 0;
+
 
 void sdlsnd_init(word32 *shmaddr)
 {
@@ -48,7 +52,7 @@ sound_write_sdl(int real_samps, int size)
 
     if (real_samps) {
         shm_read = (g_sound_shm_pos - size + SOUND_SHM_SAMP_SIZE)%SOUND_SHM_SAMP_SIZE;
-        SDL_LockAudio();
+        SDL_LockAudioDevice(dev);
         while(size > 0) {
             if(g_playbuf_buffered >= snd_buf) {
                 printf("sound_write_sdl failed @%d, %d buffered, %d samples skipped\n",snd_write,g_playbuf_buffered, size);
@@ -70,17 +74,17 @@ sound_write_sdl(int real_samps, int size)
 
         assert((snd_buf+snd_write - snd_read)%snd_buf == g_playbuf_buffered%snd_buf);
         assert(g_sound_shm_pos == shm_read);
-        SDL_UnlockAudio();
+        SDL_UnlockAudioDevice(dev);
     }
     if(g_sound_paused && (g_playbuf_buffered > 0)) {
         glogf("Unpausing sound, %d buffered",g_playbuf_buffered);
         g_sound_paused = 0;
-        SDL_PauseAudio(0);
+        SDL_PauseAudioDevice(dev, 0);
     }
     if(!g_sound_paused && (g_playbuf_buffered <= 0)) {
         glog("Pausing sound");
         g_sound_paused = 1;
-        SDL_PauseAudio(1);
+        SDL_PauseAudioDevice(dev, 1);
     }
 #endif
 }
@@ -124,9 +128,8 @@ sound_init_device_sdl()
     long rate;
     SDL_AudioSpec wanted;
 
-    //if(SDL_InitSubSystem(SDL_INIT_AUDIO)) {
-	  if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-      fprintf(stderr, "sdl: Couldn't init SDL_Audio: %s!\n", SDL_GetError());
+    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+      glogf("SDL2 Couldn't init SDL_INIT_AUDIO: %s!", SDL_GetError());
       return 0;
     }
 
@@ -139,23 +142,28 @@ sound_init_device_sdl()
     wanted.userdata = NULL;
 
     /* Open audio, and get the real spec */
-    if(SDL_OpenAudio(&wanted, &spec) < 0) {
-        fprintf(stderr, "sdl: Couldn't open audio: %s!\n", SDL_GetError());
-        SDL_QuitSubSystem(SDL_INIT_AUDIO);
-        return 0;
+    dev = SDL_OpenAudioDevice(NULL, 0, &wanted, &spec, 0);
+    if (dev == 0) {
+      glogf("SDL2 Couldn't open audio: %s!", SDL_GetError());
+      SDL_QuitSubSystem(SDL_INIT_AUDIO);
+      return 0;
+
+    } else {
+      glogf("SDL2 opened audio device: %d", dev);
     }
+
     /* Check everything */
     if(spec.channels != wanted.channels) {
-        fprintf(stderr, "sdl: Couldn't get stereo audio format!\n");
-        goto snd_error;
+        glogf("SDL2 Warning, couldn't get stereo audio format!");
+        //goto snd_error;
     }
     if(spec.format != wanted.format) {
-        fprintf(stderr, "sdl: Couldn't get a supported audio format!\n");
-        fprintf(stderr, "sdl: wanted %X, got %X\n",wanted.format,spec.format);
-        goto snd_error;
+        glog("SDL2 Warning, couldn't get a supported audio format!");
+        glogf("SDL2 wanted %X, got %X",wanted.format,spec.format);
+        //goto snd_error;
     }
     if(spec.freq != wanted.freq) {
-        fprintf(stderr, "sdl: wanted rate = %d, got rate = %d\n", wanted.freq, spec.freq);
+        glogf("SDL2 wanted rate = %d, got rate = %d", wanted.freq, spec.freq);
     }
     /* Set things as they really are */
     rate = spec.freq;
@@ -176,14 +184,14 @@ sound_init_device_sdl()
     g_zeroes_seen = 0;
     /* Let's start playing sound */
     g_sound_paused = 0;
-    SDL_PauseAudio(0);
+    SDL_PauseAudioDevice(dev, 0);
 
 		set_audio_rate(rate);
 		return rate;
 
   snd_error:
     /* Oops! Something bad happened, cleanup. */
-    SDL_CloseAudio();
+    SDL_CloseAudioDevice(dev);
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
     if(playbuf)
         free((void*)playbuf);
@@ -199,20 +207,9 @@ void
 sound_shutdown_sdl()
 {
 #ifdef HAVE_SDL
-    SDL_CloseAudio();
+    SDL_CloseAudioDevice(dev);
     if(playbuf)
         free((void*)playbuf);
     playbuf = 0;
 #endif
-}
-
-void
-sound_shutdown2()
-{
-	sound_shutdown_sdl();
-	if (g_sound_shm_addr)
-	{
-		free(g_sound_shm_addr);
-		g_sound_shm_addr=NULL;
-	}
 }

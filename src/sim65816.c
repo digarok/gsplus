@@ -2,7 +2,7 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include <math.h>
@@ -39,17 +39,17 @@ int	g_accept_events = 0; // OG To know if the emulator is ready to accept extern
 char g_argv0_path[256] = "./";
 
 const char *g_gsplus_default_paths[] = { // probably overkill on the paths
-  "", 
-  "./", 
+  "",
+  "./",
   "${HOME}/",
   "${PWD}/",
   "${HOME}/Library/GSplus/",
   "/usr/local/lib/",
-  "/usr/lib/gsplus/", 
-  "/usr/local/gsplus/", 
-  "/usr/local/lib/gsplus/", 
+  "/usr/lib/gsplus/",
+  "/usr/local/gsplus/",
+  "/usr/local/lib/gsplus/",
   "/usr/share/gsplus/",
-  "/var/lib/",  
+  "/var/lib/",
   "${0}/",
   0 };
 
@@ -165,7 +165,7 @@ int g_imagewriter_paper = 0;
 int g_imagewriter_banner = 0;
 
 int	g_config_iwm_vbl_count = 0;
-const char g_gsplus_version_str[] = "0.14";	// skunkworks
+const char g_gsplus_version_str[] = "0.14rc";	
 int g_pause=0;	// OG Added pause
 
 #define START_DCYCS	(0.0)
@@ -898,21 +898,21 @@ int gsplusmain(int argc, char **argv) {
 	int	i;
 	char	*final_arg = 0;
 
-  
+
   // just for fun
   banner();
-  
+
 	// OG Restoring globals
 	sim65816_initglobals();
 	moremem_init();
   tmp1 = parse_cli_options(argc, argv);
-  
-  
+
+
 
   // initialize ss dir to default value (current path)
   strcpy(g_config_gsplus_screenshot_dir, "./");
 
-	
+
 
 
 	check_engine_asm_defines();
@@ -1196,11 +1196,11 @@ void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_cre
     // However, GSplus is promoting a notion of Config-as-a-VM
     // where we want to encourage many configs.  (See DGB video
     // on YT regarding the GSVision UI experiment.)
-    
+
 
     glogf("Trying to create config (%s)", "${HOME}/.config.gsp");
     gsport_expand_path(&(local_path[0]), "${HOME}/.config.gsp", 250);
-    
+
 		strcpy(outname, &(local_path[0]));
 		// Ask user if it's OK to create the file (or just create it)
 		x_dialog_create_gsport_conf(*name_ptr);
@@ -2605,7 +2605,6 @@ void
 must_write(int fd, char *bufptr, int len)
 {
 	int	ret;
-#ifndef __OS2__
 	while(len > 0) {
 		ret = write(fd, bufptr, len);
 		if(ret >= 0) {
@@ -2615,9 +2614,6 @@ must_write(int fd, char *bufptr, int len)
 			return;		// just get out
 		}
 	}
-#else
-  printf("%s\n",bufptr);
-#endif
 }
 
 void

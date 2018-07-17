@@ -2,10 +2,10 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
-#if !defined(_WIN32) && !defined(__CYGWIN__) && !defined (__OS2__)
+#if !defined(_WIN32) && !defined(__CYGWIN__)
 # include <sys/ipc.h>
 # include <sys/shm.h>
 #endif

@@ -1,6 +1,4 @@
 ## SOME NOTES ON SETTING UP GITLAB RUNNER TO BUILD ON LINUX/UBUNTU
-# Based on: https://gitlab.com/gitlab-org/gitlab-ci-multi-runner/blob/master/docs/install/linux-repository.md
-
 
 ## STEP 1 - Install Gitlab Runner
 sudo apt-get install -y curl

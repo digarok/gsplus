@@ -2,13 +2,13 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include "defc.h"
 
 #ifdef HAVE_TFE
-#include "tfe/protos_tfe.h" 
+#include "tfe/protos_tfe.h"
 #endif
 
 extern char const g_gsplus_version_str[];
@@ -134,21 +134,21 @@ Emustate_word32list g_emustate_word32list[] = {
 
 
 //#ifdef _WINDOWS
-// OG Added Transwarp ROM  
+// OG Added Transwarp ROM
 #define TRANSWARP
 int transwarp_low_val = 0;
-#ifdef _WIN32 
+#ifdef _WIN32
 __declspec(align(256))
 #endif
 unsigned char transwarpcode[][32]
-#if !defined(_WIN32) && !defined(__OS2__)
+#if !defined(_WIN32) 
 __attribute__ ((aligned(256)))
 #endif
 ={
 {
 /*0xBCFF00*/ 'T','W','G','S',0,0,0,0,0,0,0,0,0,0,0,0,
-/*0xBCFF10*/ 0x5C,0x40,0xFF,0xBC,	//	JMP GetMaxSpeed   
-/*0xBCFF14*/ 0x5C,0x60,0xFF,0xBC,	//	JMP GetNumISpeed   
+/*0xBCFF10*/ 0x5C,0x40,0xFF,0xBC,	//	JMP GetMaxSpeed
+/*0xBCFF14*/ 0x5C,0x60,0xFF,0xBC,	//	JMP GetNumISpeed
 /*0xBCFF18*/ 0x6B,0x00,0x00,0x00,	//	???
 /*0xBCFF1C*/ 0x6B,0x00,0x00,0x00	//	???
 },
@@ -160,7 +160,7 @@ __attribute__ ((aligned(256)))
 /*0xBCFF30*/ 0x6B,0x00,0x00,0x00,	//	???
 /*0xBCFF34*/ 0x6B,0x00,0x00,0x00,	//	???
 /*0xBCFF38*/ 0x6B,0x00,0x00,0x00,	//	???
-/*0xBCFF3C*/ 0x6B,0x00,0x00,0x00	//	GetTWConfig 
+/*0xBCFF3C*/ 0x6B,0x00,0x00,0x00	//	GetTWConfig
 },
 {
 /* 0xBCFF40*/	// GetMaxSpeed
@@ -291,7 +291,7 @@ fixup_bank0_2000_4000()
 		} else if((g_c035_shadow_reg & 0x02) == 0) {
 			mem0wr += BANK_SHADOW;
 		}
-		
+
 	} else {
 		if(RAMRD) {
 			mem0rd += 0x10000;
@@ -406,13 +406,13 @@ fixup_intcx()
 			}
 		}
 		for(j = 0xc8; j < 0xd0; j++) {
-			
+
 			 /*c800 - cfff */
-			if(((g_c02d_int_crom & (1 << 3)) == 0) || INTCX) 
-			{				
+			if(((g_c02d_int_crom & (1 << 3)) == 0) || INTCX)
+			{
 				rom_inc = rom10000 + (j << 8);
 			}
-			else 	
+			else
 			{
 					rom_inc = rom10000 + (j << 8);
 
@@ -436,7 +436,7 @@ fixup_wrdefram(int new_wrdefram)
 	byte	*mem0wr;
 	byte	*wrptr;
 	int	j;
-	
+
 	g_c08x_wrdefram = new_wrdefram;
 
 	if(g_c035_shadow_reg & 0x40) {
@@ -1070,7 +1070,7 @@ setup_pageinfo()
 	word32	mem_size_pages;
 
 	/* first, set all of memory to point to itself */
-	
+
 	mem_size_pages = g_mem_size_total >> 8;
 	mem0rd = &(g_memory_ptr[0]);
 	fixup_any_bank_any_page(0, mem_size_pages, mem0rd, mem0rd);
@@ -2054,7 +2054,7 @@ io_write(word32 loc, int val, double *cyc_ptr)
 			if((val & 0xe6) != 0) {
 				halt_printf("write c041: %02x\n", val);
 			}
-			
+
 			if (val & C041_EN_MOUSE)
 			{
 				// Enable Mega II mouse
@@ -2470,7 +2470,7 @@ get_slow_mem(word32 loc, int duff_cycles)
 	int val;
 
 	loc = loc & 0x1ffff;
-	
+
 	if((loc &0xf000) == 0xc000) {
 		return(io_read(loc &0xfff, duff_cycles));
 	}

@@ -2,7 +2,7 @@
   GSPLUS - Advanced Apple IIGS Emulator Environment
   Based on the KEGS emulator written by Kent Dickey
   See COPYRIGHT.txt for Copyright information
-	See COPYING.txt for license (GPL v2)
+	See LICENSE.txt for license (GPL v2)
 */
 
 // @todo: mouse clip bugs.. great western shootout. Paint 8/16.   still in win32
@@ -286,7 +286,8 @@ void dev_video_init_sdl() {
   // Create an application window with the following settings:
   char window_title[32];
   sprintf(window_title, "GSplus v%-6s", g_gsplus_version_str);
-  int startx,starty = SDL_WINDOWPOS_UNDEFINED;
+  int startx = SDL_WINDOWPOS_UNDEFINED;
+  int starty = SDL_WINDOWPOS_UNDEFINED;
   if (g_startx != WINDOWPOS_UNDEFINED) { startx = g_startx; }
   if (g_starty != WINDOWPOS_UNDEFINED) { starty = g_starty; }
   int more_flags = 0;
@@ -303,7 +304,7 @@ void dev_video_init_sdl() {
   if (g_resizeable) {
     more_flags |= SDL_WINDOW_RESIZABLE;
   }
-  
+
 
   window = SDL_CreateWindow(
     window_title,											 // window title (GSport vX.X)
@@ -315,7 +316,7 @@ void dev_video_init_sdl() {
     SDL_WINDOW_OPENGL                  // flags - see below
     | more_flags
   );
-  
+
 
   // Check that the window was successfully created
   if (window == NULL) {
@@ -369,7 +370,7 @@ void dev_video_init_sdl() {
   dstrect.w = BASE_WINDOW_WIDTH;
   dstrect.h = X_A2_WINDOW_HEIGHT;
   int pitch = BASE_WINDOW_WIDTH;
-  
+
 
   // UPDATE A RECT OF THE APPLE II SCREEN TEXTURE
   SDL_UpdateTexture(overlay_texture, &dstrect, overlay_pixels, pitch*sizeof(Uint32) );
