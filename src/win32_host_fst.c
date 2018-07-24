@@ -2672,6 +2672,7 @@ void host_fst(void) {
 	fprintf(stderr, "Host FST: %04x %s", call, call_name(call));
 
 	if (call & 0x8000) {
+		fputs("\n", stderr);
 		// system level.
 		switch(call) {
 			case 0x8001:
@@ -2719,7 +2720,6 @@ void host_fst(void) {
 			case 0x02:
 			case 0x05:
 			case 0x06:
-			case 0x07:
 			case 0x0b:
 			case 0x10:
 				path1 = get_path1();

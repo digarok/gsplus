@@ -2607,7 +2607,6 @@ void host_fst(void) {
 			case 0x02:
 			case 0x05:
 			case 0x06:
-			case 0x07:
 			case 0x0b:
 			case 0x10:
 				path1 = get_path1();
