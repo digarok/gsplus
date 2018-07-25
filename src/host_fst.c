@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <time.h>
+#include <libgen.h>
 
 #include "defc.h"
 #include "gsos.h"
@@ -73,6 +74,12 @@ enum {
 	directory_file,
 };
 
+enum {
+	translate_none,
+	translate_crlf,
+	translate_merlin,
+};
+
 
 struct directory {
 	int displacement;
@@ -87,6 +94,7 @@ struct fd_entry {
 	int type;
 	int access;
 	int fd;
+	int translate;
 	struct directory *dir;
 };
 
@@ -136,7 +144,8 @@ static int read_only = 0;
 
 char *g_cfg_host_path = ""; // must not be null.
 int g_cfg_host_read_only = 0;
-
+int g_cfg_host_crlf = 1;
+int g_cfg_host_merlin = 0;
 
 /*
  * simple malloc pool to simplify code.  Should never need > 4 allocations.
@@ -204,6 +213,22 @@ static char *gc_strdup(const char *src) {
 	return cp;
 }
 
+static word32 enoent(const char *path) {
+	/*
+		some op on path return ENOENT. check if it's
+		fileNotFound or pathNotFound
+	 */
+	char *p = (char *)path;
+	for(;;) {
+		struct stat st;
+		p = dirname(p);
+		if (p == NULL) break;
+		if (p[0] == '.' && p[1] == 0) break;
+		if (p[0] == '/' && p[1] == 0) break;
+		if (stat(p, &st) < 0) return pathNotFound;
+	}
+	return fileNotFound;
+}
 
 static word32 map_errno() {
 	switch(errno) {
@@ -224,6 +249,11 @@ static word32 map_errno() {
 		default:
 			return drvrIOError;
 	}
+}
+
+static word32 map_errno_path(const char *path) {
+	if (errno == ENOENT) return enoent(path);
+	return map_errno();
 }
 
 
@@ -274,16 +304,92 @@ static word32 remove_fd(int cookie) {
 	return rv;
 }
 
-static ssize_t safe_read(int fd, void *buffer, size_t count) {
+static void cr_to_lf(byte *buffer, size_t size) {
+	size_t i;
+	for (i = 0; i < size; ++i) {
+		if (buffer[i] == '\r') buffer[i] = '\n';
+	}
+}
+
+static void lf_to_cr(byte *buffer, size_t size) {
+	size_t i;
+	for (i = 0; i < size; ++i) {
+		if (buffer[i] == '\n') buffer[i] = '\r';
+	}
+}
+
+static void merlin_to_text(byte *buffer, size_t size) {
+	size_t i;
+	for (i = 0; i < size; ++i) {
+		byte b = buffer[i];
+		if (b == 0xa0) b = '\t';
+		b &= 0x7f;
+		if (b == '\r') b = '\n';
+		buffer[i] = b;
+	}
+}
+
+static void text_to_merlin(byte *buffer, size_t size) {
+	size_t i;
+	for (i = 0; i < size; ++i) {
+		byte b = buffer[i];
+		if (b == '\t') b = 0xa0;
+		if (b == '\n') b = '\r';
+		if (b != ' ') b |= 0x80;
+		buffer[i] = b;
+	}	
+}
+
+static ssize_t safe_read(struct fd_entry *e, byte *buffer, size_t count) {
+	int fd = e->fd;
+	int tr = e->translate;
+
 	for (;;) {
 		ssize_t ok = read(fd, buffer, count);
-		if (ok >= 0) return ok;
+		if (ok >= 0) {
+			size_t i;
+			if (tr == translate_crlf) {
+				for (i = 0; i < ok; ++i) {
+					if (buffer[i] == '\n') buffer[i] = '\r';
+				}
+			}
+			if (tr == translate_merlin) {
+				for (i = 0; i < ok; ++i) {
+					unsigned char c = buffer[i];
+					if (c == '\t') c = 0xa0;
+					if (c == '\n') c = '\r';
+					if (c != ' ') c |= 0x80;
+					buffer[i] = c;
+				}
+			}
+			return ok;
+		}
 		if (ok < 0 && errno == EINTR) continue;
 		return ok;
 	}
 }
 
-static ssize_t safe_write(int fd, const void *buffer, size_t count) {
+static ssize_t safe_write(struct fd_entry *e, byte *buffer, size_t count) {
+	int fd = e->fd;
+	int tr = e->translate;
+
+	if (tr == translate_crlf) {
+		size_t i;
+		for (i = 0; i < count; ++i) {
+			if (buffer[i] == '\r') buffer[i] = '\n';
+		}
+	}
+	if (tr == translate_merlin) {
+		size_t i;
+		for (i = 0; i < count; ++i) {
+			unsigned char c = buffer[i];
+			if (c == 0xa0) c = '\t';
+			c &= 0x7f;
+			if (c == '\r') c = '\n';
+			buffer[i] = c;
+		}
+	}
+
 	for (;;) {
 		ssize_t ok = write(fd, buffer, count);
 		if (ok >= 0) return ok;
@@ -478,12 +584,12 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 
 	ssize_t tmp;
-	tmp = getxattr(path, "user.apple.ResourceFork", NULL, 0);
+	tmp = getxattr(path, "user.com.apple.ResourceFork", NULL, 0);
 	if (tmp < 0) tmp = 0;
 	fi->resource_eof = tmp;
 	fi->resource_blocks = (tmp + 511) / 512;
 
-	tmp = getxattr(path, "user.apple.FinderInfo", fi->finder_info, 32);
+	tmp = getxattr(path, "user.com.apple.FinderInfo", fi->finder_info, 32);
 	if (tmp == 16 || tmp == 32){
 		fi->has_fi = 1;
 
@@ -494,6 +600,37 @@ static void get_file_xinfo(const char *path, struct file_info *fi) {
 static void get_file_xinfo(const char *path, struct file_info *fi) {
 }
 #endif
+
+#undef _
+#define _(a, b, c) { a, sizeof(a) - 1, b, c }
+struct ftype_entry {
+	char *ext;
+	unsigned length;
+	unsigned file_type;
+	unsigned aux_type;
+};
+
+static struct ftype_entry suffixes[] = {
+	_("c",    0xb0, 0x0008),
+	_("cc",   0xb0, 0x0008),
+	_("h",    0xb0, 0x0008),
+	_("rez",  0xb0, 0x0015),
+	_("asm",  0xb0, 0x0003),
+	_("mac",  0xb0, 0x0003),
+	_("pas",  0xb0, 0x0005),
+	_("txt",  0x04, 0x0000),
+	_("text", 0x04, 0x0000),
+	_("s",    0x04, 0x0000),
+	{ 0, 0, 0, 0}
+};
+
+static struct ftype_entry prefixes[] = {
+	_("m16.",  0xb0, 0x0003),
+	_("e16.",  0xb0, 0x0003),
+	{ 0, 0, 0, 0}
+};
+
+#undef _
 
 static word32 get_file_info(const char *path, struct file_info *fi) {
 	struct stat st;
@@ -542,6 +679,31 @@ static word32 get_file_info(const char *path, struct file_info *fi) {
 
 	if (S_ISREG(st.st_mode)) {
 		get_file_xinfo(path, fi);
+
+		if (!fi->has_fi) {
+			/* guess the file type / auxtype based on extension */
+			int n;
+			const char *dot = NULL;
+			const char *slash = NULL;
+
+			for(n = 0; ; ++n) {
+				char c = path[n];
+				if (c == 0) break;
+				else if (c == '/') { slash = path + n + 1; dot = NULL; }
+				else if (c == '.') dot = path + n + 1;
+			}
+
+			if (dot && *dot) {
+				for (n = 0; n < sizeof(suffixes) / sizeof(suffixes[0]); ++n) {
+					if (!suffixes[n].ext) break;
+					if (!strcasecmp(dot, suffixes[n].ext)) {
+						fi->file_type = suffixes[n].file_type;
+						fi->aux_type = suffixes[n].aux_type;
+						break;
+					}
+				}
+			}
+		}
 	}
 
 	// get file type/aux type
@@ -1021,24 +1183,38 @@ static word32 fst_create(int class, const char *path) {
 	}
 	int ok;
 
+	if (fi.storage_type == 0 && fi.file_type == 0x0f)
+		fi.storage_type = 0x0d;
+
 	if (fi.storage_type == 0x0d) {
 		ok = mkdir(path, 0777);
-		if (ok < 0) return map_errno();
+		if (ok < 0) {
+			return map_errno_path(path);
+		}
+
+		if (class) {
+			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, fi.storage_type, 0);
+		} else {
+			set_memory16_c(pb + CreateRec_storageType, fi.storage_type, 0);
+		}
+
 		return 0;
 	}
 	if (fi.storage_type <= 3 || fi.storage_type == 0x05) {
 		// normal file.
 		// 0x05 is an extended/resource file but we don't do anything special.
 		ok = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
-		if (ok < 0) return map_errno();
+		if (ok < 0) return map_errno_path(path);
 		// set ftype, auxtype...
 		set_file_info(path, &fi);
 		close(ok);
 
+		fi.storage_type = 1;
+
 		if (class) {
-			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, 1, 0);
+			if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, fi.storage_type, 0);
 		} else {
-			set_memory16_c(pb + CreateRec_storageType, 1, 0);
+			set_memory16_c(pb + CreateRec_storageType, fi.storage_type, 0);
 		}
 
 		return 0;
@@ -1067,7 +1243,7 @@ static word32 fst_destroy(int class, const char *path) {
 	if (!path) return badStoreType;
 
 	if (stat(path, &st) < 0) {
-		return map_errno();
+		return map_errno_path(path);
 	}
 
 	// can't delete volume root. 
@@ -1078,7 +1254,7 @@ static word32 fst_destroy(int class, const char *path) {
 	int ok = S_ISDIR(st.st_mode) ? rmdir(path) : unlink(path);
 
 
-	if (ok < 0) return map_errno();
+	if (ok < 0) return map_errno_path(path);
 	return 0;
 }
 
@@ -1295,7 +1471,7 @@ static int open_data_fork(const char *path, word16 *access, word16 *error) {
 		break;
 	}
 	if (fd < 0) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 	}
 
 	return fd;
@@ -1333,7 +1509,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 		break;
 	}
 	if (fd < 0) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 	}
 
 	return fd;
@@ -1345,7 +1521,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	int tmp = open(path, O_RDONLY);
 	if (tmp < 0) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 		return -1;
 	}
 
@@ -1376,7 +1552,7 @@ static int open_resource_fork(const char *path, word16 *access, word16 *error) {
 	}
 
 	if (fd < 0) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 		close(tmp);
 		return -1;
 	}
@@ -1515,6 +1691,20 @@ static word32 fst_open(int class, const char *path) {
 		return tooManyFilesOpen;
 	}
 
+	if (type == regular_file){
+
+		if (g_cfg_host_crlf) {
+			if (fi.file_type == 0x04 || fi.file_type == 0xb0)
+				e->translate = translate_crlf;
+		}
+
+		if (g_cfg_host_merlin && fi.file_type == 0x04) {
+			int n = strlen(path);
+			if (n >= 3 && path[n-1] == 'S' && path[n-2] == '.')
+				e->translate = translate_merlin;
+		}
+	}
+
 	e->access = access;
 	e->path = strdup(path);
 	e->type = type;
@@ -1574,7 +1764,7 @@ static word32 fst_read(int class) {
 
 		for (word32 i = 0 ; i < request_count; ++i) {
 			byte b;
-			ok = safe_read(e->fd, &b, 1);
+			ok = safe_read(e, &b, 1);
 			if (ok < 0) return map_errno();
 			if (ok == 0) break;
 			transfer_count++;
@@ -1587,7 +1777,8 @@ static word32 fst_read(int class) {
 		byte *data = gc_malloc(request_count);
 		if (!data) return outOfMem;
 
-		ok = safe_read(e->fd, data, request_count);
+
+		ok = safe_read(e, data, request_count);
 		if (ok < 0) rv = map_errno();
 		if (ok == 0) rv = eofEncountered;
 		if (ok > 0) {
@@ -1649,7 +1840,7 @@ static word32 fst_write(int class) {
 	}
 
 	word32 rv = 0;
-	ssize_t ok = safe_write(e->fd, data, request_count);
+	ssize_t ok = safe_write(e, data, request_count);
 	if (ok < 0) rv = map_errno();
 	if (ok > 0) {
 		if (class)
@@ -1879,7 +2070,7 @@ static struct directory *read_directory(const char *path, word16 *error) {
 
 	dirp = opendir(path);
 	if (!dirp) {
-		*error = map_errno();
+		*error = map_errno_path(path);
 		return NULL;
 	}
 
@@ -1990,7 +2181,7 @@ static word32 fst_get_dir_entry(int class) {
 	struct 	file_info fi;
 	rv = get_file_info(fullpath, &fi);
 
-
+	if (dname) fprintf(stderr, " - %s", dname);
 
 	// p16 and gs/os both use truncating c1 output string.
 	rv = set_gsstr_truncate(name, dname);
@@ -2046,12 +2237,12 @@ static word32 fst_change_path(int class, const char *path1, const char *path2) {
 
 	/* make sure they're not trying to rename the volume... */
 	struct stat st;
-	if (stat(path1, &st) < 0) return map_errno();
+	if (stat(path1, &st) < 0) return map_errno_path(path1);
 	if (st.st_dev == root_dev && st.st_ino == root_ino)
 		return invalidAccess;
 
 	// rename will delete any previous file.
-	if (rename(path1, path2) < 0) return map_errno();
+	if (rename(path1, path2) < 0) return map_errno_path(path2);
 	return 0;
 }
 
@@ -2365,10 +2556,11 @@ void host_fst(void) {
 	word32 acc = 0;
 	word16 call = engine.xreg;
 
-	fprintf(stderr, "Host FST: %04x %s\n", call, call_name(call));
+	fprintf(stderr, "Host FST: %04x %s", call, call_name(call));
 
 
 	if (call & 0x8000) {
+		fputs("\n", stderr);
 		// system level.
 		switch(call) {
 			case 0x8001:
@@ -2383,19 +2575,50 @@ void host_fst(void) {
 		}
 	} else {
 
+		if (!root) {
+			acc = networkError;
+			engine.acc =  acc;
+			SEC();
+ 			fprintf(stderr, "          %02x   %s\n", acc, error_name(acc));
+
+			return;
+		}
+
 		int class = call >> 13;
 		call &= 0x1fff;
 
 		if (class > 1) {
+			acc = invalidClass;
+			engine.acc = acc;
 			SEC();
-			engine.acc = invalidClass;
+ 			fprintf(stderr, "          %02x   %s\n", acc, error_name(acc));
+
 			return;
 		}
-		char *path1 = get_path1();
-		char *path2 = get_path2();
+
+		char *path1 = NULL;
+		char *path2 = NULL;
 		char *path3 = NULL;
 		char *path4 = NULL;
 		const char *cp;
+
+		switch(call & 0xff) {
+			case 0x01:
+			case 0x02:
+			case 0x05:
+			case 0x06:
+			case 0x0b:
+			case 0x10:
+				path1 = get_path1();
+				break;
+			case 0x04:
+				path1 = get_path1();
+				path2 = get_path2();
+				break;
+		}
+
+		if (path1) fprintf(stderr, " - %s", path1);
+		if (path2) fprintf(stderr, " - %s", path2);
 
 		switch(call & 0xff) {
 			case 0x01:
@@ -2493,8 +2716,7 @@ void host_fst(void) {
 				acc = invalidFSTop;
 				break;
 		}
-
-
+		fputs("\n", stderr);
 	}
 
  	if (acc) fprintf(stderr, "          %02x   %s\n", acc, error_name(acc));

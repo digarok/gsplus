@@ -130,6 +130,8 @@ extern int g_win_status_debug_request;
 
 extern char *g_cfg_host_path;
 extern int g_cfg_host_read_only;
+extern int g_cfg_host_crlf;
+extern int g_cfg_host_merlin;
 
 extern int g_screen_index[];
 extern word32 g_full_refresh_needed;
@@ -289,6 +291,8 @@ Cfg_menu g_cfg_host_menu[] = {
 { "Host FST Configuration", g_cfg_host_menu, 0, 0, CFGTYPE_MENU },
 { "Shared Host Folder", KNMP(g_cfg_host_path), CFGTYPE_DIR },
 { "Read Only,0,No,1,Yes", KNMP(g_cfg_host_read_only), CFGTYPE_INT },
+{ "CR/LF conversion,0,No,1,Yes", KNMP(g_cfg_host_crlf), CFGTYPE_INT },
+{ "Merlin conversion,0,No,1,Yes", KNMP(g_cfg_host_merlin), CFGTYPE_INT },
 { "", 0, 0, 0, 0 },
 { "Back to Main Config", g_cfg_main_menu, 0, 0, CFGTYPE_MENU },
 { 0, 0, 0, 0, 0 },
