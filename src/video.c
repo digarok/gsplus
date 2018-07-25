@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
- 
- Copyright (C) 2010 - 2012 by GSport contributors
- 
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
- for more details.
-
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include <time.h>
@@ -105,6 +89,11 @@ int	g_border_last_vbl_changes = 0;
 
 int	g_use_dhr140 = 0;
 int	g_use_bw_hires = 0;
+int g_startx = WINDOWPOS_UNDEFINED;
+int g_starty = WINDOWPOS_UNDEFINED;
+int g_highdpi = 0;
+int g_borderless = 0;
+int g_resizeable = 0;
 
 int	g_a2_new_all_stat[200];
 int	g_a2_cur_all_stat[200];
@@ -587,7 +576,7 @@ video_reset()
 		stat |= ALL_STAT_COLOR_C021;
 	}
 	if(g_config_control_panel) {
-		/* Don't update cur_a2_stat when in configuration panel */ 
+		/* Don't update cur_a2_stat when in configuration panel */
 		g_save_cur_a2_stat = stat;
 	} else {
 		g_cur_a2_stat = stat;
@@ -607,7 +596,7 @@ int	g_screen_redraw_skip_amt = -1;
 
 word32	g_cycs_in_check_input = 0;
 
-int g_needfullrefreshfornextframe = 1 ;	
+int g_needfullrefreshfornextframe = 1 ;
 
 void video_update()
 {
@@ -655,8 +644,8 @@ void video_update()
 		g_vid_update_last_line = 0;
 		video_update_through_line(0);
 	}
-	
-	
+
+
 // OG Notify host that video has been uodated
 #if defined(ACTIVEGSPLUGIN) && defined(MAC)
 	{
@@ -1653,7 +1642,7 @@ redraw_changed_gr(int start_offset, int start_line, int num_lines, int reparse,
 						(eff_line > end_line)) {
 						continue;
 					}
-				
+
 					img_ptr[0] = val0_wd + palette_add;
 					img_ptr[1] = val0_wd + palette_add;
 					img_ptr[2] = val0_wd + palette_add;
@@ -3213,7 +3202,7 @@ video_push_lines(Kimage *kimage_ptr, int start_line, int end_line, int left_pix,
 	int center = 0; // OG added variable to center screen
 
 	//OG add null pointer check when emulator is restarted
-	if (!kimage_ptr)	
+	if (!kimage_ptr)
 	{
 		printf("warning : video_push_lines(kimage_ptr=null)\n");
 		return ;
@@ -3246,7 +3235,7 @@ video_push_lines(Kimage *kimage_ptr, int start_line, int end_line, int left_pix,
 		center=EFF_BORDER_WIDTH - BORDER_WIDTH;
 
 	// OG shifting image to the center
-	x_push_kimage(kimage_ptr, g_video_act_margin_left + left_pix + center,	
+	x_push_kimage(kimage_ptr, g_video_act_margin_left + left_pix + center,
 			g_video_act_margin_top + srcy, left_pix, srcy,
 			(right_pix - left_pix), 2*(end_line - start_line));
 }
@@ -3311,7 +3300,7 @@ video_push_border_sides()
 
 	/* redraw left sides */
 	// OG Left side can alos be "jagged" as a2 screen is now being centered
-	
+
 	//video_push_border_sides_lines(0, 0, BORDER_WIDTH, 0, 200);
 
 	prev_line = -1;
@@ -3376,10 +3365,20 @@ video_push_border_special()
 
 	dest_x = 0;
 	src_x = BASE_MARGIN_LEFT - g_video_act_margin_left;
-
+/*
+	glogf("width: %d", kimage_ptr->width_act);
+	for (int i = 600; i< 700; i++) {
+		kimage_ptr->data_ptr[i*4] = 0xFF;
+		kimage_ptr->data_ptr[i*4+1] = 0xFF;
+		kimage_ptr->data_ptr[i*4+2] = 0x00;
+	}
+*/
 	if(width > 0 && height > 0) {
-		x_push_kimage(kimage_ptr, dest_x, dest_y, src_x, src_y,
-								width, height);
+		#ifdef WINSDL_BORDERHACK
+										x_push_kimage(kimage_ptr, dest_x+72, dest_y, src_x, src_y,	width, height);
+		#endif
+		x_push_kimage(kimage_ptr, dest_x, dest_y, src_x, src_y,	width, height);
+//		glogf("X:%d Y: %d SX:%d SY:%D W:%d H:%d\n",dest_x, dest_y, src_x, src_y, width, height);
 	}
 
 	// Then fix top border: dest_x from 0 to 640+LEFT+RIGHT and
@@ -3390,8 +3389,10 @@ video_push_border_special()
 	dest_y = 0;
 	src_y = BASE_MARGIN_BOTTOM;
 	if(width > 0 && height > 0) {
-		x_push_kimage(kimage_ptr, dest_x, dest_y, src_x, src_y,
-								width, height);
+		#ifdef WINSDL_BORDERHACK
+										x_push_kimage(kimage_ptr, dest_x+72, dest_y, src_x, src_y,	width, height);
+		#endif
+		x_push_kimage(kimage_ptr, dest_x, dest_y, src_x, src_y,	width, height);
 	}
 }
 
@@ -3429,21 +3430,21 @@ video_push_kimages()
 
 	if (x_calc_ratio(ratiox,ratioy))
 	{
-		line = 0;		
+		line = 0;
 		while (1)
 		{
 			start = line;
-			cur_kim = g_a2_line_kimage[line];		
-			while(line < 200 && g_a2_line_kimage[line] == cur_kim) line++;	
+			cur_kim = g_a2_line_kimage[line];
+			while(line < 200 && g_a2_line_kimage[line] == cur_kim) line++;
 			if (cur_kim == &g_kimage_superhires)
 				right = 640;
 			else
 				right = 560;
-			
+
 			video_push_lines(cur_kim, start, line,0,right);
 			if (line==200) break;
 		}
-	
+
 	}
 	else
 	{

@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
- 
- Copyright (C) 2010 - 2012 by GSport contributors
- 
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
- for more details.
-
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See LICENSE.txt for license (GPL v2)
 */
 
 /* xdriver.c and macdriver.c and windriver.c */
@@ -46,9 +30,6 @@ void x_get_kimage(Kimage *kimage_ptr);
 void x_full_screen(int do_full);
 void clipboard_paste(void);
 int clipboard_get_char(void);
-
-/* test65.c */
-void do_gen_test(int got_num, int base_seed);
 
 
 /* engine.s and engine_c.c */

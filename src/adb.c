@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
-
- Copyright (C) 2010 - 2013 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See LICENSE.txt for license (GPL v2)
 */
 
 /* adb_mode bit 3 and bit 2 (faster repeats for arrows and space/del) not done*/
@@ -1468,7 +1452,7 @@ adb_key_event(int a2code, int is_up)
 		/* ESC pressed, see if ctrl & cmd key down */
 		if(CTRL_DOWN && CMD_DOWN) {
 			/* Desk mgr int */
-			printf("Desk mgr int!\n");
+			glog("Desk mgr int!");
 
 			g_adb_interrupt_byte |= 0x20;
 			adb_add_data_int();
@@ -1507,7 +1491,7 @@ adb_key_event(int a2code, int is_up)
 
 	special = (ascii >> 8) & 0xff;
 	if(ascii < 0) {
-		printf("ascii1: %d, a2code: %02x, pos: %d\n", ascii,a2code,pos);
+		glogf("ascii1: %d, a2code: %02x, pos: %d", ascii,a2code,pos);
 		ascii = 0;
 		special = 0;
 	}
@@ -1707,10 +1691,6 @@ adb_physical_key_update(int a2code, int is_up)
 			a2code = 0x3a;
 			special = 0;
 			break;
-		case 0x03: /* F3 - remap to escape for OS/2 */
-			a2code = 0x35;
-			special = 0;
-			break;
 		case 0x0c: /* F12 - remap to reset */
 			a2code = 0x7f;
 			special = 0;
@@ -1735,6 +1715,9 @@ adb_physical_key_update(int a2code, int is_up)
 
 	if(special && !is_up) {
 		switch(special) {
+		case 0x03: /* F3 - screenshot */
+			g_screenshot_requested = 1;
+			break;
 		case 0x04: /* F4 - emulator config panel */
       if (CMD_DOWN) {
           glog("Quit!");
@@ -1748,7 +1731,7 @@ adb_physical_key_update(int a2code, int is_up)
 			break;
 		case 0x05: /* F5 - emulator clipboard paste */
 			if (SHIFT_DOWN) {
-				g_screenshot_requested = 1;
+				// reserved
 			} else {
 				clipboard_paste();
 			}

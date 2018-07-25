@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
-
- Copyright (C) 2010 - 2014 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include "defc.h"
@@ -26,9 +10,7 @@
 #include "config.h"
 #include "glog.h"
 #include "imagewriter.h"
-#if defined(__OS2__)
-#include "arch\os2\src\dirport.h"
-#elif defined(_MSC_VER)
+#if defined(_MSC_VER)
 #include "arch\win32\dirent-win32.h"
 #else
 #include <dirent.h>
@@ -44,6 +26,9 @@
 #define snprintf _snprintf
 typedef unsigned int mode_t;
 #endif
+
+static const char parse_log_prefix_file[] = "Option set [file]:";
+
 
 extern int Verbose;
 extern word32 g_vbl_count;
@@ -62,6 +47,33 @@ extern int g_rom_version;
 extern int g_fatal_log;
 
 extern word32 g_adb_repeat_vbl;
+
+extern int g_audio_enable;
+extern int g_preferred_rate;
+extern int g_fullscreen;
+extern int g_highdpi;
+extern int g_borderless;
+extern int g_resizeable;
+extern int g_screen_redraw_skip_amt;
+extern int g_use_dhr140;
+extern int g_use_bw_hires;
+extern int g_scanline_simulator;
+extern int g_startx;
+extern int g_starty;
+extern int g_joystick_number;
+extern int g_joystick_x_axis;
+extern int g_joystick_y_axis;
+extern int g_joystick_x2_axis;
+extern int g_joystick_y2_axis;
+extern int g_joystick_button_0;
+extern int g_joystick_button_1;
+extern int g_joystick_button_2;
+extern int g_joystick_button_3;
+extern int g_ethernet;
+extern int g_halt_on_bad_read;
+extern int g_ignore_bad_acc;
+extern int g_ignore_halts;
+extern int g_dbg_enable_port;
 
 extern int halt_sim;
 extern int g_limit_speed;
@@ -160,6 +172,7 @@ int	g_cfg_curs_inv = 0;
 int	g_cfg_curs_mousetext = 0;
 int g_cfg_triggeriwreset = 0;
 
+#define CFG_PG_SCROLL_AMT 15
 #define CFG_MAX_OPTS	16
 #define CFG_OPT_MAXSTR	100
 
@@ -181,6 +194,38 @@ int g_cfg_file_dir_only = 0;
 extern Cfg_menu g_cfg_main_menu[];
 
 #define KNMP(a)		&a, #a, 0
+
+// This first menu is not a menu, but a list of config options that are
+// represented here so they will be parsed correctly out of the config files.
+Cfg_menu g_cfg_uiless_menu[] = {
+	{ "", KNMP(g_audio_enable), CFGTYPE_INT },
+	{ "", KNMP(g_preferred_rate), CFGTYPE_INT },
+	{ "", KNMP(g_fullscreen), CFGTYPE_INT },
+	{ "", KNMP(g_highdpi), CFGTYPE_INT },
+	{ "", KNMP(g_borderless), CFGTYPE_INT },
+	{ "", KNMP(g_resizeable), CFGTYPE_INT },
+	{ "", KNMP(g_screen_redraw_skip_amt), CFGTYPE_INT },
+	{ "", KNMP(g_use_dhr140), CFGTYPE_INT },
+	{ "", KNMP(g_use_bw_hires), CFGTYPE_INT },
+	{ "", KNMP(g_scanline_simulator), CFGTYPE_INT },
+	{ "", KNMP(g_startx), CFGTYPE_INT },
+	{ "", KNMP(g_starty), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_number), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_x_axis), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_y_axis), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_x2_axis), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_y2_axis), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_button_0), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_button_1), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_button_2), CFGTYPE_INT },
+	{ "", KNMP(g_joystick_button_3), CFGTYPE_INT },
+	{ "", KNMP(g_ethernet), CFGTYPE_INT },
+	{ "", KNMP(g_halt_on_bad_read), CFGTYPE_INT },
+	{ "", KNMP(g_ignore_bad_acc), CFGTYPE_INT },
+	{ "", KNMP(g_ignore_halts), CFGTYPE_INT },
+	{ 0, 0, 0, 0, 0 },
+};
+
 
 Cfg_menu g_cfg_disk_menu[] = {
 { "Disk Configuration", g_cfg_disk_menu, 0, 0, CFGTYPE_MENU },
@@ -403,10 +448,8 @@ Cfg_menu g_cfg_main_menu[] = {
 { "Virtual ImageWriter Configuration", g_cfg_imagewriter_menu, 0, 0, CFGTYPE_MENU },
 #endif
 { "Developer Options", g_cfg_devel_menu, 0, 0, CFGTYPE_MENU },
-{ "Auto-update configuration file,0,Manual,1,Immediately",
-		KNMP(g_config_gsplus_auto_update), CFGTYPE_INT },
-{ "Speed,0,Unlimited,1,1.0MHz,2,2.8MHz,3,8.0MHz (Zip)",
-		KNMP(g_limit_speed), CFGTYPE_INT },
+{ "Auto-update configuration file,0,Manual,1,Immediately", KNMP(g_config_gsplus_auto_update), CFGTYPE_INT },
+{ "Speed,0,Unlimited,1,1.0MHz,2,2.8MHz,3,8.0MHz (Zip)", KNMP(g_limit_speed), CFGTYPE_INT },
 { "Expansion Mem Size,0,0MB,0x100000,1MB,0x200000,2MB,0x300000,3MB,"
 	"0x400000,4MB,0x600000,6MB,0x800000,8MB,0xa00000,10MB,0xc00000,12MB,"
 	"0xe00000,14MB", KNMP(g_mem_size_exp), CFGTYPE_INT },
@@ -442,7 +485,7 @@ Cfg_listhdr g_cfg_partitionlist = { 0 };
 
 int g_cfg_file_pathfield = 0;
 
-const char *g_gsplus_rom_names[] = { "ROM", "ROM", "ROM.01", "ROM.03", 0 };
+const char *g_gsplus_rom_names[] = { "ROM", "ROM", "ROM01", "ROM03", "ROM.01", "ROM.03", 0 };
 	/* First entry is special--it will be overwritten by g_cfg_rom_path */
 
 const char *g_gsplus_c1rom_names[] = { "parallel.rom", 0 };
@@ -450,8 +493,7 @@ const char *g_gsplus_c2rom_names[] = { 0 };
 const char *g_gsplus_c3rom_names[] = { 0 };
 const char *g_gsplus_c4rom_names[] = { 0 };
 const char *g_gsplus_c5rom_names[] = { 0 };
-const char *g_gsplus_c6rom_names[] = { "c600.rom", "controller.rom", "disk.rom",
-				"DISK.ROM", "diskII.prom", 0 };
+const char *g_gsplus_c6rom_names[] = { "c600.rom", "controller.rom", "disk.rom", "DISK.ROM", "diskII.prom", 0 };
 const char *g_gsplus_c7rom_names[] = { 0 };
 
 const char **g_gsplus_rom_card_list[8] = {
@@ -566,6 +608,7 @@ config_init()
 	int	can_create;
 
 	config_init_menus(g_cfg_main_menu);
+	config_init_menus(g_cfg_uiless_menu);
 
 	// Find the configuration file
 	g_config_gsplus_name[0] = 0;
@@ -578,7 +621,6 @@ config_init()
 void
 cfg_exit()
 {
-	/* printf("In cfg exit\n"); */
 	if(g_rom_version >= 1) {
 		g_config_control_panel = 0;
 	}
@@ -605,11 +647,10 @@ cfg_text_screen_dump()
 	int	i, j;
 
 	filename = "gsplus.screen.dump";
-	printf("Writing text screen to the file %s\n", filename);
+	glogf("Writing text screen to the file %s", filename);
 	ofile = fopen(filename, "w");
 	if(ofile == 0) {
-		fatal_printf("Could not write to file %s, (%d)\n", filename,
-				errno);
+		fatal_printf("Could not write to file %s, (%d)\n", filename, errno);
 		return;
 	}
 
@@ -720,9 +761,7 @@ config_parse_option(char *buf, int pos, int len, int line)
 	}
 
 	// find "name" as first contiguous string
-	glogf("...parse_option: line %d, len:%d  \"%s\"", line, len, &buf[pos]);
-
-	// printf("...parse_option: line %d, %p,%p = %s (%s) len:%d\n", line, &buf[pos], buf, &buf[pos], buf, len);
+	glogf("%s line %d, len:%d  \"%s\"", parse_log_prefix_file, line, len, &buf[pos]);
 
 	nameptr = &buf[pos];
 	while(pos < len) {
@@ -779,8 +818,7 @@ config_parse_option(char *buf, int pos, int len, int line)
 		*strptr = gsplus_malloc_str(&buf[pos]);
 		break;
 	default:
-		printf("Config file variable %s is unknown type: %d\n",
-			nameptr, type);
+		glogf("Config file variable %s is unknown type: %d", nameptr, type);
 	}
 
 }
@@ -929,7 +967,7 @@ config_load_roms()
 					"read %d bytes\n", &g_cfg_tmp_path[0], errno, len, ret);
 				continue;
 			}
-			printf("Read: %d bytes of ROM in slot %d from file %s.\n", ret, i, &g_cfg_tmp_path[0]);
+			glogf("Read: %d bytes of ROM in slot %d from file %s.", ret, i, &g_cfg_tmp_path[0]);
 			fclose(file);
 		}
 	}
@@ -1053,23 +1091,10 @@ config_parse_config_gsplus_file()
 	// not really a fan of that either and think it should be take out.
 	// Especially now that you can pass a filename.
 
-// #ifndef __OS2__
-// 	if(g_cfg_cwd_str[0] != 0) {
-// 		ret = chdir(&g_cfg_cwd_str[0]);
-// 		if(ret != 0) {
-// 			printf("chdir to %s, errno:%d\n", g_cfg_cwd_str, errno);
-// 		}
-// 	}
-// 	/* In any case, copy the directory path to g_cfg_cwd_str */
-// 	(void)getcwd(&g_cfg_cwd_str[0], CFG_PATH_MAX);
-// #endif
-
-
 	fconf = fopen(g_config_gsplus_name, "r");
 	if(fconf == 0) {
 		perror("ERROR");
-		fatal_printf("Cannot open configuration file at %s!  Stopping!\n",
-				g_config_gsplus_name);
+		fatal_printf("Cannot open configuration file at %s!  Stopping!\n",g_config_gsplus_name);
 		my_exit(3);
 	}
 
@@ -1355,7 +1380,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 	int	cmp_o, cmp_p, cmp_dot;
 	int	cmp_b, cmp_i, cmp_n;
 	int	can_write;
-	int	len;
+	int	len = 0;
 	int	nibs;
 	int	unix_pos;
 	int	name_len;
@@ -1639,7 +1664,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 			nibs = len;
 		}
 		if(size != 35*len) {
-			glogf("Disk 5.25 error: size is %d, not 140K.  Will try to mount anyway", size, 35*len);
+			glogf("Warning - Disk 5.25 error: size is %d, not 140K.  Will try to mount anyway", size, 35*len);
 		}
 		for(i = 0; i < 35; i++) {
 			iwm_move_to_track(dsk, 4*i);
@@ -1651,8 +1676,7 @@ insert_disk(int slot, int drive, const char *name, int ejected, int force_size,
 		unix_pos = dsk->image_start;
 		size = dsk->image_size;
 		if(size != 800*1024) {
-			fatal_printf("Disk 3.5 error: size is %d, not 800K.  "
-				"Will try to mount anyway\n", size);
+			glogf("Warning - Disk 3.5 error: size is %d, not 800K.  Will try to mount anyway", size, 35*len);
 		}
 		disk_set_num_tracks(dsk, 2*80);
 		for(i = 0; i < 2*80; i++) {
@@ -2668,7 +2692,7 @@ cfg_str_match(const char *str1, const char *str2, int len)
 void
 cfg_file_readdir(const char *pathptr)
 {
-#ifndef __OS2__
+
 	struct dirent *direntptr;
 	struct stat stat_buf;
 	DIR	*dirptr;
@@ -2795,7 +2819,6 @@ cfg_file_readdir(const char *pathptr)
 			g_cfg_dirlist.curent = i;
 		}
 	}
-#endif
 }
 
 void
@@ -2820,14 +2843,14 @@ Optionally boot from that slot.
 	if (slot > 0)
 	{
 		insert_disk(slot,0,filename,0,0,0,-1);
-		printf("Inserted disk in slot %d, drive 1.  Filename: %s\n", slot, filename);
+		glogf("Inserted disk in slot %d, drive 1.  Filename: %s", slot, filename);
 		if (should_boot) {
 			g_temp_boot_slot = slot;
-			printf("That slot has been set to boot.\n");
+			glog("That slot has been set to boot.");
 		}
 	}
 	else
-		printf("Unable to determine appropriate place to insert file %s.\n",filename);
+		glogf("Unable to determine appropriate place to insert file %s.",filename);
 }
 
 int
@@ -2847,28 +2870,25 @@ Guess the image size.  Return values:
 	rc = stat(filename, &stat_buf);
 	if(rc < 0)
 	{
-		printf("Can't get statistics on file %s; errno: %d\n",
-			filename, errno);
+		glogf("Can't get statistics on file %s; errno: %d",	filename, errno);
 		rc = -1;
 	} else {
 		len = stat_buf.st_size;
-		printf("Found file %s, size %d; guessing ",
-			filename, len);
 		if (len <  140 * 1024) {
 			/* Not enough for a 140k image */
-			printf("small ProDOS image.\n");
+			glogf("Found file %s, size %d; guessing small ProDOS image.",	filename, len);
 			rc = 0;
 		} else if (len <  140 * 1024 + 256 + 1) {
 			/* Reasonable size for 140k image, maybe in 2mg format */
-			printf("a 5-1/4\" image.\n");
+			glogf("Found file %s, size %d; guessing a 5-1/4\" image.",	filename, len);
 			rc = 1;
 		} else if (len < 800 * 1024 + 256 + 1) {
 			/* Reasonable size for 800k image, maybe in 2mg format */
-			printf("a 3-1/2\" image.\n");
+			glogf("Found file %s, size %d; guessing a 3-1/2\" image.",	filename, len);
 			rc = 2;
 		} else {
 			/* Let's pretend it's an HDV image */
-			printf("a hard drive image.\n");
+			glogf("Found file %s, size %d; guessing a hard drive image.",	filename, len);
 			rc = 3;
 		}
 	}
@@ -3080,7 +3100,7 @@ cfg_file_update_ptr(char *str)
 	}
 	*g_cfg_file_strptr = newstr;
 	if(g_cfg_file_strptr == &(g_cfg_rom_path)) {
-		printf("Updated ROM file\n");
+		glog("Updated ROM file");
 		load_roms_init_memory();
 	}
 	g_config_gsplus_update_needed = 1;
@@ -3088,7 +3108,6 @@ cfg_file_update_ptr(char *str)
 void
 cfg_file_selected(int select_dir)
 {
-#ifndef __OS2__
 	struct stat stat_buf;
 	char	*str;
 	int	fmt;
@@ -3120,8 +3139,7 @@ cfg_file_selected(int select_dir)
 			(int)stat_buf.st_mode);
 	#endif
 	if(ret != 0) {
-		printf("stat %s returned %d, errno: %d\n", &g_cfg_file_path[0],
-					ret, errno);
+		glogf("stat %s returned %d, errno: %d", &g_cfg_file_path[0], ret, errno);
 	} else {
 		if(fmt == S_IFDIR && !select_dir) {
 			/* it's a directory */
@@ -3142,7 +3160,6 @@ cfg_file_selected(int select_dir)
 			}
 		}
 	}
-#endif
 }
 
 void
@@ -3193,8 +3210,19 @@ cfg_file_handle_key(int key)
 			cfg_fix_topent(listhdrptr);
 		}
 		break;
+	case 0x33: /* pg dn */
+		if(g_cfg_file_pathfield == 0) {
+			listhdrptr->curent += CFG_PG_SCROLL_AMT;
+			cfg_fix_topent(listhdrptr);
+		}
+		break;
+	case 0x39: /* pg up */
+		if(g_cfg_file_pathfield == 0) {
+			listhdrptr->curent -= CFG_PG_SCROLL_AMT;
+			cfg_fix_topent(listhdrptr);
+		}
+		break;
 	case 0x0d:	/* return */
-		//glog("Selected disk image file");
 		cfg_file_selected(0);
 		break;
 	case 0x09:	/* tab */
@@ -3203,7 +3231,6 @@ cfg_file_handle_key(int key)
 	case 0x08:	/* left arrow */
 	case 0x7f:	/* delete key */
 		if(g_cfg_file_pathfield) {
-			// printf("left arrow/delete\n");
 			len = strlen(&g_cfg_file_curpath[0]) - 1;
 			if(len >= 0) {
 				g_cfg_file_curpath[len] = 0;
@@ -3214,13 +3241,10 @@ cfg_file_handle_key(int key)
 		cfg_file_selected(g_cfg_file_dir_only);
 		break;
 	default:
-		printf("key: %02x\n", key);
+		glogf("Unhandled config key: 0x%02x", key);
 	}
-#if 0
-	printf("curent: %d, topent: %d, last: %d\n",
-		g_cfg_dirlist.curent, g_cfg_dirlist.topent, g_cfg_dirlist.last);
-#endif
 }
+
 void
 config_control_panel()
 {
@@ -3247,7 +3271,6 @@ config_control_panel()
 			(0xf << BIT_ALL_STAT_TEXT_COLOR) | ALL_STAT_ALTCHARSET;
 	g_a2_new_all_stat[0] = g_cur_a2_stat;
 	g_new_a2_stat_cur_line = 0;
-	//cfg_printf("In config_control_panel\n");
 	for(i = 0; i < 20; i++) {
 		// Toss any queued-up keypresses
 		if(adb_read_c000() & 0x80) {
@@ -3383,6 +3406,17 @@ config_control_panel()
 					menu_line = 1;
 				}
 				break;
+			case 0x33: /* pg dn */
+				menu_line += CFG_PG_SCROLL_AMT;
+				menu_inc = 1;
+				break;
+			case 0x39: /* pg up */
+				menu_line -= CFG_PG_SCROLL_AMT;
+				menu_inc = 0;
+				if(menu_line < 1) {
+					menu_line = 1;
+				}
+				break;
 			case 0x15: /* right arrow */
 				cfg_parse_menu(menuptr, menu_line,menu_line,1);
 				break;
@@ -3437,7 +3471,7 @@ config_control_panel()
 				}
 				break;
 			default:
-				printf("key: %02x\n", key);
+				glogf("Unhandled config key: 0x%02x", key);
 			}
 		} else if(key >= 0) {
 			cfg_file_handle_key(key);

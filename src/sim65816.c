@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
-
- Copyright (C) 2010 - 2014 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include <math.h>
@@ -27,6 +11,7 @@
 #include "imagewriter.h"
 #include "debug.h"
 #include "glog.h"
+#include "options.h"
 
 extern const char *g_config_gsplus_name_list[];
 extern char g_config_gsplus_screenshot_dir[];
@@ -54,17 +39,17 @@ int	g_accept_events = 0; // OG To know if the emulator is ready to accept extern
 char g_argv0_path[256] = "./";
 
 const char *g_gsplus_default_paths[] = { // probably overkill on the paths
-  "", 
-  "./", 
+  "",
+  "./",
   "${HOME}/",
   "${PWD}/",
   "${HOME}/Library/GSplus/",
   "/usr/local/lib/",
-  "/usr/lib/gsplus/", 
-  "/usr/local/gsplus/", 
-  "/usr/local/lib/gsplus/", 
+  "/usr/lib/gsplus/",
+  "/usr/local/gsplus/",
+  "/usr/local/lib/gsplus/",
   "/usr/share/gsplus/",
-  "/var/lib/",  
+  "/var/lib/",
   "${0}/",
   0 };
 
@@ -132,7 +117,6 @@ int	g_screen_depth = 8;
 int g_scanline_simulator = 0;
 
 extern int g_screen_redraw_skip_amt;
-extern int g_use_shmem;
 extern int g_use_dhr140;
 extern int g_use_bw_hires;
 
@@ -142,13 +126,14 @@ double	g_fcycles_stop = 0.0;
 int	halt_sim = 0;
 int	enter_debug = 0;
 int	g_rom_version = -1;
+
 int	g_user_halt_bad = 0;
 int	g_halt_on_bad_read = 0;
 int	g_ignore_bad_acc = 1;
 int	g_ignore_halts = 1;
+
 int	g_code_red = 0;
 int	g_code_yellow = 0;
-int	g_use_alib = 0;
 int	g_serial_type[2];
 int	g_iw2_emul = 0;
 int	g_serial_out_masking = 0;
@@ -180,7 +165,7 @@ int g_imagewriter_paper = 0;
 int g_imagewriter_banner = 0;
 
 int	g_config_iwm_vbl_count = 0;
-const char g_gsplus_version_str[] = "0.13";	// the "KS" special version
+const char g_gsplus_version_str[] = "0.14rc";	
 int g_pause=0;	// OG Added pause
 
 #define START_DCYCS	(0.0)
@@ -207,7 +192,6 @@ int	g_engine_scan_int = 0;
 int	g_engine_doc_int = 0;
 
 int	g_testing = 0;
-int	g_testing_enabled = 0;
 
 #define MAX_FATAL_LOGS		20
 
@@ -272,7 +256,6 @@ void sim65816_initglobals() {
   g_ignore_halts = 1;
   g_code_red = 0;
   g_code_yellow = 0;
-  g_use_alib = 0;
   g_iw2_emul = 0;
   g_serial_out_masking = 0;
   //g_serial_modem[2] = { 0, 1 };
@@ -302,7 +285,6 @@ void sim65816_initglobals() {
   g_engine_doc_int = 0;
 
   g_testing = 0;
-  g_testing_enabled = 0;
 
   g_debug_file_fd = -1;
   g_fatal_log = -1;
@@ -909,37 +891,6 @@ void banner() {
   printf("\x1b[37m    GSplus v%s \x1b[0m  \n\n", g_gsplus_version_str);
 }
 
-void help_exit() {
-  printf(" USAGE: \n\n");
-  printf("   ./gsplus                           # simple - uses default config.txt\n");
-  printf("   ./gsplus -config games_hds.gsp     # set custom config file\n\n");
-  printf(" You need to supply your own Apple IIgs Firmware ROM image.\n");
-  printf(" Press F4 when running gsplus to enter config menu and select ROM image location.\n");
-  printf(" Or copy the ROM image to the gsplus directory.\n");
-  printf(" It will search for:   \"ROM\", \"ROM.01\", \"ROM.03\" \n\n\n");
-  printf("  Other command line options: \n\n");
-  printf("    -badrd                Halt on bad reads\n");
-  printf("    -noignbadacc          Don’t ignore bad memory accesses\n");
-  printf("    -noignhalt            Don’t ignore code red halts\n");
-  printf("    -test                 Allow testing\n");
-  printf("    -joystick             Ignore joystick option\n");
-  printf("    -bw                   Force B/W modes\n");
-  printf("    -dhr140               Use simple double-hires color map\n");
-  printf("    -mem value            Set memory size to value\n");
-  printf("    -skip value           Set skip_amt to value\n");
-  printf("    -audio value          Set audio enable to value\n");
-  printf("    -arate value          Set preferred audio rate to value\n");
-  printf("    -enet value           Set ethernet to value\n");
-  printf("    -config value         Set config file to value\n");
-  printf("    -debugport value      Set debugport to value\n");
-  printf("    -ssdir value          Set screenshot save directory to value\n");
-  printf("    -scanline             Enable scanline simulator\n");
-  printf("    -noscanline           Disable scanline simulator (default)\n");
-  printf("    -v value              Set verbose flags to value\n\n");
-  printf("  Note: The final argument, if not a flag, will be tried as a mountable device.\n\n");
-  exit(1);
-}
-
 int gsplusmain(int argc, char **argv) {
 	int	diff;
 	int	skip_amt;
@@ -947,160 +898,22 @@ int gsplusmain(int argc, char **argv) {
 	int	i;
 	char	*final_arg = 0;
 
+
+  // just for fun
+  banner();
+
 	// OG Restoring globals
 	sim65816_initglobals();
 	moremem_init();
+  tmp1 = parse_cli_options(argc, argv);
+
+
 
   // initialize ss dir to default value (current path)
   strcpy(g_config_gsplus_screenshot_dir, "./");
 
-	/* parse args */
-	for(i = 1; i < argc; i++) {
-    if( (!strcmp("-?", argv[i])) || (!strcmp("-h", argv[i])) || (!strcmp("-help", argv[i]))) {
-      help_exit();
-		} else if(!strcmp("-badrd", argv[i])) {
-			printf("Halting on bad reads\n");
-			g_halt_on_bad_read = 2;
-		} else if(!strcmp("-noignbadacc", argv[i])) {
-			printf("Not ignoring bad memory accesses\n");
-			g_ignore_bad_acc = 0;
-		} else if(!strcmp("-noignhalt", argv[i])) {
-			printf("Not ignoring code red halts\n");
-			g_ignore_halts = 0;
-		} else if(!strcmp("-test", argv[i])) {
-			printf("Allowing testing\n");
-			g_testing_enabled = 1;
-		} else if(!strcmp("-hpdev", argv[i])) {
-			printf("Using /dev/audio\n");
-			g_use_alib = 0;
-		} else if(!strcmp("-alib", argv[i])) {
-			printf("Using Aserver audio server\n");
-			g_use_alib = 1;
-		} else if(!strcmp("-24", argv[i])) {
-			printf("Using 24-bit visual\n");
-			g_force_depth = 24;
-		} else if(!strcmp("-16", argv[i])) {
-			printf("Using 16-bit visual\n");
-			g_force_depth = 16;
-		} else if(!strcmp("-15", argv[i])) {
-			printf("Using 15-bit visual\n");
-			g_force_depth = 15;
-		} else if(!strcmp("-mem", argv[i])) {
-			if((i+1) >= argc) {
-				printf("Missing argument\n");
-				exit(1);
-			}
-			g_mem_size_exp = strtol(argv[i+1], 0, 0) & 0x00ff0000;
-			printf("Using %d as memory size\n", g_mem_size_exp);
-			i++;
-		} else if(!strcmp("-skip", argv[i])) {
-			if((i+1) >= argc) {
-				printf("Missing argument\n");
-				exit(1);
-			}
-			skip_amt = strtol(argv[i+1], 0, 0);
-			printf("Using %d as skip_amt\n", skip_amt);
-			g_screen_redraw_skip_amt = skip_amt;
-			i++;
-		} else if(!strcmp("-audio", argv[i])) {
-			if((i+1) >= argc) {
-				printf("Missing argument\n");
-				exit(1);
-			}
-			tmp1 = strtol(argv[i+1], 0, 0);
-			printf("Using %d as audio enable val\n", tmp1);
-			g_audio_enable = tmp1;
-			i++;
-		} else if(!strcmp("-arate", argv[i])) {
-			if((i+1) >= argc) {
-				printf("Missing argument\n");
-				exit(1);
-			}
-			tmp1 = strtol(argv[i+1], 0, 0);
-			printf("Using %d as preferred audio rate\n", tmp1);
-			g_preferred_rate = tmp1;
-			i++;
-		} else if(!strcmp("-v", argv[i])) {
-			if((i+1) >= argc) {
-				printf("Missing argument\n");
-				exit(1);
-			}
-			tmp1 = strtol(argv[i+1], 0, 0);
-			printf("Setting Verbose = 0x%03x\n", tmp1);
-			Verbose = tmp1;
-			i++;
-		} else if(!strcmp("-display", argv[i])) {
-			if((i+1) >= argc) {
-				printf("Missing argument\n");
-				exit(1);
-			}
-			printf("Using %s as display\n", argv[i+1]);
-			sprintf(g_display_env, "DISPLAY=%s", argv[i+1]);
-			putenv(&g_display_env[0]);
-			i++;
-		} else if(!strcmp("-noshm", argv[i])) {
-			printf("Not using X shared memory\n");
-			g_use_shmem = 0;
-		} else if(!strcmp("-joystick", argv[i])) {
-			printf("Ignoring -joystick option\n");
-		} else if(!strcmp("-dhr140", argv[i])) {
-			printf("Using simple dhires color map\n");
-			g_use_dhr140 = 1;
-		} else if(!strcmp("-bw", argv[i])) {
-			printf("Forcing black-and-white hires modes\n");
-			g_cur_a2_stat |= ALL_STAT_COLOR_C021;
-			g_use_bw_hires = 1;
-		} else if(!strcmp("-scanline", argv[i])) {
-      g_scanline_simulator = 1;
-    } else if(!strcmp("-noscanline", argv[i])) {
-      g_scanline_simulator = 0;
-    } else if(!strcmp("-enet", argv[i])) {
-			if((i+1) >= argc) {
-				printf("Missing argument\n");
-				exit(1);
-			}
-			tmp1 = strtol(argv[i+1], 0, 0);
-			printf("Using %d as ethernet enable val\n", tmp1);
-			g_ethernet = tmp1;
-			i++;
-		} else if(!strcmp("-config", argv[i])) {   // Config file passed
-      if((i+1) >= argc) {
-        printf("Missing argument\n");
-        exit(1);
-      }
-      printf("Using %s as configuration file\n", argv[i+1]);
-      g_config_gsplus_name_list[0] = argv[i+1]; // overwrite default list with passed item as sole option
-      g_config_gsplus_name_list[1] = 0; // terminate string array
-      i++;
-    } else if (!strcmp("-ssdir", argv[i])) {  // screenshot directory passed
-      strcpy(g_config_gsplus_screenshot_dir, argv[i+1]);
-      struct stat path_stat;
-      stat(g_config_gsplus_screenshot_dir, &path_stat); // (weakly) validate path
-      if (!S_ISDIR(path_stat.st_mode)) {
-        strcpy(g_config_gsplus_screenshot_dir, "./");
-      }
-      printf("USING SCREEN PATH: %s\n", g_config_gsplus_screenshot_dir);
-      i++;
-    } else if(!strcmp("-debugport", argv[i])) {     // Debug port passed
-        if((i+1) >= argc) {
-          printf("Missing argument\n");
-          exit(1);
-        }
-        g_dbg_enable_port = strtol(argv[i+1], 0, 0);
-        printf("Debug port: %d\n", g_dbg_enable_port);
-        i++;
-    } else {
-			if ((i == (argc - 1)) && (strncmp("-", argv[i], 1) != 0)) {
-				final_arg = argv[i];
-			} else {
-				printf("Bad option: %s\n", argv[i]);
-				exit(3);
-			}
-		}
-	}
 
-  // just for fun
-  banner();
+
 
 	check_engine_asm_defines();
 	fixed_memory_ptrs_init();
@@ -1383,11 +1196,11 @@ void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_cre
     // However, GSplus is promoting a notion of Config-as-a-VM
     // where we want to encourage many configs.  (See DGB video
     // on YT regarding the GSVision UI experiment.)
-    
+
 
     glogf("Trying to create config (%s)", "${HOME}/.config.gsp");
     gsport_expand_path(&(local_path[0]), "${HOME}/.config.gsp", 250);
-    
+
 		strcpy(outname, &(local_path[0]));
 		// Ask user if it's OK to create the file (or just create it)
 		x_dialog_create_gsport_conf(*name_ptr);
@@ -2792,7 +2605,6 @@ void
 must_write(int fd, char *bufptr, int len)
 {
 	int	ret;
-#ifndef __OS2__
 	while(len > 0) {
 		ret = write(fd, bufptr, len);
 		if(ret >= 0) {
@@ -2802,9 +2614,6 @@ must_write(int fd, char *bufptr, int len)
 			return;		// just get out
 		}
 	}
-#else
-  printf("%s\n",bufptr);
-#endif
 }
 
 void

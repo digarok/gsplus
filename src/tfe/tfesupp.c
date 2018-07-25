@@ -39,7 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#ifdef WIN32 
+#ifdef WIN32
 #include <windows.h>
 #include <windowsx.h>
 #include <commctrl.h>
@@ -82,10 +82,8 @@ void *lib_malloc(size_t size)
     void *ptr = malloc(size);
 #endif
 
-#ifndef __OS2__
     if (ptr == NULL && size > 0)
         exit(-1);
-#endif
 #ifdef LIB_DEBUG
     lib_debug_alloc(ptr, size, 3);
 #endif
@@ -123,10 +121,8 @@ void *lib_realloc(void *ptr, size_t size)
     void *new_ptr = realloc(ptr, size);
 #endif
 
-#ifndef __OS2__
     if (new_ptr == NULL)
         exit(-1);
-#endif
 #ifdef LIB_DEBUG
     lib_debug_free(ptr, 1, 0);
     lib_debug_alloc(new_ptr, size, 1);
@@ -182,7 +178,6 @@ unsigned long crc32_buf(const char *buffer, unsigned int len)
     crc = 0xffffffff;
     for (p = buffer; len > 0; ++p, --len)
         crc = (crc >> 8) ^ crc32_table[(crc ^ *p) & 0xff];
-    
+
     return ~crc;
 }
-

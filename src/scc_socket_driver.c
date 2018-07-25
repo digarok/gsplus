@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
-
- Copyright (C) 2010 - 2012 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See LICENSE.txt for license (GPL v2)
 */
 
 /* This file contains the socket calls */
@@ -86,7 +70,7 @@ scc_socket_close_handle(SOCKET sockfd)
 {
 	if (sockfd != -1)
 	{
-#if defined(_WIN32) || defined (__OS2__)
+#if defined(_WIN32)
 		return closesocket(sockfd); // NW: a Windows socket handle is not a file descriptor
 #else
 		return close(sockfd);
@@ -241,12 +225,10 @@ scc_socket_open_outgoing(int port, double dcycs)
 	sa_in.sin_port = htons(port_number);
 	hostentptr = gethostbyname((const char*)&scc_ptr->modem_cmd_str[0]);	// OG Added Cast
 	if(hostentptr == 0) {
-#if defined(_WIN32) || defined (__OS2__)
-		fatal_printf("Lookup host %s failed\n",
-						&scc_ptr->modem_cmd_str[0]);
+#if defined(_WIN32)
+		fatal_printf("Lookup host %s failed\n",	&scc_ptr->modem_cmd_str[0]);
 #else
-		fatal_printf("Lookup host %s failed, herrno: %d\n",
-					&scc_ptr->modem_cmd_str[0], h_errno);
+		fatal_printf("Lookup host %s failed, herrno: %d\n",	&scc_ptr->modem_cmd_str[0], h_errno);
 #endif
 		scc_socket_close_handle(sockfd);
 		scc_socket_close(port, 1, dcycs);
@@ -286,7 +268,7 @@ scc_socket_make_nonblock(int port, double dcycs)
 	Scc	*scc_ptr;
 	SOCKET	sockfd;
 	int	ret;
-#if defined(_WIN32) || defined (__OS2__)
+#if defined(_WIN32)
 	u_long	flags;
 #else
 	int	flags;
@@ -295,7 +277,7 @@ scc_socket_make_nonblock(int port, double dcycs)
 	scc_ptr = &(scc_stat[port]);
 	sockfd = scc_ptr->sockfd;
 
-#if defined(_WIN32) || defined (__OS2__)
+#if defined(_WIN32)
 	flags = 1;
 	ret = ioctlsocket(sockfd, FIONBIO, &flags);
 	if(ret != 0) {
@@ -404,7 +386,7 @@ scc_accept_socket(int port, double dcycs)
 
 		flags = 0;
 		ret = 0;
-#if !defined(_WIN32) && !defined(__OS2__)
+#if !defined(_WIN32)
 		/* For Linux, we need to set O_NONBLOCK on the rdwrfd */
 		flags = fcntl(rdwrfd, F_GETFL, 0);
 		if(flags == -1) {
@@ -697,7 +679,7 @@ void
 scc_socket_empty_writebuf(int port, double dcycs)
 {
 #ifdef SCC_SOCKETS
-# if !defined(_WIN32) && !defined(__OS2__)
+# if !defined(_WIN32)
 	struct sigaction newact, oldact;
 # endif
 	Scc	*scc_ptr;
@@ -783,7 +765,7 @@ scc_socket_empty_writebuf(int port, double dcycs)
 				scc_ptr->out_char_dcycs = dcycs;
 			}
 
-#if defined(_WIN32) || defined (__OS2__)
+#if defined(_WIN32)
 			ret = send(rdwrfd, (const char*)&(scc_ptr->out_buf[rdptr]), len, 0); // OG Added Cast
 # else
 			/* ignore SIGPIPE around writes to the socket, so we */

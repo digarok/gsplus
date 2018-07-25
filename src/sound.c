@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
-
- Copyright (C) 2010 - 2012 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include "defc.h"
@@ -268,7 +252,7 @@ sound_init_general()
 {
 
 /* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__) && !defined(HAVE_SDL)
+#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(HAVE_SDL)
 	int	pid;
 	int	shmid;
 	int	tmp;
@@ -280,7 +264,7 @@ sound_init_general()
 	int	ret;
 
 /* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__) && !defined(HAVE_SDL)
+#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(HAVE_SDL)
 	if(!g_use_shmem) {
 		if(g_audio_enable < 0) {
 			printf("Defaulting audio off for slow X display\n");
@@ -298,7 +282,7 @@ sound_init_general()
 
 	size = SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE;
 /* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(__OS2__)	&& !defined(HAVE_SDL)
+#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(HAVE_SDL)
 	shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0777);
 	if(shmid < 0) {
 		printf("sound_init: shmget ret: %d, errno: %d\n", shmid, errno);
@@ -328,7 +312,7 @@ sound_init_general()
 
 	fflush(stdout);
 /* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(MAC) && !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(__OS2__) && !defined(HAVE_SDL)
+#if !defined(MAC) && !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(HAVE_SDL)
 	/* prepare pipe so parent can signal child each other */
 	/*  pipe[0] = read side, pipe[1] = write end */
 	ret = pipe(&g_pipe_fd[0]);
@@ -384,7 +368,6 @@ sound_init_general()
 	win32snd_init(shmaddr);
 # elif defined (MAC) && !defined(HAVE_SDL)
   macsnd_init(shmaddr);
-# elif defined (__OS2__)
 # endif
 #endif
 
@@ -393,7 +376,6 @@ sound_init_general()
 void
 parent_sound_get_sample_rate(int read_fd)
 {
-#ifndef __OS2__
 	word32	tmp;
 	int	ret;
 
@@ -406,7 +388,6 @@ parent_sound_get_sample_rate(int read_fd)
 	close(read_fd);
 
 	set_audio_rate(tmp);
-#endif
 }
 
 void
@@ -456,7 +437,6 @@ sound_shutdown()
 
 #ifdef WIN_SOUND	/* Workaround - gcc in cygwin wasn't defining _WIN32 */
 	win32snd_shutdown();
-#elif defined(__OS2__)
 #elif defined(HAVE_SDL)
   if((g_audio_enable != 0)) {
     //sdlsnd_shutdown();
@@ -660,8 +640,6 @@ send_sound(int real_samps, int size)
 	child_sound_playit(tmp);
 #elif defined(HAVE_SDL)
 	sound_write_sdl( real_samps,  size);
-#elif defined(__OS2__)
-
 #else
 	/* Although this looks like a big/little-endian issue, since the */
 	/*  child is also reading an int, it just works with no byte swap */

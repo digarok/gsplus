@@ -1,28 +1,13 @@
 /*
- GSplus - an Apple //gs Emulator
- Copyright (C) 2016 - Dagen Brock
-
- Copyright (C) 2010 - 2013 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See LICENSE.txt for license (GPL v2)
 */
 
 #include "defc.h"
 #include "glog.h"
+
 #ifdef __linux__
 # include <linux/joystick.h>
 # include <sys/time.h>
@@ -41,6 +26,8 @@
 SDL_Joystick *gGameController = NULL;
 #endif
 
+
+
 extern int g_joystick_native_type1;		/* in paddles.c */
 extern int g_joystick_native_type2;		/* in paddles.c */
 extern int g_joystick_native_type;		/* in paddles.c */
@@ -55,6 +42,99 @@ const char *g_joystick_dev = "/dev/input/js0";	/* default joystick dev file */
 int	g_joystick_native_fd = -1;
 int	g_joystick_num_axes = 0;
 int	g_joystick_num_buttons = 0;
+int g_joystick_number = 0;				// SDL2
+int g_joystick_x_axis = 0; 				// SDL2
+int g_joystick_y_axis = 1; 				// SDL2
+int g_joystick_button_0 = 0; 		 	// SDL2
+int g_joystick_button_1 = 1; 	  	// SDL2
+
+int g_joystick_x2_axis = 2; 				// SDL2
+int g_joystick_y2_axis = 3; 				// SDL2
+int g_joystick_button_2 = 2; 		 	// SDL2
+int g_joystick_button_3 = 3; 	  	// SDL2
+#define JOY2SUPPORT
+
+
+#if defined(HAVE_SDL) && !defined(JOYSTICK_DEFINED)
+# define JOYSTICK_DEFINED
+void
+joystick_init()
+{
+  int i;
+  if( SDL_Init( SDL_INIT_JOYSTICK ) < 0 ) {
+      glogf( "SDL could not initialize joystick! SDL Error: %s", SDL_GetError() );
+  } else {
+    glog("SDL2 joystick initialized");
+  }
+  if (SDL_NumJoysticks()<1) {
+    glog("No joysticks detected");
+    SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+  } else {
+		// @todo: make controller configurable
+		// @todo: add multiple controller support
+	  gGameController = SDL_JoystickOpen( g_joystick_number );
+	  if( gGameController == NULL ) {
+	    glogf( "Warning: Unable to open game controller! SDL Error: %s", SDL_GetError() );
+	  }
+	}
+  g_joystick_native_type = 2;
+  g_joystick_native_type1 = 2;
+	g_joystick_native_type2 = -1;
+  for(i = 0; i < 4; i++) {
+    g_paddle_val[i] = 180;
+  }
+  g_joystick_type = JOYSTICK_TYPE_NATIVE_1;
+  SDL_JoystickUpdate();
+  joystick_update(0.0);
+}
+
+void
+joystick_update(double dcycs)
+{
+  if (gGameController) {
+    SDL_JoystickUpdate();
+    g_paddle_val[0] = (int)SDL_JoystickGetAxis(gGameController, g_joystick_x_axis);   // default is 0
+    g_paddle_val[1] = (int)SDL_JoystickGetAxis(gGameController, g_joystick_y_axis);   // default is 1
+    g_paddle_val[2] = (int)SDL_JoystickGetAxis(gGameController, g_joystick_x2_axis);  // default is 2
+    g_paddle_val[3] = (int)SDL_JoystickGetAxis(gGameController, g_joystick_y2_axis);  // default is 3
+  
+    if (SDL_JoystickGetButton(gGameController, g_joystick_button_0)) {
+			g_paddle_buttons = g_paddle_buttons | 1;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~1);
+		}
+    if (SDL_JoystickGetButton(gGameController, g_joystick_button_1)) {
+			g_paddle_buttons = g_paddle_buttons | 2;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~2);
+		}
+    if (SDL_JoystickGetButton(gGameController, g_joystick_button_2)) {
+			g_paddle_buttons = g_paddle_buttons | 4;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~4);
+		}
+    if (SDL_JoystickGetButton(gGameController, g_joystick_button_3)) {
+			g_paddle_buttons = g_paddle_buttons | 8;
+		} else {
+			g_paddle_buttons = g_paddle_buttons & (~8);
+		}
+    paddle_update_trigger_dcycs(dcycs);
+  }
+}
+
+void
+joystick_update_buttons()
+{
+}
+
+void joystick_shut() {
+  SDL_JoystickClose( gGameController );
+  gGameController = NULL;
+}
+#endif
+
+
+
 
 
 #if defined(__linux__) && !defined(JOYSTICK_DEFINED)
@@ -162,7 +242,7 @@ joystick_init()
 
 	//	Check that there is a joystick device
 	if(joyGetNumDevs() <= 0) {
-		printf("No joystick hardware detected\n");
+		glog("No joystick hardware detected");
 		g_joystick_native_type1 = -1;
 		g_joystick_native_type2 = -1;
 		return;
@@ -190,7 +270,7 @@ joystick_init()
 	}
 
 	if (g_joystick_native_type1<0 && g_joystick_native_type2 <0) {
-		printf ("No joystick is attached\n");
+		glog("No joystick is attached");
 		return;
 	}
 
@@ -259,72 +339,6 @@ joystick_update_buttons()
 #endif
 
 
-#if defined(HAVE_SDL) && !defined(JOYSTICK_DEFINED)
-# define JOYSTICK_DEFINED
-void
-joystick_init()
-{
-  int i;
-  if( SDL_Init( SDL_INIT_JOYSTICK ) < 0 ) {
-      glogf( "SDL could not initialize joystick! SDL Error: %s", SDL_GetError() );
-  } else {
-    glog("SDL2 joystick initialized");
-  }
-  if (SDL_NumJoysticks()<1) {
-    glog("No joysticks detected");
-    SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-  } else {
-		// @todo: make controller configurable
-		// @todo: add multiple controller support
-	  gGameController = SDL_JoystickOpen( 0 );
-	  if( gGameController == NULL ) {
-	    glogf( "Warning: Unable to open game controller! SDL Error: %s", SDL_GetError() );
-	  }
-	}
-  g_joystick_native_type = 2;
-  g_joystick_native_type1 = 2;
-	g_joystick_native_type2 = -1;
-  for(i = 0; i < 4; i++) {
-    g_paddle_val[i] = 180;
-  }
-  g_joystick_type = JOYSTICK_TYPE_NATIVE_1;
-  SDL_JoystickUpdate();
-  joystick_update(0.0);
-}
-
-void
-joystick_update(double dcycs)
-{
-  if (gGameController) {
-    SDL_JoystickUpdate();
-    g_paddle_val[0] = (int)SDL_JoystickGetAxis(gGameController, 0);
-    g_paddle_val[1] = (int)SDL_JoystickGetAxis(gGameController, 1);
-    if (SDL_JoystickGetButton(gGameController, 0)) {
-			g_paddle_buttons = g_paddle_buttons | 1;
-		} else {
-			g_paddle_buttons = g_paddle_buttons & (~1);
-		}
-    if (SDL_JoystickGetButton(gGameController, 1)) {
-			g_paddle_buttons = g_paddle_buttons | 2;
-		} else {
-			g_paddle_buttons = g_paddle_buttons & (~2);
-		}
-    paddle_update_trigger_dcycs(dcycs);
-  }
-
-}
-
-void
-joystick_update_buttons()
-{
-}
-
-void joystick_shut() {
-  SDL_JoystickClose( gGameController );
-  gGameController = NULL;
-}
-#endif
-
 
 
 
@@ -354,7 +368,6 @@ joystick_update_buttons()
 {
 }
 
-// OG
 void joystick_shut()
 {
 }
