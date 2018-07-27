@@ -31,6 +31,7 @@
 #include <X11/keysym.h>
 #include <time.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <signal.h>
 
 #ifdef X_SHARED_MEM
@@ -611,6 +612,10 @@ dev_video_init()
 	}
 	fflush(stdout);
 	g_text_FontSt = XLoadQueryFont(g_display, FONT_NAME_STATUS);
+	if (g_text_FontSt == NULL) {
+		perror("Could not load font");
+		exit(1);
+	}
 	vid_printf("font # returned: %08x\n", (word32)(g_text_FontSt->fid));
 	font_height = g_text_FontSt->ascent + g_text_FontSt->descent;
 	vid_printf("font_height: %d\n", font_height);
