@@ -1,9 +1,12 @@
 stages:
   - build
   - package
+  - deploy
+  - updatewebsite
 
 
 
+# TARGET SYSTEM: UBUNTU X
 build-ubuntu-x:
   tags:
     - ubuntu
@@ -16,7 +19,9 @@ build-ubuntu-x:
   artifacts:
     paths:
       - gsplusx
-    expire_in: 5 minutes
+    expire_in: 10 minutes
+  only:
+    - master
 
 package-ubuntu-x:
   tags:
@@ -32,10 +37,12 @@ package-ubuntu-x:
       - config.txt
       - doc/gsplusmanual.pdf
       - doc/LICENSE.txt
+    expire_in: 10 minutes
+  only:
+    - master
 
 
-
-
+# TARGET SYSTEM: DEPRECATED, UBUNTU SDL
 build-ubuntu-sdl:
   tags:
     - ubuntu
@@ -45,11 +52,11 @@ build-ubuntu-sdl:
     - cd src
     - ln -s vars_x86linux_sdl vars
     - make clean ; make
+  only:
+    - master
 
 
-
-
-
+# TARGET SYSTEM: REALLY ANY LINUX, BUT UBUNTU W SDL2
 build-ubuntu-sdl2:
   tags:
     - ubuntu
@@ -59,32 +66,48 @@ build-ubuntu-sdl2:
     - cd src
     - ln -s vars_x86linux_sdl2 vars
     - make clean ; make
-    - mv ../gsplus ../gsplus-ubuntu-sdl
+    - mv ../gsplus ../gsplus-ubuntu-sdl.bin
   artifacts:
     paths:
-      - gsplus-ubuntu-sdl
-    expire_in: 5 minutes
+      - gsplus-ubuntu-sdl.bin
+    expire_in: 10 minutes
 
 package-ubuntu-sdl2:
   tags:
     - ubuntu
   stage: package
+  variables:
+    GIT_STRATEGY: fetch
+    PACKAGE_DIR: gsplus-ubuntu-sdl
   script:
-    - cp src/config.txt .
-    - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
-    - cp LICENSE.txt doc/
-    - mv gsplus-ubuntu-sdl gsplus
+    - mkdir $PACKAGE_DIR
+    - mkdir $PACKAGE_DIR/doc
+    - mv gsplus-ubuntu-sdl.bin $PACKAGE_DIR/gsplus
+    - cp src/config.txt $PACKAGE_DIR
+    - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> $PACKAGE_DIR/config.txt'
+    - cp src/parallel.rom %PACKAGE_DIR%
+    - cp LICENSE.txt $PACKAGE_DIR/doc/
+    - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
+    - cp doc/README.txt %PACKAGE_DIR%
+    - tar -cvjf gsplus-ubuntu-sdl.tar.bz2 $PACKAGE_DIR
   artifacts:
     paths:
-      - gsplus
-      - config.txt
-      - doc/README.txt
-      - doc/gsplusmanual.pdf
-      - doc/LICENSE.txt
+      - gsplus-ubuntu-sdl.tar.bz2
+    expire_in: 10 minutes
+deploy-ubuntu:
+  tags:
+    - ubuntu
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - aws s3 cp gsplus-ubuntu-sdl.tar.bz2 s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/ubuntu-sdl/$CI_BUILD_ID/ --acl public-read
 
 
 
 
+
+# TARGET SYSTEM: OSX 10.SOMETHING
 build-osx:
   tags:
     - osx
@@ -97,7 +120,7 @@ build-osx:
   artifacts:
     paths:
       - gsplus-osx
-    expire_in: 5 minutes
+    expire_in: 10 minutes
 
 package-osx:
   tags:
@@ -114,10 +137,19 @@ package-osx:
   artifacts:
     paths:
       - GSplus-Install.dmg
+    expire_in: 10 minutes
+
+deploy-osx:
+  tags:
+    - osx
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - aws s3 cp GSplus-Install.dmg s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/osx/$CI_BUILD_ID/ --acl public-read
 
 
-
-
+# TARGET SYSTEM: WIN32 WIN API UNDER CYGWIN
 build-win32:
   tags:
     - windows
@@ -127,7 +159,9 @@ build-win32:
   artifacts:
     paths:
       - gsplus32.exe
-    expire_in: 5 minutes
+    expire_in: 10 minutes
+  only:
+    - master
 
 package-win32:
   tags:
@@ -153,11 +187,12 @@ package-win32:
       - cygstdc++-6.dll
       - cygwin1.dll
       - cygfreetype-6.dll
+    expire_in: 10 minutes
+  only:
+    - master
 
 
-
-
-
+# TARGET SYSTEM: WIN32 SDL2 UNDER CYGWIN W MINGW64 SDL2 LIBS
 build-win-sdl2:
   tags:
     - windows
@@ -167,66 +202,61 @@ build-win-sdl2:
     - ln -s vars_win32_sdl2 vars
     - make clean
     - make
-    - cp parallel.rom ..
-    - cp /cygdrive/c/cygwin/bin/cygbz2-1.dll ..
-    - cp /cygdrive/c/cygwin/bin/cygfreetype-6.dll ..
-    - cp /cygdrive/c/cygwin/bin/cyggcc_s-1.dll ..
-    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll ..
-    - cp /cygdrive/c/cygwin/bin/cygpng16-16.dll ..
-    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll ..
-    - cp /cygdrive/c/cygwin/bin/cygstdc++-6.dll ..
-    - cp /cygdrive/c/cygwin/bin/cygwin1.dll ..
-    - cp /cygdrive/c/cygwin/bin/cygz.dll ..
-    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2.dll ..
-    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2_image.dll ..
-
-
   artifacts:
     paths:
       - gsplus.exe
-      - parallel.rom
-      - cygbz2-1.dll
-      - cygfreetype-6.dll
-      - cyggcc_s-1.dll
-      - cygjpeg-8.dll
-      - cygpng16-16.dll
-      - cygjpeg-8.dll
-      - cygstdc++-6.dll
-      - cygwin1.dll
-      - cygz.dll
-      - SDL2.dll
-      - SDL2_image.dll
-
-    expire_in: 5 minutes
-
+    expire_in: 10 minutes
 
 package-win-sdl2:
   tags:
     - windows
   stage: package
+  variables:
+    GIT_STRATEGY: fetch
+    PACKAGE_DIR: gsplus-win-sdl
   script:
-    - pwd
-    - ls -al
-    - cp src/config.txt .
-    - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
-    - cp LICENSE.txt doc/
-
+    - mkdir %PACKAGE_DIR%
+    - cp gsplus.exe %PACKAGE_DIR%
+    - cp LICENSE.txt %PACKAGE_DIR%
+    - cp src/config.txt %PACKAGE_DIR%
+    - cp src/parallel.rom %PACKAGE_DIR%
+    - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
+    - cp doc/README.txt %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygbz2-1.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygfreetype-6.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cyggcc_s-1.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygpng16-16.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygstdc++-6.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygwin1.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygz.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2_image.dll %PACKAGE_DIR%
+    - cp gsplus.exe %PACKAGE_DIR%
+    - zip gsplus-win-sdl.zip -r %PACKAGE_DIR%
   artifacts:
     paths:
-      - gsplus.exe
-      - config.txt
-      - doc/gsplusmanual.pdf
-      - doc/LICENSE.txt
-      - doc/README.txt
-      - parallel.rom
-      - cygbz2-1.dll
-      - cygfreetype-6.dll
-      - cyggcc_s-1.dll
-      - cygjpeg-8.dll
-      - cygpng16-16.dll
-      - cygjpeg-8.dll
-      - cygstdc++-6.dll
-      - cygwin1.dll
-      - cygz.dll
-      - SDL2.dll
-      - SDL2_image.dll
+      - gsplus-win-sdl.zip
+    expire_in: 10 minutes
+deploy-win-sdl2:
+  tags:
+    - windows
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - aws s3 cp gsplus-win-sdl.zip s3://%AWS_BUCKET%/%CI_TAG%/%CI_VERSION%/%CI_PIPELINE_ID%/win-sdl/%CI_BUILD_ID%/ --acl public-read
+
+update-website-universal:
+  tags:
+    - osx
+  stage: updatewebsite
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - aws s3 ls gsplus-artifacts/ --recursive > s3artifacts.txt
+    - php assets/updatewebsite.php s3artifacts.txt public > index.html
+    - php assets/updatewebsite.php s3artifacts.txt auto > index_auto.html
+    - aws s3 cp index.html s3://$AWS_BUCKET/ --acl public-read
+    - aws s3 cp index_auto.html s3://$AWS_BUCKET/ --acl public-read
