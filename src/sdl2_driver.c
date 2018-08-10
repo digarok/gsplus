@@ -5,6 +5,9 @@
 	See LICENSE.txt for license (GPL v2)
 */
 
+// fps shiz
+unsigned int lastTime = 0, currentTime, frames;
+
 // @todo: mouse clip bugs.. great western shootout. Paint 8/16.   still in win32
 #include "SDL.h"
 #include "SDL_image.h"
@@ -381,6 +384,16 @@ void dev_video_init_sdl() {
 
 // Copy a rect to our SDL window
 void sdl_push_kimage(Kimage *kimage_ptr, int destx, int desty, int srcx, int srcy, int width, int height) {
+  // FPS shiz
+  currentTime = SDL_GetTicks();
+  if (currentTime > lastTime + 1000) {
+    printf("FPS: %d\n", frames);
+    frames = 0;
+    lastTime = currentTime;
+  }
+  frames++;
+
+
   byte *src_ptr;
   int pixel_size = 4;
   src_ptr = kimage_ptr->data_ptr + (srcy * kimage_ptr->width_act + srcx) * pixel_size;
