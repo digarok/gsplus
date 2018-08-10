@@ -1182,6 +1182,7 @@ void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_cre
     glog("    ftp://ftp.apple.asimov.net/pub/apple_II/emulators/rom_images/");
     glog("  ... and rename the file to \"ROM\" and restart");
     glog("  ... or hit <F4> and browse for a valid ROM image.");
+    x_show_alert(0, "Missing Apple IIgs ROM file.\nHit F4 to configure ROM location or refer to documentation.");
   }
 
 	if(can_create_file) {
@@ -1214,8 +1215,6 @@ void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_cre
 		// If it returns, then there was succes and we should get out
 		return;
 	} else if(ok_if_missing) {
-		/* Just show an alert and return if ok_if_missing < 0 */
-		x_show_alert(0, 0);
 		return;
 	}
 

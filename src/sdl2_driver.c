@@ -752,6 +752,12 @@ int clipboard_get_char(void) {
   return c | 0x80;
 }
 
+int x_show_alert(int is_fatal, const char *str) {
+  if (str) {
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "GS+ Alert", str, NULL);
+  }
+  return 0;
+}
 
 
 
@@ -759,7 +765,6 @@ int clipboard_get_char(void) {
 // THIS DRIVER.
 
 // called by src/sim65816.c
-int x_show_alert(int is_fatal, const char *str) { return 0; }
 void get_ximage(Kimage *kimage_ptr) { }
 void x_toggle_status_lines() { }
 void x_redraw_status_lines() { }
