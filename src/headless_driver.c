@@ -1,21 +1,9 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-*/
-
+   GSPLUS - Advanced Apple IIGS Emulator Environment
+   Based on the KEGS emulator written by Kent Dickey
+   See COPYRIGHT.txt for Copyright information
+   See LICENSE.txt for license (GPL v2)
+ */
 
 #include "defc.h"
 #include "glog.h"
@@ -42,7 +30,7 @@ int clipboard_get_char() { return 0; }
 
 void clipboard_paste(void) { }
 
-void dev_video_init() { 
+void dev_video_init() {
 
 	g_screen_depth = 24;
 	g_screen_mdepth = 32;
@@ -100,4 +88,3 @@ void
 x_push_kimage(Kimage *kimage_ptr, int destx, int desty, int srcx, int srcy, int width, int height)
 {
 }
-

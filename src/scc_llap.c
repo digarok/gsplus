@@ -1,9 +1,9 @@
 /*
-  GSPLUS - Advanced Apple IIGS Emulator Environment
-  Based on the KEGS emulator written by Kent Dickey
-  See COPYRIGHT.txt for Copyright information
-	See LICENSE.txt for license (GPL v2)
-*/
+   GSPLUS - Advanced Apple IIGS Emulator Environment
+   Based on the KEGS emulator written by Kent Dickey
+   See COPYRIGHT.txt for Copyright information
+   See LICENSE.txt for license (GPL v2)
+ */
 
 /* This is an interface between the SCC emulation and the LAP bridge. */
 
@@ -25,128 +25,118 @@ extern Scc scc_stat[2];
 extern int g_config_gsplus_update_needed;
 static bool bridge_initialized = false;
 
-void scc_llap_init()
-{
-	atbridge_set_diagnostics(g_appletalk_diagnostics);
-	bridge_initialized = atbridge_init();
-	atbridge_set_net(g_appletalk_network_hint);
+void scc_llap_init() {
+  atbridge_set_diagnostics(g_appletalk_diagnostics);
+  bridge_initialized = atbridge_init();
+  atbridge_set_net(g_appletalk_network_hint);
 }
 
-void scc_llap_set_node(byte val)
-{
-	atbridge_set_node(val);
+void scc_llap_set_node(byte val) {
+  atbridge_set_node(val);
 }
 
-void scc_llap_update()
-{
-	if (bridge_initialized)
-	{
-		atbridge_process();
+void scc_llap_update() {
+  if (bridge_initialized)
+  {
+    atbridge_process();
 
-		// Save the AppleTalk network number.  Since the network number does not
-		// change very often, this will slightly improve startup time.
-		if (g_appletalk_network_hint != atbridge_get_net())
-		{
-			g_appletalk_network_hint = atbridge_get_net();
-			g_config_gsplus_update_needed = 1;
-		}
-	}
+    // Save the AppleTalk network number.  Since the network number does not
+    // change very often, this will slightly improve startup time.
+    if (g_appletalk_network_hint != atbridge_get_net())
+    {
+      g_appletalk_network_hint = atbridge_get_net();
+      g_config_gsplus_update_needed = 1;
+    }
+  }
 }
 
 /** Transfer one packet from the bridge to the SCC **/
-void scc_llap_fill_readbuf(int port, int space_left, double dcycs)
-{
-	atbridge_set_diagnostics(g_appletalk_diagnostics);
+void scc_llap_fill_readbuf(int port, int space_left, double dcycs) {
+  atbridge_set_diagnostics(g_appletalk_diagnostics);
 
-	byte* data;
+  byte* data;
 
-	if (!bridge_initialized)
-		return;
+  if (!bridge_initialized)
+    return;
 
-	data = NULL;
-	size_t	bytes_read;
-	size_t	i;
+  data = NULL;
+  size_t bytes_read;
+  size_t i;
 
-	llap_dequeue_out(dcycs, &bytes_read, &data);
+  llap_dequeue_out(dcycs, &bytes_read, &data);
 
-	for(i = 0; i < bytes_read; i++) {
-		scc_add_to_readbuf(port, data[i], dcycs);
-	}
+  for(i = 0; i < bytes_read; i++) {
+    scc_add_to_readbuf(port, data[i], dcycs);
+  }
 
-	free(data);
+  free(data);
 
-	// Normally, the bridge updates from the 60 Hz loop, but that alone bottlenecks network throughput.
-	scc_llap_update();
+  // Normally, the bridge updates from the 60 Hz loop, but that alone bottlenecks network throughput.
+  scc_llap_update();
 }
 
 /** Transfer one packet from the SCC to the AppleTalk bridge. **/
-void scc_llap_empty_writebuf(int port, double dcycs)
-{
-	atbridge_set_diagnostics(g_appletalk_diagnostics);
+void scc_llap_empty_writebuf(int port, double dcycs) {
+  atbridge_set_diagnostics(g_appletalk_diagnostics);
 
-	Scc* scc_ptr;
+  Scc* scc_ptr;
 
-	if (!bridge_initialized)
-		return;
+  if (!bridge_initialized)
+    return;
 
-	int	rdptr;
-	int	wrptr;
-	int	len;
+  int rdptr;
+  int wrptr;
+  int len;
 
-	scc_ptr = &(scc_stat[port]);
+  scc_ptr = &(scc_stat[port]);
 
-	// If there's data in the output buffer, send it.
-	rdptr = scc_ptr->out_rdptr;
-	wrptr = scc_ptr->out_wrptr;
-	if(rdptr == wrptr)
-		return;
-		
-	len = wrptr - rdptr;
-	if (len < 0)
-	{
-		// The data is not contiguous since it wraps around the end of the buffer.
-		// But, this should never happen since this function always empties the entire
-		// buffer, and the buffer is large enough to hold the maximum packet size.
-		halt_printf("SCC LLAP: Unexpected non-contiguous data.  Dropping packet.\n");
-	}
-	else
-	{
-		// The data is contiguous, so read the data directly from the buffer.
-		llap_enqueue_in(dcycs, len, &scc_ptr->out_buf[rdptr]);
-	}
-		
-	// Remove the sent data from the output buffer.  Since the buffer contains
-	// one complete packet, always send all of the data.
-	scc_ptr->out_rdptr = 0;
-	scc_ptr->out_wrptr = 0;
+  // If there's data in the output buffer, send it.
+  rdptr = scc_ptr->out_rdptr;
+  wrptr = scc_ptr->out_wrptr;
+  if(rdptr == wrptr)
+    return;
 
-	// Latch EOM to indicate that the SCC has sent the message.
-	// The timing will be a bit off from the real hardware since we're not 
-	// emulating the sending hardware timing and CRC generation.
-	scc_ptr->eom = 1;
+  len = wrptr - rdptr;
+  if (len < 0)
+  {
+    // The data is not contiguous since it wraps around the end of the buffer.
+    // But, this should never happen since this function always empties the entire
+    // buffer, and the buffer is large enough to hold the maximum packet size.
+    halt_printf("SCC LLAP: Unexpected non-contiguous data.  Dropping packet.\n");
+  }
+  else
+  {
+    // The data is contiguous, so read the data directly from the buffer.
+    llap_enqueue_in(dcycs, len, &scc_ptr->out_buf[rdptr]);
+  }
 
-	// Normally, the bridge updates from the 60 Hz loop, but that alone bottlenecks network throughput.
-	scc_llap_update();
+  // Remove the sent data from the output buffer.  Since the buffer contains
+  // one complete packet, always send all of the data.
+  scc_ptr->out_rdptr = 0;
+  scc_ptr->out_wrptr = 0;
+
+  // Latch EOM to indicate that the SCC has sent the message.
+  // The timing will be a bit off from the real hardware since we're not
+  // emulating the sending hardware timing and CRC generation.
+  scc_ptr->eom = 1;
+
+  // Normally, the bridge updates from the 60 Hz loop, but that alone bottlenecks network throughput.
+  scc_llap_update();
 }
 
 #else
-void scc_llap_init()
-{
+void scc_llap_init() {
 }
 
-void scc_llap_set_node(byte val)
-{
+void scc_llap_set_node(byte val) {
 }
 
-void scc_llap_update()
-{
+void scc_llap_update() {
 }
 
-void scc_llap_fill_readbuf(int port, int space_left, double dcycs)
-{
+void scc_llap_fill_readbuf(int port, int space_left, double dcycs) {
 }
 
-void scc_llap_empty_writebuf(int port, double dcycs)
-{
+void scc_llap_empty_writebuf(int port, double dcycs) {
 }
 #endif

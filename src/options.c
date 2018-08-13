@@ -1,4 +1,10 @@
-
+/*
+   GSPLUS - Advanced Apple IIGS Emulator Environment
+   Based on the KEGS emulator written by Kent Dickey
+   See COPYRIGHT.txt for Copyright information
+   See LICENSE.txt for license (GPL v2)
+ */
+ 
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,9 +17,9 @@
 
 // Halts on bad reads.  Sets flags via engine_s.s:set_halt_act() function
 extern int g_halt_on_bad_read;        // defined in sim65816.c
-// Ignore bad memory accesses.  
+// Ignore bad memory accesses.
 extern int g_ignore_bad_acc;          // defined in sim65816.c
-// Ignore red alert halts.  
+// Ignore red alert halts.
 extern int g_ignore_halts;            // defined in sim65816.c
 // Size of RAM memory expansion card in bytes (default = 8*1024*1024 = 8MB)
 extern int g_mem_size_exp;            // defined in sim65816.c
@@ -41,7 +47,7 @@ extern int g_ethernet;                // defined in sim65816.c
 extern int g_dbg_enable_port;         // defined in debug.c
 // Set preferred audio frequency
 extern int g_preferred_rate;          // defined in sound_driver.c, implemented in various driver files
-// Enable/disable audio               
+// Enable/disable audio
 extern int g_audio_enable;            // defined in sound.c
 // Start in fullscreen mode
 extern int g_fullscreen;              // defined in adb.c, because weird driver writing for x
@@ -102,7 +108,7 @@ int parse_int(const char *str1, int min, int max)
   printf ( "TMP %d\n", tmp);
   return tmp;
 }
-int parse_cli_options(int argc, char **argv) { 
+int parse_cli_options(int argc, char **argv) {
   int	i;
   int tmp1;
   int	skip_amt;
@@ -206,7 +212,7 @@ int parse_cli_options(int argc, char **argv) {
       tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
       glogf("%s Setting joystick X axis %d", parse_log_prefix, tmp1);
       g_joystick_x_axis = tmp1;
-      i++;  
+      i++;
     } else if(!strcmp("-joy_y", argv[i])) {
       if((i+1) >= argc) {
         glogf("%s Error, option '-joy_y' missing argument", parse_log_prefix);
@@ -224,7 +230,7 @@ int parse_cli_options(int argc, char **argv) {
         tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
         glogf("%s Setting joystick X2 axis %d", parse_log_prefix, tmp1);
         g_joystick_x2_axis = tmp1;
-        i++;  
+        i++;
     } else if(!strcmp("-joy_y2", argv[i])) {
         if((i+1) >= argc) {
           glogf("%s Error, option '-joy_y2' missing argument", parse_log_prefix);
