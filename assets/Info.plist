@@ -6,6 +6,8 @@
     <string>English</string>
     <key>CFBundleExecutable</key>
     <string>gsplus</string>
+    <key>CFBundleName</key>
+    <string>GSplus</string>
     <key>CFBundleGetInfoString</key>
     <string>0.14, Copyright 2018 Dagen Brock</string>
     <key>CFBundleIconFile</key>
