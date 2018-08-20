@@ -846,8 +846,8 @@ static char * get_gsstr(word32 ptr) {
 
 static char * get_pstr(word32 ptr) {
   if (!ptr) return NULL;
-  int length = get_memory16_c(ptr, 0);
-  ptr += 2;
+  int length = get_memory_c(ptr, 0);
+  ptr += 1;
   char *str = gc_malloc(length + 1);
   for (int i = 0; i < length; ++i) {
     char c = get_memory_c(ptr+i, 0);
