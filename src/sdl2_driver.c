@@ -1,9 +1,12 @@
 /*
-  GSPLUS - Advanced Apple IIGS Emulator Environment
-  Based on the KEGS emulator written by Kent Dickey
-  See COPYRIGHT.txt for Copyright information
-	See LICENSE.txt for license (GPL v2)
-*/
+   GSPLUS - Advanced Apple IIGS Emulator Environment
+   Based on the KEGS emulator written by Kent Dickey
+   See COPYRIGHT.txt for Copyright information
+   See LICENSE.txt for license (GPL v2)
+ */
+
+// fps shiz
+unsigned int lastTime = 0, currentTime, frames;
 
 // @todo: mouse clip bugs.. great western shootout. Paint 8/16.   still in win32
 #include "SDL.h"
@@ -22,16 +25,16 @@
 #endif
 
 // BITMASKS
-#define ShiftMask  	1
-#define ControlMask	4
-#define LockMask  	2
+#define ShiftMask       1
+#define ControlMask     4
+#define LockMask        2
 
 int g_use_shmem = 0;
 
 int g_num_check_input_calls = 0;
 int g_check_input_flush_rate = 2;
-int	g_win_status_debug = 0;			// Current visibility of status lines.
-int g_win_status_debug_request = 0;	// Desired visibility of status lines.
+int g_win_status_debug = 0;                     // Current visibility of status lines.
+int g_win_status_debug_request = 0;     // Desired visibility of status lines.
 int g_screen_mdepth = 0;
 int kb_shift_control_state = 0;
 
@@ -64,7 +67,7 @@ extern word32 g_full_refresh_needed;
 extern word32 g_palette_8to1624[256];
 extern word32 g_a2palette_8to1624[256];
 extern Kimage g_mainwin_kimage;
-extern const char g_gsplus_version_str[];	// version string for title bar
+extern const char g_gsplus_version_str[];       // version string for title bar
 
 SDL_Window *window;                    // Declare a pointer
 SDL_Renderer *renderer;
@@ -73,124 +76,123 @@ SDL_Texture *overlay_texture; // This is used for scanline simulation. Could be 
 Uint32 *overlay_pixels;
 
 static char *g_clipboard = NULL;  // clipboard variables
-static size_t  g_clipboard_pos = 0;
+static size_t g_clipboard_pos = 0;
 
 void dev_video_init_sdl();
 void handle_sdl_key_event(SDL_Event event);
 void check_input_events_sdl();
 int handle_sdl_mouse_motion_event(SDL_Event event);
 
-int	g_num_a2_keycodes = 0;
+int g_num_a2_keycodes = 0;
 int a2_key_to_sdlkeycode[][3] = {
-  { 0x35,	SDLK_ESCAPE,0 },
-  { 0x7a,	SDLK_F1,	0 },
-  { 0x78,	SDLK_F2,	0 },
-  { 0x63,	SDLK_F3,	0 },
-  { 0x76,	SDLK_F4,	0 },
-  { 0x60,	SDLK_F5,	0 },
-  { 0x61,	SDLK_F6,	0 },
-  { 0x62,	SDLK_F7,	0 },
-  { 0x64,	SDLK_F8,	0 },
-  { 0x65,	SDLK_F9,	0 },
-  { 0x6d,	SDLK_F10,	0 },
-  { 0x67,	SDLK_F11,	0 },
-  { 0x6f,	SDLK_F12,	0 },
-  { 0x69,	SDLK_F13,	0 },
-  { 0x6b,	SDLK_F14,	0 },
-  { 0x71,	SDLK_F15,	0 },
+  { 0x35,       SDLK_ESCAPE,0 },
+  { 0x7a,       SDLK_F1,        0 },
+  { 0x78,       SDLK_F2,        0 },
+  { 0x63,       SDLK_F3,        0 },
+  { 0x76,       SDLK_F4,        0 },
+  { 0x60,       SDLK_F5,        0 },
+  { 0x61,       SDLK_F6,        0 },
+  { 0x62,       SDLK_F7,        0 },
+  { 0x64,       SDLK_F8,        0 },
+  { 0x65,       SDLK_F9,        0 },
+  { 0x6d,       SDLK_F10,       0 },
+  { 0x67,       SDLK_F11,       0 },
+  { 0x6f,       SDLK_F12,       0 },
+  { 0x69,       SDLK_F13,       0 },
+  { 0x6b,       SDLK_F14,       0 },
+  { 0x71,       SDLK_F15,       0 },
   { 0x7f, SDLK_PAUSE, 0 },
-  { 0x32,	'`', '~' },		/* Key number 18? */
-  { 0x12,	'1', '!' },
-  { 0x13,	'2', '@' },
-  { 0x14,	'3', '#' },
-  { 0x15,	'4', '$' },
-  { 0x17,	'5', '%' },
-  { 0x16,	'6', '^' },
-  { 0x1a,	'7', '&' },
-  { 0x1c,	'8', '*' },
-  { 0x19,	'9', '(' },
-  { 0x1d,	'0', ')' },
-  { 0x1b,	'-', '_' },
-  { 0x18,	'=', '+' },
-  { 0x33,	SDLK_BACKSPACE, 0 },
-  { 0x72,	SDLK_INSERT, 0 },	/* Help? XK_Help  */
+  { 0x32,       '`', '~' },             /* Key number 18? */
+  { 0x12,       '1', '!' },
+  { 0x13,       '2', '@' },
+  { 0x14,       '3', '#' },
+  { 0x15,       '4', '$' },
+  { 0x17,       '5', '%' },
+  { 0x16,       '6', '^' },
+  { 0x1a,       '7', '&' },
+  { 0x1c,       '8', '*' },
+  { 0x19,       '9', '(' },
+  { 0x1d,       '0', ')' },
+  { 0x1b,       '-', '_' },
+  { 0x18,       '=', '+' },
+  { 0x33,       SDLK_BACKSPACE, 0 },
+  { 0x72,       SDLK_INSERT, 0 },       /* Help? XK_Help  */
   /*	{ 0x73,	XK_Home, 0 },		alias XK_Home to be XK_KP_Equal! */
-  { 0x74,	SDLK_PAGEUP, 0 },
-  { 0x47,	SDLK_NUMLOCKCLEAR, 0 },	/* Clear, XK_Clear */
-  { 0x51,	SDLK_KP_EQUALS, 0 },		/* Note XK_Home alias! XK_Home */
-  { 0x4b,	SDLK_KP_DIVIDE, 0 },
-  { 0x43,	SDLK_KP_MULTIPLY, 0 },
-  { 0x30,	SDLK_TAB, 0 },
-  { 0x0c,	'q', 'Q' },
-  { 0x0d,	'w', 'W' },
-  { 0x0e,	'e', 'E' },
-  { 0x0f,	'r', 'R' },
-  { 0x11,	't', 'T' },
-  { 0x10,	'y', 'Y' },
-  { 0x20,	'u', 'U' },
-  { 0x22,	'i', 'I' },
-  { 0x1f,	'o', 'O' },
-  { 0x23,	'p', 'P' },
-  { 0x21,	'[', '{' },
-  { 0x1e,	']', '}' },
-  { 0x2a,	0x5c, '|' },	/* backslash, bar */
-  { 0x75,	SDLK_DELETE, 0 },
-  { 0x77,	SDLK_END, 0 },
-  { 0x79,	SDLK_PAGEDOWN, 0 },
-  { 0x59,	SDLK_KP_7, SDLK_HOME },
-  { 0x5b,	SDLK_KP_8, SDLK_UP },
-  { 0x5c,	SDLK_KP_9, SDLK_PAGEUP },
-  { 0x4e,	SDLK_KP_MINUS, 0 },
-  { 0x39,	SDLK_CAPSLOCK, 0 },
-  { 0x00,	'a', 'A' },
-  { 0x01,	's', 'S' },
-  { 0x02,	'd', 'D' },
-  { 0x03,	'f', 'F' },
-  { 0x05,	'g', 'G' },
-  { 0x04,	'h', 'H' },
-  { 0x26,	'j', 'J' },
-  { 0x28,	'k', 'K' },
-  { 0x25,	'l', 'L' },
-  { 0x29,	';', ':' },
-  { 0x27,	0x27, '"' },	/* single quote */
-  { 0x24,	SDLK_RETURN, 0 },
-  { 0x56,	SDLK_KP_4, SDLK_LEFT},
-  { 0x57,	SDLK_KP_5, 0 },
-  { 0x58,	SDLK_KP_6, SDLK_RIGHT },
-  { 0x45,	SDLK_KP_PLUS, 0 },
-  { 0x38,	SDLK_LSHIFT, SDLK_RSHIFT },
-  { 0x06,	'z', 'Z' },
-  { 0x07,	'x', 'X' },
-  { 0x08,	'c', 'C' },
-  { 0x09,	'v', 'V' },
-  { 0x0b,	'b', 'B' },
-  { 0x2d,	'n', 'N' },
-  { 0x2e,	'm', 'M' },
-  { 0x2b,	',', '<' },
-  { 0x2f,	'.', '>' },
-  { 0x2c,	'/', '?' },
-  { 0x3e,	SDLK_UP, 0 },
-  { 0x53,	SDLK_KP_1, 0 },
-  { 0x54,	SDLK_KP_2, SDLK_DOWN },
-  { 0x55,	SDLK_KP_3, SDLK_PAGEDOWN },
-  { 0x36,	SDLK_RCTRL, SDLK_LCTRL },
-  { 0x3a,	SDLK_LALT, SDLK_RALT },		/* Option */
-  { 0x37,	SDLK_LGUI, SDLK_RGUI },		/* Command */
-  { 0x31,	' ', 0 },
-  { 0x3b,	SDLK_LEFT, 0 },
-  { 0x3d,	SDLK_DOWN, 0 },
-  { 0x3c,	SDLK_RIGHT, 0 },
-  { 0x52,	SDLK_KP_0, 0 },
-  { 0x41,	SDLK_KP_PERIOD, 0 },
-  { 0x4c,	SDLK_KP_ENTER, 0 },
+  { 0x74,       SDLK_PAGEUP, 0 },
+  { 0x47,       SDLK_NUMLOCKCLEAR, 0 }, /* Clear, XK_Clear */
+  { 0x51,       SDLK_KP_EQUALS, 0 },            /* Note XK_Home alias! XK_Home */
+  { 0x4b,       SDLK_KP_DIVIDE, 0 },
+  { 0x43,       SDLK_KP_MULTIPLY, 0 },
+  { 0x30,       SDLK_TAB, 0 },
+  { 0x0c,       'q', 'Q' },
+  { 0x0d,       'w', 'W' },
+  { 0x0e,       'e', 'E' },
+  { 0x0f,       'r', 'R' },
+  { 0x11,       't', 'T' },
+  { 0x10,       'y', 'Y' },
+  { 0x20,       'u', 'U' },
+  { 0x22,       'i', 'I' },
+  { 0x1f,       'o', 'O' },
+  { 0x23,       'p', 'P' },
+  { 0x21,       '[', '{' },
+  { 0x1e,       ']', '}' },
+  { 0x2a,       0x5c, '|' },    /* backslash, bar */
+  { 0x75,       SDLK_DELETE, 0 },
+  { 0x77,       SDLK_END, 0 },
+  { 0x79,       SDLK_PAGEDOWN, 0 },
+  { 0x59,       SDLK_KP_7, SDLK_HOME },
+  { 0x5b,       SDLK_KP_8, SDLK_UP },
+  { 0x5c,       SDLK_KP_9, SDLK_PAGEUP },
+  { 0x4e,       SDLK_KP_MINUS, 0 },
+  { 0x39,       SDLK_CAPSLOCK, 0 },
+  { 0x00,       'a', 'A' },
+  { 0x01,       's', 'S' },
+  { 0x02,       'd', 'D' },
+  { 0x03,       'f', 'F' },
+  { 0x05,       'g', 'G' },
+  { 0x04,       'h', 'H' },
+  { 0x26,       'j', 'J' },
+  { 0x28,       'k', 'K' },
+  { 0x25,       'l', 'L' },
+  { 0x29,       ';', ':' },
+  { 0x27,       0x27, '"' },    /* single quote */
+  { 0x24,       SDLK_RETURN, 0 },
+  { 0x56,       SDLK_KP_4, SDLK_LEFT},
+  { 0x57,       SDLK_KP_5, 0 },
+  { 0x58,       SDLK_KP_6, SDLK_RIGHT },
+  { 0x45,       SDLK_KP_PLUS, 0 },
+  { 0x38,       SDLK_LSHIFT, SDLK_RSHIFT },
+  { 0x06,       'z', 'Z' },
+  { 0x07,       'x', 'X' },
+  { 0x08,       'c', 'C' },
+  { 0x09,       'v', 'V' },
+  { 0x0b,       'b', 'B' },
+  { 0x2d,       'n', 'N' },
+  { 0x2e,       'm', 'M' },
+  { 0x2b,       ',', '<' },
+  { 0x2f,       '.', '>' },
+  { 0x2c,       '/', '?' },
+  { 0x3e,       SDLK_UP, 0 },
+  { 0x53,       SDLK_KP_1, 0 },
+  { 0x54,       SDLK_KP_2, SDLK_DOWN },
+  { 0x55,       SDLK_KP_3, SDLK_PAGEDOWN },
+  { 0x36,       SDLK_RCTRL, SDLK_LCTRL },
+  { 0x3a,       SDLK_LALT, SDLK_RALT },         /* Option */
+  { 0x37,       SDLK_LGUI, SDLK_RGUI },         /* Command */
+  { 0x31,       ' ', 0 },
+  { 0x3b,       SDLK_LEFT, 0 },
+  { 0x3d,       SDLK_DOWN, 0 },
+  { 0x3c,       SDLK_RIGHT, 0 },
+  { 0x52,       SDLK_KP_0, 0 },
+  { 0x41,       SDLK_KP_PERIOD, 0 },
+  { 0x4c,       SDLK_KP_ENTER, 0 },
   { -1, -1, -1 }
 
 };
 
 
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   return gsplusmain(argc, argv);
 }
 
@@ -222,12 +224,12 @@ SDL_bool IsFullScreen(SDL_Window *win) {
 
 
 void dev_video_init() {
-  word32	lores_col;
+  word32 lores_col;
 
   // build keycode map ??
   g_num_a2_keycodes = 0;
-  int	i;
-  int	keycode;
+  int i;
+  int keycode;
 
   for(i = 0; i < 0x7f; i++) {
     keycode = a2_key_to_sdlkeycode[i][0];
@@ -307,15 +309,14 @@ void dev_video_init_sdl() {
 
 
   window = SDL_CreateWindow(
-    window_title,											 // window title (GSport vX.X)
-    // SDL_WINDOWPOS_UNDEFINED,           // initial x position
-    // SDL_WINDOWPOS_UNDEFINED,           // initial y position
-    startx, starty,
+    window_title,                         // window title (GSport vX.X)
+    startx,
+    starty,
     BASE_WINDOW_WIDTH,                 // width, in pixels
     X_A2_WINDOW_HEIGHT,                // height, in pixels
     SDL_WINDOW_OPENGL                  // flags - see below
     | more_flags
-  );
+    );
 
 
   // Check that the window was successfully created
@@ -337,16 +338,16 @@ void dev_video_init_sdl() {
   SDL_RenderSetLogicalSize(renderer, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
 
   texture = SDL_CreateTexture(renderer,
-    SDL_PIXELFORMAT_ARGB8888,
-    SDL_TEXTUREACCESS_STREAMING,
-    BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
+                              SDL_PIXELFORMAT_ARGB8888,
+                              SDL_TEXTUREACCESS_STREAMING,
+                              BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
   // The window is open: could enter program loop here (see SDL_PollEvent())
   //overlay test
   overlay_texture = SDL_CreateTexture(renderer,
-    SDL_PIXELFORMAT_ARGB8888,
-    SDL_TEXTUREACCESS_STREAMING,
-    BASE_WINDOW_WIDTH,
-    X_A2_WINDOW_HEIGHT);
+                                      SDL_PIXELFORMAT_ARGB8888,
+                                      SDL_TEXTUREACCESS_STREAMING,
+                                      BASE_WINDOW_WIDTH,
+                                      X_A2_WINDOW_HEIGHT);
 
   SDL_SetTextureBlendMode(overlay_texture, SDL_BLENDMODE_BLEND);
   overlay_pixels = malloc(BASE_WINDOW_WIDTH*X_A2_WINDOW_HEIGHT*sizeof(Uint32));
@@ -381,6 +382,7 @@ void dev_video_init_sdl() {
 
 // Copy a rect to our SDL window
 void sdl_push_kimage(Kimage *kimage_ptr, int destx, int desty, int srcx, int srcy, int width, int height) {
+
   byte *src_ptr;
   int pixel_size = 4;
   src_ptr = kimage_ptr->data_ptr + (srcy * kimage_ptr->width_act + srcx) * pixel_size;
@@ -423,9 +425,9 @@ void set_refresh_needed() {
 
 void x_get_kimage(Kimage *kimage_ptr) {
   byte *data;
-  int	width;
-  int	height;
-  int	depth;
+  int width;
+  int height;
+  int depth;
 
   width = kimage_ptr->width_req;
   height = kimage_ptr->height;
@@ -442,7 +444,7 @@ void check_input_events() {
 
 
 void check_input_events_sdl() {
-  int	motion = 0;
+  int motion = 0;
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -450,7 +452,7 @@ void check_input_events_sdl() {
     if (event.type == SDL_WINDOWEVENT) {
       set_refresh_needed();
     }
-    switch( event.type ){
+    switch( event.type ) {
       case SDL_KEYDOWN:
       case SDL_KEYUP:
         handle_sdl_key_event(event);
@@ -473,7 +475,7 @@ void check_input_events_sdl() {
         cfg_inspect_maybe_insert_file(file, 0);
         SDL_free(file);
       }
-        break;
+      break;
       default:
         break;
     }
@@ -482,7 +484,7 @@ void check_input_events_sdl() {
 
 
 int sdl_keysym_to_a2code(int keysym, int is_up) {
-  int	i;
+  int i;
 
   if(keysym == 0) {
     return -1;
@@ -513,7 +515,7 @@ int sdl_keysym_to_a2code(int keysym, int is_up) {
   /* Look up Apple 2 keycode */
   for(i = g_num_a2_keycodes - 1; i >= 0; i--) {
     if((keysym == a2_key_to_sdlkeycode[i][1]) ||
-    (keysym == a2_key_to_sdlkeycode[i][2])) {
+       (keysym == a2_key_to_sdlkeycode[i][2])) {
       return a2_key_to_sdlkeycode[i][0];
     }
   }
@@ -523,9 +525,9 @@ int sdl_keysym_to_a2code(int keysym, int is_up) {
 
 
 void handle_sdl_key_event(SDL_Event event) {
-  int	state_xor;
+  int state_xor;
   int state = 0;
-  int	is_up;
+  int is_up;
 
   int mod = event.key.keysym.mod;
 
@@ -535,11 +537,11 @@ void handle_sdl_key_event(SDL_Event event) {
 
   // when mod key is first press, comes as event, otherwise just a modifier
   if( mod & KMOD_LCTRL  || mod & KMOD_RCTRL ||
-    event.type == (SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LCTRL || event.key.keysym.sym == SDLK_RCTRL))) {
-      state = state | ControlMask;
+      event.type == (SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LCTRL || event.key.keysym.sym == SDLK_RCTRL))) {
+    state = state | ControlMask;
   }
   if( (mod & KMOD_LSHIFT)  || (mod & KMOD_RSHIFT) ||
-  event.type == (SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LSHIFT || event.key.keysym.sym == SDLK_RSHIFT))) {
+      event.type == (SDL_KEYDOWN && (event.key.keysym.sym == SDLK_LSHIFT || event.key.keysym.sym == SDLK_RSHIFT))) {
     state = state | ShiftMask;
   }
   if( mod & KMOD_CAPS) {
@@ -568,7 +570,7 @@ void handle_sdl_key_event(SDL_Event event) {
   if (event.type == SDL_KEYUP) {
     is_up = 1;
   }
-  switch( event.key.keysym.sym ){
+  switch( event.key.keysym.sym ) {
     case SDLK_F11:
       if (kb_shift_control_state & ShiftMask) {  // SHIFT+F11
         if (!is_up) {
@@ -610,7 +612,7 @@ int handle_sdl_mouse_motion_event(SDL_Event event) {
   x = event.motion.x - BASE_MARGIN_LEFT;
   y = event.motion.y - BASE_MARGIN_TOP;
   if (event.type == SDL_MOUSEBUTTONUP) {
-    return update_mouse(x, y, 0 , event.motion.state &7 );
+    return update_mouse(x, y, 0, event.motion.state &7 );
   } else {
     return update_mouse(x, y, event.motion.state, event.motion.state &7 );
   }
@@ -695,13 +697,13 @@ void x_take_screenshot() {
   SDL_FreeSurface(sshot);
 
   SDL_Surface *s = SDL_CreateRGBSurface(0, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
-    if (s) {
-      SDL_Surface * image = SDL_LoadBMP("screenshot.bmp");
-      IMG_SavePNG(image, screenshot_filename);
-      SDL_FreeSurface(image);
-    }
-    SDL_FreeSurface(s);
+  if (s) {
+    SDL_Surface * image = SDL_LoadBMP("screenshot.bmp");
+    IMG_SavePNG(image, screenshot_filename);
+    SDL_FreeSurface(image);
   }
+  SDL_FreeSurface(s);
+}
 
 
 void clipboard_paste(void) {
@@ -728,7 +730,7 @@ int clipboard_get_char(void) {
   char c;
 
   if (!g_clipboard)
-  return 0;
+    return 0;
 
   /* skip utf-8 characters. */
   do {
@@ -737,7 +739,7 @@ int clipboard_get_char(void) {
 
   /* windows -- skip the \n in \r\n. */
   if (c == '\r' && g_clipboard[g_clipboard_pos] == '\n')
-  g_clipboard_pos++;
+    g_clipboard_pos++;
 
   /* everybody else -- convert \n to \r */
   if (c == '\n') c = '\r';
@@ -752,6 +754,12 @@ int clipboard_get_char(void) {
   return c | 0x80;
 }
 
+int x_show_alert(int is_fatal, const char *str) {
+  if (str) {
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "GS+ Alert", str, NULL);
+  }
+  return 0;
+}
 
 
 
@@ -759,7 +767,6 @@ int clipboard_get_char(void) {
 // THIS DRIVER.
 
 // called by src/sim65816.c
-int x_show_alert(int is_fatal, const char *str) { return 0; }
 void get_ximage(Kimage *kimage_ptr) { }
 void x_toggle_status_lines() { }
 void x_redraw_status_lines() { }
@@ -770,7 +777,7 @@ void x_auto_repeat_off(int must) { }
 void x_release_kimage(Kimage* kimage_ptr) { }
 // OG Addding ratio
 int x_calc_ratio(float x,float y) { return 1; }
-void x_set_mask_and_shift(word32 x_mask, word32 *mask_ptr, int *shift_left_ptr, int *shift_right_ptr) {	return; }
+void x_set_mask_and_shift(word32 x_mask, word32 *mask_ptr, int *shift_left_ptr, int *shift_right_ptr) { return; }
 void x_update_color(int col_num, int red, int green, int blue, word32 rgb) { }
 void x_update_physical_colormap() { }
 void show_xcolor_array() { }
