@@ -1,25 +1,9 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
- 
- Copyright (C) 2010 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-*/
+   GSPLUS - Advanced Apple IIGS Emulator Environment
+   Based on the KEGS emulator written by Kent Dickey
+   See COPYRIGHT.txt for Copyright information
+   See LICENSE.txt for license (GPL v2)
+ */
 
 #include <assert.h>
 #include "defc.h"
@@ -34,7 +18,7 @@ extern int g_audio_rate;
 unsigned int __stdcall child_sound_loop_win32(void *param);
 void check_wave_error(int res, char *str);
 
-#define NUM_WAVE_HEADERS	8
+#define NUM_WAVE_HEADERS        8
 
 //HWAVEOUT g_wave_handle = NULL;	// OG Default value must be set
 //WAVEHDR g_wavehdr[NUM_WAVE_HEADERS];
@@ -43,7 +27,7 @@ extern int g_audio_enable;
 extern word32 *g_sound_shm_addr;
 extern int g_preferred_rate;
 
-int	g_sdlsnd_buflen = 0x1000;
+int g_sdlsnd_buflen = 0x1000;
 word32 *bptr = NULL;
 int g_sdlsnd_write_idx;
 int g_sdlsnd_read_idx;
@@ -71,13 +55,12 @@ static void sound_write_sdl(int real_samps, int size);
 
 #endif
 
-void sdlsnd_init(word32 *shmaddr)
-{
+void sdlsnd_init(word32 *shmaddr) {
   printf("sdlsnd_init\n");
   if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-		printf("Cannot initialize SDL audio\n");
-		g_audio_enable = 0;
-	}
+    printf("Cannot initialize SDL audio\n");
+    g_audio_enable = 0;
+  }
 
   child_sound_loop(-1, -1, shmaddr);
   return;
@@ -86,17 +69,15 @@ void sdlsnd_init(word32 *shmaddr)
 
 
 
-void
-win32snd_init(word32 *shmaddr)
-{
-	printf("win32snd_init\n");
-	child_sound_loop(-1, -1, shmaddr);
+void win32snd_init(word32 *shmaddr)      {
+  printf("win32snd_init\n");
+  child_sound_loop(-1, -1, shmaddr);
 
-	return;
+  return;
 }
 
 
-void sdl_send_audio(word32	*ptr, int size, int real_samps) {
+void sdl_send_audio(word32      *ptr, int size, int real_samps) {
 
   /* code */
   //printf(" sdl_s_a %d\t 0x%08x ",size, &ptr);
@@ -119,16 +100,16 @@ void handle_sdl_snd(void *userdata, Uint8 *stream, int len) {
   /* Only play if we have data left */
 /*  if ( g_playbuf_buffered == 0) {
     return;
-  }
-*/
+   }
+ */
   for(int i = 0; i < len; ++i) {
     if(g_playbuf_buffered <= 0) {
-        stream[i] = 0;
+      stream[i] = 0;
     } else {
-        stream[i] = bptr[g_sdlsnd_read_idx++];
-        if(g_sdlsnd_read_idx == g_sdlsnd_buflen)
-            g_sdlsnd_read_idx = 0;
-        g_playbuf_buffered--;
+      stream[i] = bptr[g_sdlsnd_read_idx++];
+      if(g_sdlsnd_read_idx == g_sdlsnd_buflen)
+        g_sdlsnd_read_idx = 0;
+      g_playbuf_buffered--;
     }
   }
   return;
@@ -144,15 +125,15 @@ void handle_sdl_snd(void *userdata, Uint8 *stream, int len) {
     g_playbuf_buffered -= len;
   } else {
     /*
-    int top_len = 0;
-    top_len = g_sdlsnd_buflen - g_sdlsnd_read_idx;
-    SDL_memcpy (stream, &bptr[g_sdlsnd_read_idx], top_len);
-    g_sdlsnd_read_idx = 0;
-    g_playbuf_buffered -= top_len;
-  //  SDL_memcpy (stream+top_len, bptr[g_sdlsnd_read_idx], len-top_len);
-    g_sdlsnd_read_idx += len-top_len;
-    g_playbuf_buffered -= len-top_len;
-    */
+       int top_len = 0;
+       top_len = g_sdlsnd_buflen - g_sdlsnd_read_idx;
+       SDL_memcpy (stream, &bptr[g_sdlsnd_read_idx], top_len);
+       g_sdlsnd_read_idx = 0;
+       g_playbuf_buffered -= top_len;
+       //  SDL_memcpy (stream+top_len, bptr[g_sdlsnd_read_idx], len-top_len);
+       g_sdlsnd_read_idx += len-top_len;
+       g_playbuf_buffered -= len-top_len;
+     */
   }
 
   //SDL_MixAudio(stream, pointer, len, SDL_MIX_MAXVOLUME);
@@ -160,9 +141,7 @@ void handle_sdl_snd(void *userdata, Uint8 *stream, int len) {
 }
 
 
-void
-child_sound_init_sdl()
-{
+void child_sound_init_sdl()      {
   printf("child_sound_init_sdl");
 
   SDL_memset(&want, 0, sizeof(want)); // or SDL_zero(want)
@@ -174,11 +153,11 @@ child_sound_init_sdl()
 
   dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
   if (dev == 0) {
-      printf("Failed to open audio: %s\n", SDL_GetError());
+    printf("Failed to open audio: %s\n", SDL_GetError());
   } else {
-      if (have.format != want.format) { // we let this one thing change.
-          printf("We didn't get Float32 audio format.\n");
-      }
+    if (have.format != want.format) {   // we let this one thing change.
+      printf("We didn't get Float32 audio format.\n");
+    }
 
   }
 
@@ -201,16 +180,15 @@ child_sound_init_sdl()
 
   SDL_PauseAudioDevice(dev, 0);   // start audio playing.
 
-	g_audio_rate = have.freq;
+  g_audio_rate = have.freq;
   printf("g_audio_rate: %d\n", g_audio_rate);
-	set_audio_rate(g_audio_rate);   // let kegs simulator know the rate
+  set_audio_rate(g_audio_rate);         // let kegs simulator know the rate
 }
 
 
 
 
-void
-sdlsnd_shutdown() {
+void sdlsnd_shutdown()      {
   //SDL_Delay(5000);  // let the audio callback play some sound for 5 seconds.
   SDL_CloseAudioDevice(dev);
   printf("sdlsnd_shutdown");

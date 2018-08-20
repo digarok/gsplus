@@ -1,0 +1,40 @@
+# Win32 - SDL2 version
+#
+# This should build a `gsplus.exe` executable and copy it to the project root dir.
+# You can run it, though as always you need to supply an Apple IIgs ROM file.
+# Have fun, and please note any errors on the issues page of the project.
+
+
+# Prerequisites: You must install Cygwin on your system.
+#   I install Cygwin with all "Devel" and "Perl" packages.
+#   I also search for and add any FreeType libs.
+#   If you want to deploy to s3 (gitlabci) then also add pip for python.
+#   If you are deploying the packages then you also need zip.
+#   You will not use the Cygwin SDL2/image libraries as they are deprecated.
+#   Instead you must download the mingw64-w64 libraries and link against those.
+wget https://www.libsdl.org/release/SDL2-devel-2.0.8-mingw.tar.gz
+tar -xvzf SDL2-devel-2.0.8-mingw.tar.gz
+cd SDL2-2.0.8
+mkdir /cygdrive/c/mingw
+mv i686-w64-mingw32/ /cygdrive/c/mingw/
+cd ..
+
+wget https://www.libsdl.org/projects/SDL_image/release/SDL2_image-devel-2.0.3-mingw.tar.gz
+tar -xvzf SDL2_image-devel-2.0.3-mingw.tar.gz
+rsync -a SDL2_image-2.0.3/i686-w64-mingw32/ /cygdrive/c/mingw/i686-w64-mingw32/
+
+# Build.
+git clone git@github.com:digarok/gsplus.git
+cd gsplus/src
+ln -s vars_win32_sdl2 vars
+make clean ; make
+
+
+# if you want to make a machine that can also deploy to s3 (gitlabci):
+pip2.7 install awscli
+
+# aws creds are to be passed via CI environment variables
+# also, you have to fix the behavior for windows to run this.
+# open an Administrator CMD prompt and run:
+assoc .py=pyautofile
+ftype pyautofile="c:\cygwin\bin\python" "%1" %*

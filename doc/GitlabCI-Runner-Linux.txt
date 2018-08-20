@@ -1,6 +1,4 @@
 ## SOME NOTES ON SETTING UP GITLAB RUNNER TO BUILD ON LINUX/UBUNTU
-# Based on: https://gitlab.com/gitlab-org/gitlab-ci-multi-runner/blob/master/docs/install/linux-repository.md
-
 
 ## STEP 1 - Install Gitlab Runner
 sudo apt-get install -y curl
@@ -9,6 +7,14 @@ sudo apt-get install -y gitlab-ci-multi-runner
 
 
 ## STEP 2 - Register it with your server
+sudo gitlab-ci-multi-runner register -n \
+  --url http://centralserv.gotgeeks.com/ci \
+  --registration-token UqGC2qvJmvU1QBK3mx4b \
+  --executor shell \
+  --description "LinBuild" \
+  --tag-list "ubuntu"
+
+# or manually
 sudo gitlab-ci-multi-runner register
 # "Please enter the gitlab-ci coordinator URL (e.g. https://gitlab.com/ci )"
 #  https://centralserv.gotgeeks.com/ci
