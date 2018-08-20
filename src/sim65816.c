@@ -6,6 +6,8 @@
  */
 
 #include <math.h>
+#include <ctype.h>
+
 #include "defc.h"
 #include "printer.h"
 #include "imagewriter.h"
@@ -2437,17 +2439,108 @@ void do_mvn(word32 banks)      {
 
 extern void host_fst(void);
 
-void do_wdm(word32 arg)      {
-  switch(arg) {
-    case 0x8d:     /* Bouncin Ferno does WDM 8d */
-      break;
+static void wdm_print() {
+	/* x:y is ptr to cstring to print, a is type of string */
+	/* 0 = cstring, 1 = pstring, 2 = gsosstring, $8000 is add \n */
 
-    case 0xff:     /* fst */
-      host_fst();
-      break;
+	word32 address = engine.xreg + (engine.yreg << 16);
+	word16 type = engine.acc;
+	char c;
+	int length;
 
-    default:
-      halt_printf("do_wdm: %02x! pc = $%06x\n", arg, engine.kpc - 2);
+	if (address) switch (type & 0xff){
+		case 0:
+			while ((c = get_memory_c(address++, 0))) {
+				fputc(c, stdout);
+			}
+			break;
+
+		case 1:
+			length = get_memory_c(address++, 0);
+			while (length--) {
+				c = get_memory_c(address++, 0);
+				fputc(c, stdout);
+			}
+			break;
+
+		case 2:
+			length = get_memory16_c(address, 0);
+			address += 2;
+			while (length--) {
+				c = get_memory_c(address++, 0);
+				fputc(c, stdout);
+			}
+			break;
+	}
+	if (type & 0x8000) fputc('\n', stdout);
+}
+
+static void wdm_hexdump() {
+	/* x:y is ptr to memory, a is length */
+	word32 count = engine.acc;
+	word32 address = engine.xreg + (engine.yreg << 16);
+	if (address && count) {
+
+		static char hex[] = "0123456789abcdef";
+		char buffer1[16*3+1];
+		char buffer2[16+1];
+		byte b;
+		int i, j;
+		while (count) {
+
+			memset(buffer1, ' ', sizeof(buffer1)-1);
+			memset(buffer2, ' ', sizeof(buffer2)-1);
+			buffer1[48] = 0;
+			buffer2[16] = 0;
+
+			int xx = 16;
+			if (count < 16) xx = count;
+			for (i = 0, j = 0; i < xx; ++i) {
+				b = get_memory_c(address + i, 0);
+				buffer1[j++] = hex[b >> 4];
+				buffer1[j++] = hex[b & 0x0f];
+				buffer1[j++] = ' ';
+				b &= 0x7f; /* support high ascii */
+				buffer2[i] = isprint(b) ? b : '.';
+
+			}
+			printf("%06x %s%s\n", address, buffer1, buffer2);
+			count -= xx;
+			address += xx;
+		}
+	}
+}
+
+void
+do_wdm(word32 arg)
+{
+	switch(arg) {
+	case 0x8d: /* Bouncin Ferno does WDM 8d */
+		break;
+
+
+		/* 0xAx range can be used for debugging, etc */
+
+	case 0xa0: /* print */
+		wdm_print();
+		break;
+
+	case 0xa1: /* hexdump */
+		wdm_hexdump();
+		break;
+
+
+		/* 0xFx shouldn't be called unless you know what you're doing */
+
+	case 0xfe: /* used for ModemWorks branch */
+		break;
+
+	case 0xff: /* fst */
+		host_fst();
+		break;
+
+  default:
+    halt_printf("do_wdm: %02x! pc = $%06x\n", arg, engine.kpc - 2);
   }
 }
 
