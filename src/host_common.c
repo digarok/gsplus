@@ -256,6 +256,9 @@ word32 host_map_errno(int xerrno) {
       return outOfMem;
     case EEXIST:
       return dupPathname;
+    case ENOTEMPTY:
+      return invalidAccess;
+
     default:
       return drvrIOError;
   }

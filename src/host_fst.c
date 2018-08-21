@@ -1527,7 +1527,9 @@ static word32 fst_change_path(int class, const char *path1, const char *path2) {
   if (host_is_root(&st))
     return invalidAccess;
 
-  // rename will delete any previous file.
+  // rename will delete any previous file. ChangePath should return an error.
+  if (stat(path2, &st) == 0) return dupPathname;
+
   if (rename(path1, path2) < 0) return host_map_errno_path(errno, path2);
   return 0;
 }
