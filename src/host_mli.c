@@ -911,8 +911,6 @@ static int mli_quit(unsigned dcb) {
 
 static int mli_open(unsigned dcb, const char *name, const char *path) {
 
-	struct stat st;
-
 	int fd;
 	int refnum = 0;
 	unsigned type;
