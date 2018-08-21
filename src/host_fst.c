@@ -930,7 +930,7 @@ static word32 fst_open(int class, const char *path) {
     if (pcount >= 5) set_memory16_c(pb + OpenRecGS_access, access, 0);
     if (pcount >= 6) set_memory16_c(pb + OpenRecGS_fileType, fi.file_type, 0);
     if (pcount >= 7) set_memory32_c(pb + OpenRecGS_auxType, fi.aux_type, 0);
-    if (pcount >= 8) set_memory16_c(pb + OpenRecGS_storageType, fi. storage_type, 0);
+    if (pcount >= 8) set_memory16_c(pb + OpenRecGS_storageType, fi.storage_type, 0);
 
     if (pcount >= 9) host_set_date_time_rec(pb + OpenRecGS_createDateTime, fi.create_date);
     if (pcount >= 10) host_set_date_time_rec(pb + OpenRecGS_modDateTime, fi.modified_date);
@@ -968,7 +968,7 @@ static word32 fst_open(int class, const char *path) {
     return tooManyFilesOpen;
   }
 
-  if (type == file_regular){
+  if (type == file_regular) {
 
     if (g_cfg_host_crlf) {
       if (fi.file_type == 0x04 || fi.file_type == 0xb0)

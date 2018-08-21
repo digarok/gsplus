@@ -1,33 +1,33 @@
 enum {
-	file_non,
-	file_regular,
-	file_resource,
-	file_directory,
+  file_non,
+  file_regular,
+  file_resource,
+  file_directory,
 };
 
 enum {
-	translate_none,
-	translate_crlf,
-	translate_merlin,
+  translate_none,
+  translate_crlf,
+  translate_merlin,
 };
 
 
 
 struct file_info {
 
-	time_t create_date;
-	time_t modified_date;
-	word16 access;
-	word16 storage_type;
-	word16 file_type;
-	word32 aux_type;
-	word32 eof;
-	word32 blocks;
-	word32 resource_eof;
-	word32 resource_blocks;
-	mode_t st_mode;
-	int has_fi;
-	byte finder_info[32];
+  time_t create_date;
+  time_t modified_date;
+  word16 access;
+  word16 storage_type;
+  word16 file_type;
+  word32 aux_type;
+  word32 eof;
+  word32 blocks;
+  word32 resource_eof;
+  word32 resource_blocks;
+  mode_t st_mode;
+  int has_fi;
+  byte finder_info[32];
 };
 
 
@@ -43,14 +43,14 @@ extern Engine_reg engine;
 #define CLI() engine.psr &= ~0x04
 
 enum {
-	C = 0x01,
-	Z = 0x02,
-	I = 0x04,
-	D = 0x08,
-	X = 0x10,
-	M = 0x20,
-	V = 0x40,
-	N = 0x80
+  C = 0x01,
+  Z = 0x02,
+  I = 0x04,
+  D = 0x08,
+  X = 0x10,
+  M = 0x20,
+  V = 0x40,
+  N = 0x80
 };
 
 extern int g_cfg_host_read_only;
