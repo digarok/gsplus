@@ -24,6 +24,15 @@
 #include <sys/paths.h>
 #endif
 
+#ifndef XATTR_FINDERINFO_NAME
+#define XATTR_FINDERINFO_NAME "com.apple.FinderInfo"
+#endif
+
+#ifndef XATTR_RESOURCEFORK_NAME
+#define XATTR_RESOURCEFORK_NAME "com.apple.ResourceFork"
+#endif
+
+
 #include "defc.h"
 #include "gsos.h"
 #include "fst.h"
