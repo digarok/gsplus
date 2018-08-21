@@ -2510,6 +2510,8 @@ static void wdm_hexdump() {
 		}
 	}
 }
+extern void host_mli_head(void);
+extern void host_mli_tail(void);
 
 void
 do_wdm(word32 arg)
@@ -2531,6 +2533,14 @@ do_wdm(word32 arg)
 
 
 		/* 0xFx shouldn't be called unless you know what you're doing */
+
+	case 0xfc: /* mli head patch */
+		host_mli_head();
+		break;
+
+	case 0xfd: /* mli tail patch */
+		host_mli_tail();
+		break;
 
 	case 0xfe: /* used for ModemWorks branch */
 		break;

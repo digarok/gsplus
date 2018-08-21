@@ -207,6 +207,10 @@ __attribute__ ((aligned(256)))
 
 ;
 
+/* SLOT 7 DEVSEL RAM (used by HOST.MLI) */
+static byte slot7_devsel[15] = { 0 };
+
+
 // OG Added moremem_init()
 void moremem_init() {
   g_em_emubyte_cnt = 0;
@@ -1637,7 +1641,7 @@ int io_read(word32 loc, double *cyc_ptr)     {
         case 0xf4: case 0xf5: case 0xf6: case 0xf7:
         case 0xf8: case 0xf9: case 0xfa: case 0xfb:
         case 0xfc: case 0xfd: case 0xfe: case 0xff:
-          return 0;
+          return slot7_devsel[loc & 0x0f] /* 0 */;
 
         default:
           printf("loc: %04x bad\n", loc);
@@ -2378,7 +2382,9 @@ void io_write(word32 loc, int val, double *cyc_ptr)      {
         case 0xf4: case 0xf5: case 0xf6: case 0xf7:
         case 0xf8: case 0xf9: case 0xfa: case 0xfb:
         case 0xfc: case 0xfd: case 0xfe: case 0xff:
-          UNIMPL_WRITE;
+          slot7_devsel[loc & 0x0f] = val; /* UNIMPL_WRITE; */
+          return;
+          
         default:
           printf("WRite loc: %x\n",loc);
           exit(-300);
