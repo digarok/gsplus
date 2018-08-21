@@ -451,7 +451,7 @@ static int mli_atinit(unsigned dcb) {
   if (!saved_mli_address) return paramRangeErr;
 
   saved_unit = 0x80;
-  if (pcount >= 4) saved_unit = get_memory16_c(dcb + 6, 0);
+  if (pcount >= 4) saved_unit = get_memory_c(dcb + 6, 0) & 0xf0;
 
   if (!saved_unit) return paramRangeErr;
 
