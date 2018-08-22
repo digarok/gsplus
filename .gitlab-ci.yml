@@ -162,6 +162,7 @@ build-win32:
     expire_in: 10 minutes
   only:
     - master
+    - /^win.*/
 
 package-win32:
   tags:
@@ -205,6 +206,7 @@ package-win32:
     expire_in: 10 minutes
   only:
     - master
+    - /^win.*/
 
 deploy-win32:
   tags:
@@ -214,7 +216,9 @@ deploy-win32:
     GIT_STRATEGY: none
   script:
     - aws s3 cp gsplus-win32.zip s3://%AWS_BUCKET%/%CI_TAG%/%CI_VERSION%/%CI_PIPELINE_ID%/win32/%CI_BUILD_ID%/ --acl public-read
-
+  only:
+    - master
+    - /^win.*/
 
 # TARGET SYSTEM: WIN32 SDL2 UNDER CYGWIN W MINGW64 SDL2 LIBS
 build-win-sdl2:
