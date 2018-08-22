@@ -2862,3 +2862,8 @@ void host_fst(void) {
   if (acc) SEC();
   else CLC();
 }
+
+
+// placeholder to build on win32 until it support host MLI
+void host_mli_head() {}
+void host_mli_tail() {}
