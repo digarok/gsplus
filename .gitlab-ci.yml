@@ -94,15 +94,36 @@ package-ubuntu-sdl2:
     paths:
       - gsplus-ubuntu-sdl.tar.bz2
     expire_in: 10 minutes
+
+package-ubuntu-sdl2-deb:
+  tags:
+    - ubuntu
+  stage: package
+  variables:
+    GIT_STRATEGY: fetch
+    PACKAGE_NAME: gsplus_$CI_BUILD_ID-0
+  script:
+    - mkdir -p $PACKAGE_NAME/usr/local/bin
+    - mkdir -p $PACKAGE_NAME/DEBIAN
+    - cp gsplus $PACKAGE_NAME/usr/local/bin
+    - cp assets/control $PACKAGE_NAME/DEBIAN
+    - dpkg-dev --build $PACKAGE_NAME
+  artifacts:
+    paths:
+      - $PACKAGE_NAME
+    expire_in: 10 minutes
+
 deploy-ubuntu:
   tags:
     - ubuntu
   stage: deploy
   variables:
     GIT_STRATEGY: none
+    PACKAGE_NAME: gsplus_$CI_BUILD_ID-0
+
   script:
     - aws s3 cp gsplus-ubuntu-sdl.tar.bz2 s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/ubuntu-sdl/$CI_BUILD_ID/ --acl public-read
-
+    - aws s3 cp $PACKAGE_NAME s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/ubuntu-sdl-deb/$CI_BUILD_ID/ --acl public-read
 
 
 
@@ -270,6 +291,7 @@ deploy-win-sdl2:
 update-website-universal:
   tags:
     - osx
+    - linux
   stage: updatewebsite
   variables:
     GIT_STRATEGY: none

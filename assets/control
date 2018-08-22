@@ -1,0 +1,10 @@
+Package: gsplus
+Version: 0.14-0
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libsdl2-2.0-0, libfreetype6, libsdl2-image-2.0-0
+Maintainer: Dagen Brock <dagenbrock@gmail.com>
+Description: GSplus
+ An Apple IIgs emulator for multiple platforms,
+ based on KEGS
