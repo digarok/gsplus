@@ -162,6 +162,7 @@ build-win32:
     expire_in: 10 minutes
   only:
     - master
+    - /^win.*/
 
 package-win32:
   tags:
@@ -175,22 +176,41 @@ package-win32:
     - cp /bin/cygstdc++-6.dll	.
     - cp /bin/cygwin1.dll .
     - cp /bin/cygfreetype-6.dll .
-
+  variables:
+    GIT_STRATEGY: fetch
+    PACKAGE_DIR: gsplus-win32
+  script:
+    - mkdir %PACKAGE_DIR%
+    - cp gsplus32.exe %PACKAGE_DIR%
+    - cp LICENSE.txt %PACKAGE_DIR%
+    - cp src/config.txt %PACKAGE_DIR%
+    - cp src/parallel.rom %PACKAGE_DIR%
+    - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
+    - cp doc/README.txt %PACKAGE_DIR%
+    - cp /bin/cyggcc_s-1.dll %PACKAGE_DIR%
+    - cp /bin/cygstdc++-6.dll %PACKAGE_DIR%
+    - cp /bin/cygwin1.dll %PACKAGE_DIR%
+    - cp /bin/cygfreetype-6.dll %PACKAGE_DIR%
+    - zip gsplus-win32.zip -r %PACKAGE_DIR%
   artifacts:
     paths:
-      - gsplus32.exe
-      - config.txt
-      - doc/gsplusmanual.pdf
-      - doc/README.txt
-      - doc/LICENSE.txt
-      - cyggcc_s-1.dll
-      - cygstdc++-6.dll
-      - cygwin1.dll
-      - cygfreetype-6.dll
+      - gsplus-win32.zip
     expire_in: 10 minutes
   only:
     - master
+    - /^win.*/
 
+deploy-win32:
+  tags:
+    - windows
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - aws s3 cp gsplus-win32.zip s3://%AWS_BUCKET%/%CI_TAG%/%CI_VERSION%/%CI_PIPELINE_ID%/win32/%CI_BUILD_ID%/ --acl public-read
+  only:
+    - master
+    - /^win.*/
 
 # TARGET SYSTEM: WIN32 SDL2 UNDER CYGWIN W MINGW64 SDL2 LIBS
 build-win-sdl2:
@@ -233,7 +253,6 @@ package-win-sdl2:
     - cp /cygdrive/c/cygwin/bin/cygz.dll %PACKAGE_DIR%
     - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2.dll %PACKAGE_DIR%
     - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2_image.dll %PACKAGE_DIR%
-    - cp gsplus.exe %PACKAGE_DIR%
     - zip gsplus-win-sdl.zip -r %PACKAGE_DIR%
   artifacts:
     paths:
