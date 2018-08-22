@@ -82,7 +82,7 @@ package-ubuntu-sdl2:
   script:
     - mkdir $PACKAGE_DIR
     - mkdir $PACKAGE_DIR/doc
-    - mv gsplus-ubuntu-sdl.bin $PACKAGE_DIR/gsplus
+    - cp gsplus-ubuntu-sdl.bin $PACKAGE_DIR/gsplus
     - cp src/config.txt $PACKAGE_DIR
     - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> $PACKAGE_DIR/config.txt'
     - cp src/parallel.rom %PACKAGE_DIR%
@@ -101,16 +101,16 @@ package-ubuntu-sdl2-deb:
   stage: package
   variables:
     GIT_STRATEGY: fetch
-    PACKAGE_NAME: gsplus_$CI_BUILD_ID-0
+    PACKAGE_NAME: gsplus_$CI_VERSION-0
   script:
     - mkdir -p $PACKAGE_NAME/usr/local/bin
     - mkdir -p $PACKAGE_NAME/DEBIAN
-    - cp gsplus $PACKAGE_NAME/usr/local/bin
+    - cp gsplus-ubuntu-sdl.bin $PACKAGE_NAME/usr/local/bin/gsplus
     - cp assets/control $PACKAGE_NAME/DEBIAN
-    - dpkg-dev --build $PACKAGE_NAME
+    - dpkg-deb --build $PACKAGE_NAME
   artifacts:
     paths:
-      - $PACKAGE_NAME
+      - $PACKAGE_NAME.deb
     expire_in: 10 minutes
 
 deploy-ubuntu:
@@ -119,11 +119,11 @@ deploy-ubuntu:
   stage: deploy
   variables:
     GIT_STRATEGY: none
-    PACKAGE_NAME: gsplus_$CI_BUILD_ID-0
+    PACKAGE_NAME: gsplus_$CI_VERSION-0
 
   script:
     - aws s3 cp gsplus-ubuntu-sdl.tar.bz2 s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/ubuntu-sdl/$CI_BUILD_ID/ --acl public-read
-    - aws s3 cp $PACKAGE_NAME s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/ubuntu-sdl-deb/$CI_BUILD_ID/ --acl public-read
+    - aws s3 cp $PACKAGE_NAME.deb s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/ubuntu-sdl-deb/$CI_BUILD_ID/ --acl public-read
 
 
 
@@ -291,7 +291,6 @@ deploy-win-sdl2:
 update-website-universal:
   tags:
     - osx
-    - linux
   stage: updatewebsite
   variables:
     GIT_STRATEGY: none
