@@ -194,15 +194,7 @@ package-win32:
     - zip gsplus-win32.zip -r %PACKAGE_DIR%
   artifacts:
     paths:
-      - gsplus32.exe
-      - config.txt
-      - doc/gsplusmanual.pdf
-      - doc/README.txt
-      - doc/LICENSE.txt
-      - cyggcc_s-1.dll
-      - cygstdc++-6.dll
-      - cygwin1.dll
-      - cygfreetype-6.dll
+      - gsplus-win32.zip
     expire_in: 10 minutes
   only:
     - master
