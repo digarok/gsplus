@@ -18,6 +18,7 @@
 #include "gsos.h"
 #include "fst.h"
 
+#include "host_common.h"
 
 extern Engine_reg engine;
 
@@ -34,17 +35,6 @@ extern Engine_reg engine;
 
 #define global_buffer 0x009a00
 
-enum {
-  regular_file,
-  resource_file,
-  directory_file,
-};
-
-enum {
-  translate_none,
-  translate_crlf,
-  translate_merlin,
-};
 
 struct directory {
   int displacement;
@@ -63,78 +53,11 @@ struct fd_entry {
   struct directory *dir;
 };
 
-#pragma pack(push, 2)
-struct AFP_Info {
-  uint32_t magic;
-  uint32_t version;
-  uint32_t file_id;
-  uint32_t backup_date;
-  uint8_t finder_info[32];
-  uint16_t prodos_file_type;
-  uint32_t prodos_aux_type;
-  uint8_t reserved[6];
-};
-#pragma pack(pop)
+
 
 
 static void free_directory(struct directory *dd);
 static struct directory *read_directory(const char *path, word16 *error);
-
-static int file_type_to_finder_info(byte *buffer, word16 file_type, word32 aux_type);
-static int finder_info_to_filetype(const byte *buffer, word16 *file_type, word32 *aux_type);
-
-
-static void afp_init(struct AFP_Info *info, word16 file_type, word32 aux_type) {
-  //static_assert(sizeof(AFP_Info) == 60, "Incorrect AFP_Info size");
-  memset(info, 0, sizeof(*info));
-  info->magic = 0x00504641;
-  info->version = 0x00010000;
-  info->prodos_file_type = file_type;
-  info->prodos_aux_type = aux_type;
-  if (file_type || aux_type)
-    file_type_to_finder_info(info->finder_info, file_type, aux_type);
-}
-
-static BOOL afp_verify(struct AFP_Info *info) {
-  if (!info) return 0;
-
-  if (info->magic != 0x00504641) return 0;
-  if (info->version != 0x00010000) return 0;
-
-  return 1;
-}
-
-
-static int afp_to_filetype(struct AFP_Info *info, word16 *file_type, word32 *aux_type) {
-  // check for prodos ftype/auxtype...
-  if (info->prodos_file_type || info->prodos_aux_type) {
-    *file_type = info->prodos_file_type;
-    *aux_type = info->prodos_aux_type;
-    return 0;
-  }
-  int ok = finder_info_to_filetype(info->finder_info, file_type, aux_type);
-  if (ok == 0) {
-    info->prodos_file_type = *file_type;
-    info->prodos_aux_type = *aux_type;
-  }
-  return 0;
-}
-
-enum { prefer_prodos, prefer_hfs };
-static void afp_synchronize(struct AFP_Info *info, int preference) {
-  // if ftype/auxtype is inconsistent between prodos and finder info, use
-  // prodos as source of truth.
-  word16 f;
-  word32 a;
-  if (finder_info_to_filetype(info->finder_info, &f, &a) != 0) return;
-  if (f == info->prodos_file_type && a == info->prodos_aux_type) return;
-  if (preference == prefer_prodos)
-    file_type_to_finder_info(info->finder_info, info->prodos_file_type, info->prodos_aux_type);
-  else {
-    info->prodos_file_type = f;
-    info->prodos_aux_type = a;
-  }
-}
 
 
 #define COOKIE_BASE 0x8000
@@ -173,139 +96,7 @@ static int free_cookie(int cookie) {
 
 static struct fd_entry *fd_head = NULL;
 
-static DWORD root_file_id[3] = {};
-//static ino_t root_ino = 0;
-//static dev_t root_dev = 0;
-static char *root = NULL;
-static int read_only = 0;
 
-char *g_cfg_host_path = ""; // must not be null.
-int g_cfg_host_read_only = 0;
-int g_cfg_host_crlf = 1;
-int g_cfg_host_merlin = 0;
-
-
-/*
- * simple malloc pool to simplify code.  Should never need > 4 allocations.
- *
- */
-static void *gc[16];
-static void **gc_ptr = &gc[0];
-static void *gc_malloc(size_t size) {
-  if (gc_ptr == &gc[16]) {
-    errno = ENOMEM;
-    return NULL;
-  }
-
-  void *ptr = malloc(size);
-  if (ptr) {
-    *gc_ptr++ = ptr;
-  }
-  return ptr;
-}
-
-
-static void gc_free(void) {
-
-  while (gc_ptr > gc) free(*--gc_ptr);
-
-}
-
-static char *append_path(const char *a, const char *b) {
-  int aa = strlen(a);
-  int bb = strlen(b);
-
-  char *cp = gc_malloc(aa + bb + 2);
-  if (!cp) return NULL;
-  memcpy(cp, a, aa);
-  int len = aa;
-  if (len && cp[len-1] != '/' && b[0] != '/') cp[len++] = '/';
-  memcpy(cp + len, b, bb);
-  len += bb;
-  cp[len] = 0;
-  while (len > 2 && cp[len - 1] == '/') cp[--len] = 0;
-  return cp;
-}
-
-
-static char *append_string(const char *a, const char *b) {
-  int aa = strlen(a);
-  int bb = strlen(b);
-
-  char *cp = gc_malloc(aa + bb + 2);
-  if (!cp) return NULL;
-  memcpy(cp, a, aa);
-  int len = aa;
-  memcpy(cp + len, b, bb);
-  len += bb;
-  cp[len] = 0;
-  return cp;
-}
-
-static char *gc_strdup(const char *src) {
-  if (!src) return "";
-  if (!*src) return "";
-  int len = strlen(src) + 1;
-  char *cp = gc_malloc(len);
-  memcpy(cp, src, len);
-  return cp;
-}
-
-
-static word32 map_errno() {
-  switch(errno) {
-    case 0: return 0;
-    case EBADF:
-      return invalidAccess;
-#ifdef EDQUOT
-    case EDQUOT:
-#endif
-    case EFBIG:
-      return volumeFull;
-    case ENOENT:
-      return fileNotFound;
-    case ENOTDIR:
-      return pathNotFound;
-    case ENOMEM:
-      return outOfMem;
-    case EEXIST:
-      return dupPathname;
-    default:
-      return drvrIOError;
-  }
-}
-
-static word32 map_last_error() {
-  DWORD e = GetLastError();
-  switch (e) {
-    case ERROR_NO_MORE_FILES:
-      return endOfDir;
-    case ERROR_FILE_NOT_FOUND:
-      return fileNotFound;
-    case ERROR_PATH_NOT_FOUND:
-      return pathNotFound;
-    case ERROR_INVALID_ACCESS:
-      return invalidAccess;
-    case ERROR_FILE_EXISTS:
-    case ERROR_ALREADY_EXISTS:
-      return dupPathname;
-    case ERROR_DISK_FULL:
-      return volumeFull;
-    case ERROR_INVALID_PARAMETER:
-      return paramRangeErr;
-    case ERROR_DRIVE_LOCKED:
-      return drvrWrtProt;
-    case ERROR_NEGATIVE_SEEK:
-      return outOfRange;
-    case ERROR_SHARING_VIOLATION:
-      return fileBusy;                   // destroy open file, etc.
-    case ERROR_DIR_NOT_EMPTY:
-    // ...
-    default:
-      fprintf(stderr, "GetLastError: %08x - %d\n", (int)e, (int)e);
-      return drvrIOError;
-  }
-}
 
 static struct fd_entry *find_fd(int cookie) {
   struct fd_entry *head = fd_head;
@@ -354,444 +145,6 @@ static word32 remove_fd(int cookie) {
 }
 
 
-static void cr_to_lf(byte *buffer, size_t size) {
-  size_t i;
-  for (i = 0; i < size; ++i) {
-    if (buffer[i] == '\r') buffer[i] = '\n';
-  }
-}
-
-static void lf_to_cr(byte *buffer, size_t size) {
-  size_t i;
-  for (i = 0; i < size; ++i) {
-    if (buffer[i] == '\n') buffer[i] = '\r';
-  }
-}
-
-static void merlin_to_text(byte *buffer, size_t size) {
-  size_t i;
-  for (i = 0; i < size; ++i) {
-    byte b = buffer[i];
-    if (b == 0xa0) b = '\t';
-    b &= 0x7f;
-    if (b == '\r') b = '\n';
-    buffer[i] = b;
-  }
-}
-
-static void text_to_merlin(byte *buffer, size_t size) {
-  size_t i;
-  for (i = 0; i < size; ++i) {
-    byte b = buffer[i];
-    if (b == '\t') b = 0xa0;
-    if (b == '\n') b = '\r';
-    if (b != ' ') b |= 0x80;
-    buffer[i] = b;
-  }
-}
-
-struct file_info {
-
-  FILETIME create_date;
-  FILETIME modified_date;
-
-  word16 access;
-  word16 storage_type;
-  word16 file_type;
-  word32 aux_type;
-  word32 eof;
-  word32 blocks;
-  word32 resource_eof;
-  word32 resource_blocks;
-  int has_fi;
-  //byte finder_info[32];
-  struct AFP_Info afp;
-};
-
-static int hex(byte c) {
-  if (c >= '0' && c <= '9') return c - '0';
-  if (c >= 'a' && c <= 'f') return c + 10 - 'a';
-  if (c >= 'A' && c <= 'F') return c + 10 - 'A';
-  return 0;
-}
-
-
-
-static int finder_info_to_filetype(const byte *buffer, word16 *file_type, word32 *aux_type) {
-
-  if (!memcmp("pdos", buffer + 4, 4))
-  {
-    if (buffer[0] == 'p') {
-      *file_type = buffer[1];
-      *aux_type = (buffer[2] << 8) | buffer[3];
-      return 0;
-    }
-    if (!memcmp("PSYS", buffer, 4)) {
-      *file_type = 0xff;
-      *aux_type = 0x0000;
-      return 0;
-    }
-    if (!memcmp("PS16", buffer, 4)) {
-      *file_type = 0xb3;
-      *aux_type = 0x0000;
-      return 0;
-    }
-
-    // old mpw method for encoding.
-    if (!isxdigit(buffer[0]) && isxdigit(buffer[1]) && buffer[2] == ' ' && buffer[3] == ' ')
-    {
-      *file_type = (hex(buffer[0]) << 8) | hex(buffer[1]);
-      *aux_type = 0;
-      return 0;
-    }
-  }
-  if (!memcmp("TEXT", buffer, 4)) {
-    *file_type = 0x04;
-    *aux_type = 0x0000;
-    return 0;
-  }
-  if (!memcmp("BINA", buffer, 4)) {
-    *file_type = 0x00;
-    *aux_type = 0x0000;
-    return 0;
-  }
-  if (!memcmp("dImgdCpy", buffer, 8)) {
-    *file_type = 0xe0;
-    *aux_type = 0x0005;
-    return 0;
-  }
-
-  if (!memcmp("MIDI", buffer, 4)) {
-    *file_type = 0xd7;
-    *aux_type = 0x0000;
-    return 0;
-  }
-
-  if (!memcmp("AIFF", buffer, 4)) {
-    *file_type = 0xd8;
-    *aux_type = 0x0000;
-    return 0;
-  }
-
-  if (!memcmp("AIFC", buffer, 4)) {
-    *file_type = 0xd8;
-    *aux_type = 0x0001;
-    return 0;
-  }
-
-  return -1;
-}
-
-static int file_type_to_finder_info(byte *buffer, word16 file_type, word32 aux_type) {
-  if (file_type > 0xff || aux_type > 0xffff) return -1;
-
-  if (!file_type && aux_type == 0x0000) {
-    memcpy(buffer, "BINApdos", 8);
-    return 0;
-  }
-
-  if (file_type == 0x04 && aux_type == 0x0000) {
-    memcpy(buffer, "TEXTpdos", 8);
-    return 0;
-  }
-
-  if (file_type == 0xff && aux_type == 0x0000) {
-    memcpy(buffer, "PSYSpdos", 8);
-    return 0;
-  }
-
-  if (file_type == 0xb3 && aux_type == 0x0000) {
-    memcpy(buffer, "PS16pdos", 8);
-    return 0;
-  }
-
-  if (file_type == 0xd7 && aux_type == 0x0000) {
-    memcpy(buffer, "MIDIpdos", 8);
-    return 0;
-  }
-  if (file_type == 0xd8 && aux_type == 0x0000) {
-    memcpy(buffer, "AIFFpdos", 8);
-    return 0;
-  }
-  if (file_type == 0xd8 && aux_type == 0x0001) {
-    memcpy(buffer, "AIFCpdos", 8);
-    return 0;
-  }
-  if (file_type == 0xe0 && aux_type == 0x0005) {
-    memcpy(buffer, "dImgdCpy", 8);
-    return 0;
-  }
-
-
-  memcpy(buffer, "p   pdos", 8);
-  buffer[1] = (file_type) & 0xff;
-  buffer[2] = (aux_type >> 8) & 0xff;
-  buffer[3] = (aux_type) & 0xff;
-  return 0;
-}
-
-
-
-static void get_file_xinfo(const char *path, struct file_info *fi) {
-
-  HANDLE h;
-
-  char *p = append_string(path, ":AFP_Resource");
-  LARGE_INTEGER size = { 0 };
-
-
-  h = CreateFile(p, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-  if (h != INVALID_HANDLE_VALUE) {
-    GetFileSizeEx(h, &size);
-    CloseHandle(h);
-  }
-  fi->resource_eof = size.LowPart;
-  fi->resource_blocks = (size.LowPart + 511) / 512;
-
-
-  p = append_string(path, ":AFP_AfpInfo");
-
-  h = CreateFile(p, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-  if (h != INVALID_HANDLE_VALUE) {
-    DWORD read = 0;
-    if (ReadFile(h, &fi->afp, sizeof(struct AFP_Info), &read, NULL) && read == sizeof(struct AFP_Info)) {
-      if (afp_verify(&fi->afp)) fi->has_fi = 1;
-      afp_to_filetype(&fi->afp, &fi->file_type, &fi->aux_type);
-    }
-    CloseHandle(h);
-  }
-}
-
-static word16 map_attributes(DWORD dwFileAttributes) {
-
-  // 0x01 = read enable
-  // 0x02 = write enable
-  // 0x04 = invisible
-  // 0x08 = reserved
-  // 0x10 = reserved
-  // 0x20 = backup needed
-  // 0x40 = rename enable
-  // 0x80 = destroy enable
-
-  word16 access = 0;
-
-  if (dwFileAttributes & FILE_ATTRIBUTE_READONLY)
-    access = readEnable;
-  else
-    access = readEnable | writeEnable | renameEnable | destroyEnable;
-
-  if (dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
-    access |= fileInvisible;
-
-  // map FILE_ATTRIBUTE_ARCHIVE to backup needed bit?
-
-  return access;
-}
-
-#undef _
-#define _(a, b, c) { a, sizeof(a) - 1, b, c }
-struct ftype_entry {
-  char *ext;
-  unsigned length;
-  unsigned file_type;
-  unsigned aux_type;
-};
-
-static struct ftype_entry suffixes[] = {
-  _("c",    0xb0, 0x0008),
-  _("cc",   0xb0, 0x0008),
-  _("h",    0xb0, 0x0008),
-  _("rez",  0xb0, 0x0015),
-  _("asm",  0xb0, 0x0003),
-  _("mac",  0xb0, 0x0003),
-  _("pas",  0xb0, 0x0005),
-  _("txt",  0x04, 0x0000),
-  _("text", 0x04, 0x0000),
-  _("s",    0x04, 0x0000),
-  { 0, 0, 0, 0}
-};
-
-static struct ftype_entry prefixes[] = {
-  _("m16.",  0xb0, 0x0003),
-  _("e16.",  0xb0, 0x0003),
-  { 0, 0, 0, 0}
-};
-
-#undef _
-
-
-
-static word32 get_file_info(const char *path, struct file_info *fi) {
-
-
-  HANDLE h = CreateFile(path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-  if (h == INVALID_HANDLE_VALUE) return map_last_error();
-
-  //FILE_BASIC_INFO fbi;
-  //FILE_STANDARD_INFO fsi;
-  //FILE_ID_INFO fii;
-  BY_HANDLE_FILE_INFORMATION info;
-
-
-  memset(fi, 0, sizeof(*fi));
-  //memset(&fbi, 0, sizeof(fbi));
-  //memset(&fsi, 0, sizeof(fsi));
-
-  GetFileInformationByHandle(h, &info);
-  //GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
-  //GetFileInformationByHandleEx(h, FileStandardInfo, &fsi, sizeof(fsi));
-  //GetFileInformationByHandleEx(h, FileIdInfo, &fii, sizeof(fii));
-
-  word32 size = info.nFileSizeLow;
-
-  fi->eof = size;
-  fi->blocks = (size + 511) / 512;
-
-  fi->create_date = info.ftCreationTime;
-  fi->modified_date = info.ftLastWriteTime;
-
-  if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-    fi->storage_type = directoryFile;
-    fi->file_type = 0x0f;
-
-    DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
-    if (memcmp(&id, &root_file_id, sizeof(root_file_id)) == 0) {
-      fi->storage_type = 0x0f;
-    }
-  } else {
-    fi->file_type = 0x06;
-    if (size < 0x200) fi->storage_type = seedling;
-    else if (size < 0x20000) fi->storage_type = sapling;
-    else fi->storage_type = tree;
-
-    get_file_xinfo(path, fi);
-    if (fi->resource_eof) fi->storage_type = extendedFile;
-
-    if (!fi->has_fi) {
-      /* guess the file type / auxtype based on extension */
-      int n;
-      const char *dot = NULL;
-      const char *slash = NULL;
-
-      for(n = 0;; ++n) {
-        char c = path[n];
-        if (c == 0) break;
-        else if (c == '/') { slash = path + n + 1; dot = NULL; }
-        else if (c == '.') dot = path + n + 1;
-      }
-
-      if (dot && *dot) {
-        for (n = 0; n < sizeof(suffixes) / sizeof(suffixes[0]); ++n) {
-          if (!suffixes[n].ext) break;
-          if (!strcasecmp(dot, suffixes[n].ext)) {
-            fi->file_type = suffixes[n].file_type;
-            fi->aux_type = suffixes[n].aux_type;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  // 0x01 = read enable
-  // 0x02 = write enable
-  // 0x04 = invisible
-  // 0x08 = reserved
-  // 0x10 = reserved
-  // 0x20 = backup needed
-  // 0x40 = rename enable
-  // 0x80 = destroy enable
-
-  word16 access = 0;
-
-  if (info.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
-    access = 0x01;
-  else
-    access = 0x01 | 0x02 | 0x40 | 0x80;
-
-  if (info.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
-    access |= 0x04;
-
-  // map FILE_ATTRIBUTE_ARCHIVE to backup needed bit?
-
-  fi->access = map_attributes(info.dwFileAttributes);
-
-
-  CloseHandle(h);
-  return 0;
-}
-
-
-static word32 set_file_info(const char *path, struct file_info *fi) {
-
-  if (fi->has_fi && fi->storage_type != 0x0d && fi->storage_type != 0x0f) {
-    char *rpath = append_string(path, ":AFP_AfpInfo");
-
-    HANDLE h = CreateFile(rpath, GENERIC_WRITE,
-                          FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (h == INVALID_HANDLE_VALUE) return map_last_error();
-
-    WriteFile(h, &fi->afp, sizeof(struct AFP_Info), NULL, NULL);
-    CloseHandle(h);
-  }
-
-
-  if (fi->create_date.dwLowDateTime || fi->create_date.dwHighDateTime
-      || fi->modified_date.dwLowDateTime || fi->modified_date.dwHighDateTime) {
-    // SetFileInformationByHandle can modify dates.
-    HANDLE h;
-    h = CreateFile(path, FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (h == INVALID_HANDLE_VALUE) return map_last_error();
-
-    FILE_BASIC_INFO fbi;
-    FILE_BASIC_INFO newfbi;
-    memset(&fbi, 0, sizeof(fbi));
-    memset(&newfbi, 0, sizeof(newfbi));
-
-    BOOL ok;
-    ok = GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
-
-    int delta = 0;
-
-    word16 old_access = map_attributes(fbi.FileAttributes);
-    if (fi->access && fi->access != old_access) {
-      newfbi.FileAttributes = fbi.FileAttributes;
-
-      if (fi->access & fileInvisible) {
-        delta = 1;
-        newfbi.FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
-      }
-      // hfs fst only marks it read enable if all are clear.
-      word16 locked = writeEnable | destroyEnable | renameEnable;
-      if ((fi->access & locked) == 0) {
-        delta = 1;
-        newfbi.FileAttributes |= FILE_ATTRIBUTE_READONLY;
-      }
-    }
-
-    // todo -- compare against nt file time to see if it's actually changed.
-    // to prevent time stamp truncation.
-
-    if (fi->create_date.dwLowDateTime || fi->create_date.dwHighDateTime) {
-      delta = 1;
-      newfbi.CreationTime.LowPart = fi->create_date.dwLowDateTime;
-      newfbi.CreationTime.HighPart = fi->create_date.dwHighDateTime;
-    }
-    if (fi->modified_date.dwLowDateTime || fi->modified_date.dwHighDateTime) {
-      delta = 1;
-      newfbi.LastWriteTime.LowPart = fi->modified_date.dwLowDateTime;
-      newfbi.LastWriteTime.HighPart = fi->modified_date.dwHighDateTime;
-      //newfbi.ChangeTime.LowPart = fi->modified_date.dwLowDateTime; //?
-      //newfbi.ChangeTime.HighPart = fi->modified_date.dwHighDateTime; //?
-    }
-
-    if (delta)
-      ok = SetFileInformationByHandle(h, FileBasicInfo, &newfbi, sizeof(newfbi));
-    CloseHandle(h);
-  }
-  return 0;
-}
 
 /*
  * if this is an absolute path, verify and skip past :Host:
@@ -834,7 +187,7 @@ static char * get_gsstr(word32 ptr) {
   if (!ptr) return NULL;
   int length = get_memory16_c(ptr, 0);
   ptr += 2;
-  char *str = gc_malloc(length + 1);
+  char *str = host_gc_malloc(length + 1);
   for (int i = 0; i < length; ++i) {
     char c = get_memory_c(ptr+i, 0);
     if (c == ':') c = '/';
@@ -848,7 +201,7 @@ static char * get_pstr(word32 ptr) {
   if (!ptr) return NULL;
   int length = get_memory_c(ptr, 0);
   ptr += 1;
-  char *str = gc_malloc(length + 1);
+  char *str = host_gc_malloc(length + 1);
   for (int i = 0; i < length; ++i) {
     char c = get_memory_c(ptr+i, 0);
     if (c == ':') c = '/';
@@ -958,144 +311,6 @@ static word32 set_option_list(word32 ptr, word16 fstID, const byte *data, int si
 }
 
 
-static int dayofweek(int y, int m, int d) {     /* 1 <= m <= 12,  y > 1752 (in the U.K.) */
-  static int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
-  y -= m < 3;
-  return (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
-}
-/*
- * converts time_t to a gs/os readhextime date/time record.
- */
-
-static void set_date_time_rec(word32 ptr, FILETIME utc) {
-
-  if (utc.dwLowDateTime == 0 && utc.dwHighDateTime == 0) {
-    for (int i = 0; i < 8; ++i) set_memory_c(ptr++, 0, 0);
-    return;
-  }
-
-
-  SYSTEMTIME tmLocal;
-  SYSTEMTIME tmUTC;
-
-  FileTimeToSystemTime(&utc, &tmUTC);
-  SystemTimeToTzSpecificLocalTime(NULL, &tmUTC, &tmLocal);
-
-  if (tmLocal.wYear < 1900 || tmLocal.wYear > 1900 + 255) {
-    for (int i = 0; i < 8; ++i) set_memory_c(ptr++, 0, 0);
-    return;
-  }
-  if (tmLocal.wSecond == 60) tmLocal.wSecond = 59;       /* leap second */
-
-  int dow = dayofweek(tmLocal.wYear, tmLocal.wMonth, tmLocal.wDay);
-  set_memory_c(ptr++, tmLocal.wSecond, 0);
-  set_memory_c(ptr++, tmLocal.wMinute, 0);
-  set_memory_c(ptr++, tmLocal.wHour, 0);
-  set_memory_c(ptr++, tmLocal.wYear - 1900, 0);
-  set_memory_c(ptr++, tmLocal.wDay - 1, 0);       // 1 = sunday
-  set_memory_c(ptr++, tmLocal.wMonth - 1, 0);
-  set_memory_c(ptr++, 0, 0);
-  set_memory_c(ptr++, dow + 1, 0);
-}
-
-/*
- * converts time_t to a prodos16 date/time record.
- */
-static void set_date_time(word32 ptr, FILETIME utc) {
-
-  if (utc.dwLowDateTime == 0 && utc.dwHighDateTime == 0) {
-    for (int i = 0; i < 4; ++i) set_memory_c(ptr++, 0, 0);
-    return;
-  }
-
-  SYSTEMTIME tmLocal;
-  SYSTEMTIME tmUTC;
-
-  FileTimeToSystemTime(&utc, &tmUTC);
-  SystemTimeToTzSpecificLocalTime(NULL, &tmUTC, &tmLocal);
-
-  if (tmLocal.wYear < 1940 || tmLocal.wYear > 2039) {
-    for (int i = 0; i < 4; ++i) set_memory_c(ptr++, 0, 0);
-    return;
-  }
-  if (tmLocal.wSecond == 60) tmLocal.wSecond = 59;       /* leap second */
-
-  word16 tmp = 0;
-  tmp |= (tmLocal.wYear % 100) << 9;
-  tmp |= tmLocal.wMonth << 5;
-  tmp |= tmLocal.wDay;
-
-  set_memory16_c(ptr, tmp, 0);
-  ptr += 2;
-
-  tmp = 0;
-  tmp |= tmLocal.wHour << 8;
-  tmp |= tmLocal.wMinute;
-  set_memory16_c(ptr, tmp, 0);
-}
-
-
-static FILETIME get_date_time(word32 ptr) {
-
-  FILETIME utc = {0, 0};
-
-  word16 a = get_memory16_c(ptr + 0, 0);
-  word16 b = get_memory16_c(ptr + 2, 0);
-  if (!a && !b) return utc;
-
-
-  SYSTEMTIME tmLocal;
-  SYSTEMTIME tmUTC;
-  memset(&tmLocal, 0, sizeof(tmLocal));
-  memset(&tmUTC, 0, sizeof(tmUTC));
-
-  tmLocal.wYear = ((a >> 9) & 0x7f) + 1900;
-  tmLocal.wMonth = ((a >> 5) & 0x0f);
-  tmLocal.wDay = (a >> 0) & 0x1f;
-
-  tmLocal.wHour = (b >> 8) & 0x1f;
-  tmLocal.wMinute = (b >> 0) & 0x3f;
-  tmLocal.wSecond = 0;
-
-
-  // 00 - 39 => 2000-2039
-  // 40 - 99 => 1940-1999
-  if (tmLocal.wYear < 40) tmLocal.wYear += 100;
-
-
-  TzSpecificLocalTimeToSystemTime(NULL, &tmLocal, &tmUTC);
-  if (!SystemTimeToFileTime(&tmUTC, &utc)) utc =(FILETIME){0, 0};
-
-  return utc;
-}
-
-static FILETIME get_date_time_rec(word32 ptr) {
-
-  FILETIME utc = {0, 0};
-
-  byte buffer[8];
-  for (int i = 0; i < 8; ++i) buffer[i] = get_memory_c(ptr++, 0);
-
-  if (!memcmp(buffer, "\x00\x00\x00\x00\x00\x00\x00\x00", 8)) return utc;
-
-  SYSTEMTIME tmLocal;
-  SYSTEMTIME tmUTC;
-  memset(&tmLocal, 0, sizeof(tmLocal));
-  memset(&tmUTC, 0, sizeof(tmUTC));
-
-  tmLocal.wSecond = buffer[0];
-  tmLocal.wMinute = buffer[1];
-  tmLocal.wHour = buffer[2];
-  tmLocal.wYear = 1900 + buffer[3];
-  tmLocal.wDay = buffer[4] + 1;
-  tmLocal.wMonth = buffer[5] + 1;
-
-  TzSpecificLocalTimeToSystemTime(NULL, &tmLocal, &tmUTC);
-  if (!SystemTimeToFileTime(&tmUTC, &utc)) utc =(FILETIME){0, 0};
-
-  return utc;
-}
-
 
 static char *get_path1(void) {
   word32 direct = engine.direct;
@@ -1114,9 +329,6 @@ static char *get_path2(void) {
 }
 
 
-#define SEC() engine.psr |= 1
-#define CLC() engine.psr &= ~1
-
 
 static word32 fst_shutdown(void) {
 
@@ -1128,53 +340,18 @@ static word32 fst_shutdown(void) {
     free_fd(head);
     head = next;
   }
+  host_shutdown();
   return 0;
 }
 
 static word32 fst_startup(void) {
   // if restart, close any previous files.
 
-
-  if (!g_cfg_host_path) return invalidFSTop;
-  if (!*g_cfg_host_path) return invalidFSTop;
-  if (root) free(root);
-  root = strdup(g_cfg_host_path);
-
-  read_only = g_cfg_host_read_only;
-
   fst_shutdown();
 
   memset(&cookies, 0, sizeof(cookies));
 
-  HANDLE h = CreateFile(root, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-  if (h == INVALID_HANDLE_VALUE) {
-    fprintf(stderr, "%s does not exist or is not accessible\n", root);
-    return invalidFSTop;
-  }
-  FILE_BASIC_INFO fbi;
-  BY_HANDLE_FILE_INFORMATION info;
-
-  GetFileInformationByHandle(h, &info);
-  GetFileInformationByHandleEx(h, FileBasicInfo, &fbi, sizeof(fbi));
-  // can't delete volume root.
-  CloseHandle(h);
-
-  root_file_id[0] = info.dwVolumeSerialNumber;
-  root_file_id[1] = info.nFileIndexHigh;
-  root_file_id[2] = info.nFileIndexLow;
-
-
-  if (!(fbi.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-    fprintf(stderr, "%s is not a directory\n", root);
-    CloseHandle(h);
-    return invalidFSTop;
-  }
-  CloseHandle(h);
-
-  //root_ino = st.st_ino;
-  //root_dev = st.st_dev;
-
-  return 0;
+  return host_startup();
 }
 
 
@@ -1207,7 +384,7 @@ static word32 fst_create(int class, const char *path) {
     fi.file_type = get_memory16_c(pb + CreateRec_fileType, 0);
     fi.aux_type = get_memory32_c(pb + CreateRec_auxType, 0);
     fi.storage_type = get_memory16_c(pb + CreateRec_storageType, 0);
-    fi.create_date = get_date_time(pb + CreateRec_createDate);
+    fi.create_date = host_get_date_time(pb + CreateRec_createDate);
 
     afp_init(&fi.afp, fi.file_type, fi.aux_type);
     fi.has_fi = 1;
@@ -1219,7 +396,7 @@ static word32 fst_create(int class, const char *path) {
 
   if (fi.storage_type == 0x0d) {
     ok = CreateDirectory(path, NULL);
-    if (!ok) return map_last_error();
+    if (!ok) return host_map_win32_error(GetLastError());
 
     if (class) {
       if (pcount >= 5) set_memory16_c(pb + CreateRecGS_storageType, fi.storage_type, 0);
@@ -1239,9 +416,9 @@ static word32 fst_create(int class, const char *path) {
                           CREATE_NEW,
                           FILE_ATTRIBUTE_NORMAL,
                           NULL);
-    if (h == INVALID_HANDLE_VALUE) return map_last_error();
+    if (h == INVALID_HANDLE_VALUE) return host_map_win32_error(GetLastError());
     // set ftype, auxtype...
-    set_file_info(path, &fi);             // set_file_info_handle(...);
+    host_set_file_info(path, &fi);
     CloseHandle(h);
 
     fi.storage_type = 1;
@@ -1259,7 +436,7 @@ static word32 fst_create(int class, const char *path) {
   if (fi.storage_type == 0x8005) {
     // convert an existing file to an extended file.
     // this checks that the file exists and has a 0-sized resource.
-    word32 rv = get_file_info(path, &fi);
+    word32 rv = host_get_file_info(path, &fi);
     if (rv) return rv;
     if (fi.storage_type == extendedFile) return resExistsErr;
     if (fi.storage_type < seedling || fi.storage_type > tree) return resAddErr;
@@ -1271,40 +448,14 @@ static word32 fst_create(int class, const char *path) {
 }
 
 
-static word16 storage_type(const char *path, word16 *error) {
-  if (!path) {
-    *error = badPathSyntax;
-    return 0;             // ?
-  }
-  HANDLE h;
-  h = CreateFile(path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-  if (h == INVALID_HANDLE_VALUE) {
-    *error = map_last_error();
-    return 0;
-  }
-
-  BY_HANDLE_FILE_INFORMATION info;
-  GetFileInformationByHandle(h, &info);
-  CloseHandle(h);
-
-  DWORD id[3] = { info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow };
-  if (memcmp(&id, &root_file_id, sizeof(root_file_id)) == 0) {
-    return 0x0f;
-  }
-
-  if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-    return directoryFile;
-
-  return standardFile;
-}
 
 static word32 fst_destroy(int class, const char *path) {
 
   word16 rv = 0;
   BOOL ok = 0;
-  word16 type = storage_type(path, &rv);
+  word16 type = host_storage_type(path, &rv);
   if (rv) return rv;
-  if (read_only) return drvrWrtProt;
+  if (g_cfg_host_read_only) return drvrWrtProt;
 
   switch(type) {
     case 0: return fileNotFound;
@@ -1322,16 +473,16 @@ static word32 fst_destroy(int class, const char *path) {
       break;
   }
 
-  if (!ok) return map_last_error();
+  if (!ok) return host_map_win32_error(GetLastError());
   return 0;
 }
 
 static word32 fst_set_file_info(int class, const char *path) {
 
   word16 rv = 0;
-  word16 type = storage_type(path, &rv);
+  word16 type = host_storage_type(path, &rv);
   if (rv) return rv;
-  if (read_only) return drvrWrtProt;
+  if (g_cfg_host_read_only) return drvrWrtProt;
 
 
   word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
@@ -1341,7 +492,7 @@ static word32 fst_set_file_info(int class, const char *path) {
 
 
   // load up existing file types / finder info.
-  get_file_xinfo(path, &fi);
+  host_get_file_xinfo(path, &fi);
 
   word32 option_list = 0;
   if (class) {
@@ -1352,8 +503,8 @@ static word32 fst_set_file_info(int class, const char *path) {
     if (pcount >= 4) fi.aux_type = get_memory32_c(pb + FileInfoRecGS_auxType, 0);
     // reserved.
     //if (pcount >= 5) fi.storage_type = get_memory16_c(pb + FileInfoRecGS_storageType, 0);
-    if (pcount >= 6) fi.create_date = get_date_time_rec(pb + FileInfoRecGS_createDateTime);
-    if (pcount >= 7) fi.modified_date = get_date_time_rec(pb + FileInfoRecGS_modDateTime);
+    if (pcount >= 6) fi.create_date = host_get_date_time_rec(pb + FileInfoRecGS_createDateTime);
+    if (pcount >= 7) fi.modified_date = host_get_date_time_rec(pb + FileInfoRecGS_modDateTime);
     if (pcount >= 8) option_list = get_memory24_c(pb + FileInfoRecGS_optionList, 0);
     // remainder reserved
 
@@ -1368,8 +519,8 @@ static word32 fst_set_file_info(int class, const char *path) {
     fi.aux_type = get_memory32_c(pb + FileRec_auxType, 0);
     // reserved.
     //fi.storage_type = get_memory32_c(pb + FileRec_storageType, 0);
-    fi.create_date = get_date_time(pb + FileRec_createDate);
-    fi.modified_date = get_date_time(pb + FileRec_modDate);
+    fi.create_date = host_get_date_time(pb + FileRec_createDate);
+    fi.modified_date = host_get_date_time(pb + FileRec_modDate);
   }
 
 
@@ -1404,7 +555,7 @@ static word32 fst_set_file_info(int class, const char *path) {
   // update finder info
   if (fi.has_fi) afp_synchronize(&fi.afp, prefer_prodos);
 
-  return set_file_info(path, &fi);
+  return host_set_file_info(path, &fi);
 }
 
 static word32 fst_get_file_info(int class, const char *path) {
@@ -1414,7 +565,7 @@ static word32 fst_get_file_info(int class, const char *path) {
   struct file_info fi;
   int rv = 0;
 
-  rv = get_file_info(path, &fi);
+  rv = host_get_file_info(path, &fi);
   if (rv) return rv;
 
   if (class) {
@@ -1426,8 +577,8 @@ static word32 fst_get_file_info(int class, const char *path) {
     if (pcount >= 4) set_memory32_c(pb + FileInfoRecGS_auxType, fi.aux_type, 0);
     if (pcount >= 5) set_memory16_c(pb + FileInfoRecGS_storageType, fi.storage_type, 0);
 
-    if (pcount >= 6) set_date_time_rec(pb + FileInfoRecGS_createDateTime, fi.create_date);
-    if (pcount >= 7) set_date_time_rec(pb + FileInfoRecGS_modDateTime, fi.modified_date);
+    if (pcount >= 6) host_set_date_time_rec(pb + FileInfoRecGS_createDateTime, fi.create_date);
+    if (pcount >= 7) host_set_date_time_rec(pb + FileInfoRecGS_modDateTime, fi.modified_date);
 
     if (pcount >= 8) {
       word16 fst_id = hfsFSID;
@@ -1447,8 +598,8 @@ static word32 fst_get_file_info(int class, const char *path) {
     set_memory32_c(pb + FileRec_auxType, fi.aux_type, 0);
     set_memory16_c(pb + FileRec_storageType, fi.storage_type, 0);
 
-    set_date_time(pb + FileRec_createDate, fi.create_date);
-    set_date_time(pb + FileRec_modDate, fi.modified_date);
+    host_set_date_time(pb + FileRec_createDate, fi.create_date);
+    host_set_date_time(pb + FileRec_modDate, fi.modified_date);
 
     set_memory32_c(pb + FileRec_blocksUsed, fi.blocks, 0);
   }
@@ -1528,9 +679,9 @@ static word32 fst_volume(int class) {
 static word32 fst_clear_backup(int class, const char *path) {
 
   word16 rv = 0;
-  word16 type = storage_type(path, &rv);
+  word16 type = host_storage_type(path, &rv);
   if (rv) return rv;
-  if (read_only) return drvrWrtProt;
+  if (g_cfg_host_read_only) return drvrWrtProt;
 
   return invalidFSTop;
 }
@@ -1574,10 +725,10 @@ static struct directory *read_directory(const char *path, word16 *error) {
 
   memset(&data, 0, sizeof(data));
 
-  char *p = append_path(path, "*");
+  char *p = host_gc_append_path(path, "*");
   h = FindFirstFile(p, &data);
   if (h == INVALID_HANDLE_VALUE) {
-    *error = map_last_error();
+    *error = host_map_win32_error(GetLastError());
     return NULL;
   }
 
@@ -1595,7 +746,7 @@ static struct directory *read_directory(const char *path, word16 *error) {
       size = sizeof(struct directory) + capacity * sizeof(char *);
       struct directory * tmp = realloc(dd, size);
       if (!tmp) {
-        *error = map_errno();
+        *error = host_map_errno(errno);
         free_directory(dd);
         FindClose(h);
         return NULL;
@@ -1606,7 +757,8 @@ static struct directory *read_directory(const char *path, word16 *error) {
   } while (FindNextFile(h, &data) != 0);
 
   //?
-  if (GetLastError() != ERROR_NO_MORE_FILES) *error = map_last_error();
+  DWORD e = GetLastError();
+  if (e != ERROR_NO_MORE_FILES) *error = host_map_win32_error(e);
 
   FindClose(h);
 
@@ -1653,14 +805,14 @@ static HANDLE open_data_fork(const char *path, word16 *access, word16 *error) {
     break;
   }
   if (h == INVALID_HANDLE_VALUE) {
-    *error = map_last_error();
+    *error = host_map_win32_error(GetLastError());
   }
   return h;
 }
 
 static HANDLE open_resource_fork(const char *path, word16 *access, word16 *error) {
 
-  char *rpath = append_string(path, ":AFP_Resource");
+  char *rpath = host_gc_append_string(path, ":AFP_Resource");
 
   HANDLE h = INVALID_HANDLE_VALUE;
   for (;;) {
@@ -1698,7 +850,7 @@ static HANDLE open_resource_fork(const char *path, word16 *access, word16 *error
     break;
   }
   if (h == INVALID_HANDLE_VALUE) {
-    *error = map_last_error();
+    *error = host_map_win32_error(GetLastError());
   }
   return h;
 }
@@ -1713,12 +865,12 @@ static word32 fst_open(int class, const char *path) {
   struct file_info fi;
   word16 rv = 0;
 
-  rv = get_file_info(path, &fi);
+  rv = host_get_file_info(path, &fi);
   if (rv) return rv;
 
 
   HANDLE h = INVALID_HANDLE_VALUE;
-  int type = regular_file;
+  int type = file_regular;
   struct directory *dd = NULL;
 
   word16 pcount = 0;
@@ -1733,7 +885,7 @@ static word32 fst_open(int class, const char *path) {
 
   if (resource_number) {
     if (resource_number > 1) return paramRangeErr;
-    type = resource_file;
+    type = file_resource;
   }
 
   if (access > 3) return paramRangeErr;
@@ -1749,11 +901,11 @@ static word32 fst_open(int class, const char *path) {
       case readWriteEnable:
         return invalidAccess;
     }
-    type = directory_file;
+    type = file_directory;
   }
 
 
-  if (read_only) {
+  if (g_cfg_host_read_only) {
     switch (request_access) {
       case readEnableAllowWrite:
         request_access = readEnable;
@@ -1767,13 +919,13 @@ static word32 fst_open(int class, const char *path) {
 
   access = request_access;
   switch(type) {
-    case regular_file:
+    case file_regular:
       h = open_data_fork(path, &access, &rv);
       break;
-    case resource_file:
+    case file_resource:
       h = open_resource_fork(path, &access, &rv);
       break;
-    case directory_file:
+    case file_directory:
       dd = read_directory(path, &rv);
       break;
   }
@@ -1787,8 +939,8 @@ static word32 fst_open(int class, const char *path) {
     if (pcount >= 7) set_memory32_c(pb + OpenRecGS_auxType, fi.aux_type, 0);
     if (pcount >= 8) set_memory16_c(pb + OpenRecGS_storageType, fi.storage_type, 0);
 
-    if (pcount >= 9) set_date_time_rec(pb + OpenRecGS_createDateTime, fi.create_date);
-    if (pcount >= 10) set_date_time_rec(pb + OpenRecGS_modDateTime, fi.modified_date);
+    if (pcount >= 9) host_set_date_time_rec(pb + OpenRecGS_createDateTime, fi.create_date);
+    if (pcount >= 10) host_set_date_time_rec(pb + OpenRecGS_modDateTime, fi.modified_date);
 
     if (pcount >= 11) {
       word16 fst_id = hfsFSID;
@@ -1823,7 +975,7 @@ static word32 fst_open(int class, const char *path) {
     return tooManyFilesOpen;
   }
 
-  if (type == regular_file) {
+  if (type == file_regular) {
 
     if (g_cfg_host_crlf) {
       if (fi.file_type == 0x04 || fi.file_type == 0xb0)
@@ -1862,7 +1014,7 @@ static word32 fst_read(int class) {
   if (!e) return invalidRefNum;
 
   switch (e->type) {
-    case directory_file:
+    case file_directory:
       return badStoreType;
   }
 
@@ -1903,16 +1055,16 @@ static word32 fst_read(int class) {
       byte b;
       DWORD read_count;
       ok = ReadFile(e->handle, &b, 1, &read_count, NULL);
-      if (!ok) return map_last_error();
+      if (!ok) return host_map_win32_error(GetLastError());
       if (read_count == 0) break;
       transfer_count++;
 
       switch(e->translate) {
         case translate_crlf:
-          lf_to_cr(&b, 1);
+          host_lf_to_cr(&b, 1);
           break;
         case translate_merlin:
-          text_to_merlin(&b, 1);
+          host_text_to_merlin(&b, 1);
           break;
       }
 
@@ -1923,20 +1075,20 @@ static word32 fst_read(int class) {
   }
   else {
     DWORD read_count;
-    byte *data = gc_malloc(request_count);
+    byte *data = host_gc_malloc(request_count);
     if (!data) return outOfMem;
 
     ok = ReadFile(e->handle, data, request_count, &read_count, NULL);
-    if (!ok) rv = map_last_error();
+    if (!ok) rv = host_map_win32_error(GetLastError());
     else if (read_count == 0) rv = eofEncountered;
     if (read_count > 0) {
       transfer_count = read_count;
       switch(e->translate) {
         case translate_crlf:
-          lf_to_cr(data, transfer_count);
+          host_lf_to_cr(data, transfer_count);
           break;
         case translate_merlin:
-          text_to_merlin(data, transfer_count);
+          host_text_to_merlin(data, transfer_count);
           break;
       }
       for (size_t i = 0; i < transfer_count; ++i) {
@@ -1963,10 +1115,10 @@ static word32 fst_write(int class) {
   if (!e) return invalidRefNum;
 
   switch (e->type) {
-    case directory_file:
+    case file_directory:
       return badStoreType;
   }
-  if (read_only) return drvrWrtProt;
+  if (g_cfg_host_read_only) return drvrWrtProt;
 
   if (!(e->access & writeEnable))
     return invalidAccess;
@@ -1988,7 +1140,7 @@ static word32 fst_write(int class) {
   }
 
   if (request_count == 0) return 0;
-  byte *data = gc_malloc(request_count);
+  byte *data = host_gc_malloc(request_count);
   if (!data) return outOfMem;
 
   for (word32 i = 0; i < request_count; ++i) {
@@ -1997,16 +1149,16 @@ static word32 fst_write(int class) {
 
   switch (e->translate) {
     case translate_crlf:
-      cr_to_lf(data, request_count);
+      host_cr_to_lf(data, request_count);
       break;
     case translate_merlin:
-      merlin_to_text(data, request_count);
+      host_merlin_to_text(data, request_count);
       break;
   }
   word32 rv = 0;
   DWORD write_count = 0;
   int ok = WriteFile(e->handle, data, request_count, &write_count, NULL);
-  if (!ok) rv = map_last_error();
+  if (!ok) rv = host_map_win32_error(GetLastError());
   if (write_count > 0) {
     if (class)
       set_memory32_c(pb + IORecGS_transferCount, write_count, 0);
@@ -2032,11 +1184,11 @@ static word32 fst_flush(int class) {
   if (!e) return invalidRefNum;
 
   switch (e->type) {
-    case directory_file:
+    case file_directory:
       return badStoreType;
   }
 
-  if (!FlushFileBuffers(e->handle)) return map_last_error();
+  if (!FlushFileBuffers(e->handle)) return host_map_win32_error(GetLastError());
   return 0;
 }
 
@@ -2066,7 +1218,7 @@ static word16 win_seek(HANDLE h, word16 base, word32 displacement, LARGE_INTEGER
       return paramRangeErr;
 
   }
-  if (!SetFilePointerEx(h, d, position, m)) return map_last_error();
+  if (!SetFilePointerEx(h, d, position, m)) return host_map_win32_error(GetLastError());
   return 0;
 }
 
@@ -2078,7 +1230,7 @@ static word32 fst_set_mark(int class) {
   if (!e) return invalidRefNum;
 
   switch (e->type) {
-    case directory_file:
+    case file_directory:
       return badStoreType;
   }
 
@@ -2105,10 +1257,10 @@ static word32 fst_set_eof(int class) {
   if (!e) return invalidRefNum;
 
   switch (e->type) {
-    case directory_file:
+    case file_directory:
       return badStoreType;
   }
-  if (read_only) return drvrWrtProt;
+  if (g_cfg_host_read_only) return drvrWrtProt;
 
   if (!(e->access & writeEnable))
     return invalidAccess;
@@ -2135,7 +1287,7 @@ static word32 fst_set_eof(int class) {
   if (rv) return rv;
 
   // SetEndOfFile sets the current positions as eof.
-  if (!SetEndOfFile(e->handle)) return map_last_error();
+  if (!SetEndOfFile(e->handle)) return host_map_win32_error(GetLastError());
 
   // restore old mark. ???
   SetFilePointerEx(e->handle, mark, NULL, FILE_BEGIN);
@@ -2153,14 +1305,14 @@ static word32 fst_get_mark(int class) {
   word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
 
   switch (e->type) {
-    case directory_file:
+    case file_directory:
       return badStoreType;
   }
 
   // get the current mark
   LARGE_INTEGER pos;
   LARGE_INTEGER zero; zero.QuadPart = 0;
-  if (!SetFilePointerEx(e->handle, zero, &pos, FILE_CURRENT)) return map_last_error();
+  if (!SetFilePointerEx(e->handle, zero, &pos, FILE_CURRENT)) return host_map_win32_error(GetLastError());
 
   if (class) {
     set_memory32_c(pb + PositionRecGS_position, pos.LowPart, 0);
@@ -2182,13 +1334,13 @@ static word32 fst_get_eof(int class) {
 
 
   switch (e->type) {
-    case directory_file:
+    case file_directory:
       return badStoreType;
   }
 
   LARGE_INTEGER eof;
 
-  if (!GetFileSizeEx(e->handle, &eof)) return map_last_error();
+  if (!GetFileSizeEx(e->handle, &eof)) return host_map_win32_error(GetLastError());
 
   // what if > 32 bits?
 
@@ -2212,7 +1364,7 @@ static word32 fst_get_dir_entry(int class) {
   if (!e) return invalidRefNum;
 
 
-  if (e->type != directory_file) return badFileFormat;
+  if (e->type != file_directory) return badFileFormat;
 
   word32 pb = get_memory24_c(engine.direct + dp_param_blk_ptr, 0);
 
@@ -2269,9 +1421,9 @@ static word32 fst_get_dir_entry(int class) {
   word32 rv = 0;
   const char *dname = e->dir->entries[displacement++];
   e->dir->displacement = displacement;
-  char *fullpath = append_path(e->path, dname);
+  char *fullpath = host_gc_append_path(e->path, dname);
   struct  file_info fi;
-  rv = get_file_info(fullpath, &fi);
+  rv = host_get_file_info(fullpath, &fi);
 
   if (dname) fprintf(stderr, " - %s", dname);
 
@@ -2287,8 +1439,8 @@ static word32 fst_get_dir_entry(int class) {
     if (pcount >= 8) set_memory32_c(pb + DirEntryRecGS_eof, fi.eof, 0);
     if (pcount >= 9) set_memory32_c(pb + DirEntryRecGS_blockCount, fi.blocks, 0);
 
-    if (pcount >= 10) set_date_time_rec(pb + DirEntryRecGS_createDateTime, fi.create_date);
-    if (pcount >= 11) set_date_time_rec(pb + DirEntryRecGS_modDateTime, fi.modified_date);
+    if (pcount >= 10) host_set_date_time_rec(pb + DirEntryRecGS_createDateTime, fi.create_date);
+    if (pcount >= 11) host_set_date_time_rec(pb + DirEntryRecGS_modDateTime, fi.modified_date);
 
     if (pcount >= 12) set_memory16_c(pb + DirEntryRecGS_access, fi.access, 0);
     if (pcount >= 13) set_memory32_c(pb + DirEntryRecGS_auxType, fi.aux_type, 0);
@@ -2313,8 +1465,8 @@ static word32 fst_get_dir_entry(int class) {
     set_memory32_c(pb + DirEntryRec_endOfFile, fi.eof, 0);
     set_memory32_c(pb + DirEntryRec_blockCount, fi.blocks, 0);
 
-    set_date_time_rec(pb + DirEntryRec_createTime, fi.create_date);
-    set_date_time_rec(pb + DirEntryRec_modTime, fi.modified_date);
+    host_set_date_time_rec(pb + DirEntryRec_createTime, fi.create_date);
+    host_set_date_time_rec(pb + DirEntryRec_modTime, fi.modified_date);
 
     set_memory16_c(pb + DirEntryRec_access, fi.access, 0);
     set_memory32_c(pb + DirEntryRec_auxType, fi.aux_type, 0);
@@ -2331,12 +1483,12 @@ static word32 fst_change_path(int class, const char *path1, const char *path2) {
   BOOL ok = 0;
 
   word16 rv = 0;
-  word16 type = storage_type(path1, &rv);
+  word16 type = host_storage_type(path1, &rv);
   if (rv) return rv;
   if (type == 0x0f) return badStoreType;
-  if (read_only) return drvrWrtProt;
+  if (g_cfg_host_read_only) return drvrWrtProt;
 
-  if (!MoveFile(path1, path2)) return map_last_error();
+  if (!MoveFile(path1, path2)) return host_map_win32_error(GetLastError());
   return 0;
 }
 
@@ -2347,6 +1499,26 @@ static word32 fst_format(int class) {
 static word32 fst_erase(int class) {
   return notBlockDev;
 }
+
+#ifdef __CYGWIN__
+
+#include <sys/cygwin.h>
+
+static char *expand_path(const char *path, word32 *error) {
+
+  char buffer[PATH_MAX];
+  ssize_t ok = cygwin_conv_path(CCP_POSIX_TO_WIN_A, path, buffer, sizeof(buffer));
+  if (ok < 0) {
+    *error = fstError;
+    return NULL;
+  }
+  return host_gc_strdup(buffer);
+}
+
+
+#else
+#define expand_path(x, y) (x)
+#endif
 
 static const char *call_name(word16 call) {
   static char* class1[] = {
@@ -2476,181 +1648,6 @@ static const char *call_name(word16 call) {
   return "";
 }
 
-static const char *error_name(word16 error) {
-  static char *errors[] = {
-    "",
-    "badSystemCall",
-    "",
-    "",
-    "invalidPcount",
-    "",
-    "",
-    "gsosActive",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    // 0x10
-    "devNotFound",
-    "invalidDevNum",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    // 0x20
-    "drvrBadReq",
-    "drvrBadCode",
-    "drvrBadParm",
-    "drvrNotOpen",
-    "drvrPriorOpen",
-    "irqTableFull",
-    "drvrNoResrc",
-    "drvrIOError",
-    "drvrNoDevice",
-    "drvrBusy",
-    "",
-    "drvrWrtProt",
-    "drvrBadCount",
-    "drvrBadBlock",
-    "drvrDiskSwitch",
-    "drvrOffLine",
-    // 0x30
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    // 0x40
-    "badPathSyntax",
-    "",
-    "tooManyFilesOpen",
-    "invalidRefNum",
-    "pathNotFound",
-    "volNotFound",
-    "fileNotFound",
-    "dupPathname",
-    "volumeFull",
-    "volDirFull",
-    "badFileFormat",
-    "badStoreType",
-    "eofEncountered",
-    "outOfRange",
-    "invalidAccess",
-    "buffTooSmall",
-    // 0x50
-    "fileBusy",
-    "dirError",
-    "unknownVol",
-    "paramRangeErr",
-    "outOfMem",
-    "",
-    "",
-    "dupVolume",
-    "notBlockDev",
-    "invalidLevel",
-    "damagedBitMap",
-    "badPathNames",
-    "notSystemFile",
-    "osUnsupported",
-    "",
-    "stackOverflow",
-    // 0x60
-    "dataUnavail",
-    "endOfDir",
-    "invalidClass",
-    "resForkNotFound",
-    "invalidFSTID",
-    "invalidFSTop",
-    "fstCaution",
-    "devNameErr",
-    "defListFull",
-    "supListFull",
-    "fstError",
-    "",
-    "",
-    "",
-    "",
-    "",
-    //0x70
-    "resExistsErr",
-    "resAddErr",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    //0x80
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "networkError"
-  };
-
-  if (error < sizeof(errors) / sizeof(errors[0]))
-    return errors[error];
-  return "";
-}
-
-#ifdef __CYGWIN__
-
-#include <sys/cygwin.h>
-
-static char *expand_path(const char *path, word32 *error) {
-
-  char buffer[PATH_MAX];
-  ssize_t ok = cygwin_conv_path(CCP_POSIX_TO_WIN_A, path, buffer, sizeof(buffer));
-  if (ok < 0) {
-    *error = fstError;
-    return NULL;
-  }
-  return gc_strdup(buffer);
-}
-
-
-#else
-#define expand_path(x, y) (x)
-#endif
-
-
 void host_fst(void) {
 
   /*
@@ -2689,11 +1686,11 @@ void host_fst(void) {
     }
   } else {
 
-    if (!root) {
+    if (!host_root) {
       acc = networkError;
       engine.acc =  acc;
       SEC();
-      fprintf(stderr, "          %02x   %s\n", acc, error_name(acc));
+      fprintf(stderr, "          %02x   %s\n", acc, host_error_name(acc));
 
       return;
     }
@@ -2706,7 +1703,7 @@ void host_fst(void) {
       acc = invalidClass;
       engine.acc = acc;
       SEC();
-      fprintf(stderr, "          %02x   %s\n", acc, error_name(acc));
+      fprintf(stderr, "          %02x   %s\n", acc, host_error_name(acc));
 
       return;
     }
@@ -2740,7 +1737,7 @@ void host_fst(void) {
       case 0x01:
         cp = check_path(path1, &acc);
         if (acc) break;
-        path3 = append_path(root, cp);
+        path3 = host_gc_append_path(host_root, cp);
         path3 = expand_path(path3, &acc);
         if (acc) break;
 
@@ -2749,7 +1746,7 @@ void host_fst(void) {
       case 0x02:
         cp = check_path(path1, &acc);
         if (acc) break;
-        path3 = append_path(root, cp);
+        path3 = host_gc_append_path(host_root, cp);
         path3 = expand_path(path3, &acc);
         if (acc) break;
 
@@ -2759,13 +1756,13 @@ void host_fst(void) {
 
         cp = check_path(path1, &acc);
         if (acc) break;
-        path3 = append_path(root, cp);
+        path3 = host_gc_append_path(host_root, cp);
         path3 = expand_path(path3, &acc);
         if (acc) break;
 
         cp = check_path(path2, &acc);
         if (acc) break;
-        path4 = append_path(root, cp);
+        path4 = host_gc_append_path(host_root, cp);
         path4 = expand_path(path4, &acc);
         if (acc) break;
 
@@ -2774,7 +1771,7 @@ void host_fst(void) {
       case 0x05:
         cp = check_path(path1, &acc);
         if (acc) break;
-        path3 = append_path(root, cp);
+        path3 = host_gc_append_path(host_root, cp);
         path3 = expand_path(path3, &acc);
         if (acc) break;
 
@@ -2783,7 +1780,7 @@ void host_fst(void) {
       case 0x06:
         cp = check_path(path1, &acc);
         if (acc) break;
-        path3 = append_path(root, cp);
+        path3 = host_gc_append_path(host_root, cp);
         path3 = expand_path(path3, &acc);
         if (acc) break;
 
@@ -2798,7 +1795,7 @@ void host_fst(void) {
       case 0x0b:
         cp = check_path(path1, &acc);
         if (acc) break;
-        path3 = append_path(root, cp);
+        path3 = host_gc_append_path(host_root, cp);
         path3 = expand_path(path3, &acc);
         if (acc) break;
 
@@ -2807,7 +1804,7 @@ void host_fst(void) {
       case 0x10:
         cp = check_path(path1, &acc);
         if (acc) break;
-        path3 = append_path(root, cp);
+        path3 = host_gc_append_path(host_root, cp);
         path3 = expand_path(path3, &acc);
         if (acc) break;
 
@@ -2854,16 +1851,12 @@ void host_fst(void) {
     fputs("\n", stderr);
   }
 
-  if (acc) fprintf(stderr, "          %02x   %s\n", acc, error_name(acc));
+  if (acc) fprintf(stderr, "          %02x   %s\n", acc, host_error_name(acc));
 
-  gc_free();
+  host_gc_free();
 
   engine.acc = acc;
   if (acc) SEC();
   else CLC();
 }
 
-
-// placeholder to build on win32 until it support host MLI
-void host_mli_head() {}
-void host_mli_tail() {}
