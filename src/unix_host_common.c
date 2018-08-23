@@ -449,7 +449,7 @@ unsigned host_scan_directory(const char *path, char ***out, size_t *entries, uns
 
   for(;;) {
     struct dirent *d = readdir(dp);
-    if (!dp) break;
+    if (!d) break;
 
     const char *name = d->d_name;
 

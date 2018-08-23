@@ -8,7 +8,7 @@ OBJECTS1 = adb.o clock.o config.o debug.o dis.o engine_c.o scc.o iwm.o \
 ATOBJ = atbridge/aarp.o atbridge/atbridge.o atbridge/elap.o atbridge/llap.o atbridge/port.o
 PCAPOBJ = atbridge/pcap_delay.o
 TFEOBJ = tfe/tfe.o tfe/tfearch.o tfe/tfesupp.o
-FSTOBJ = host_common.o host_fst.o host_mli.o
+FSTOBJ = unix_host_common.o host_common.o host_fst.o host_mli.o
 
 include vars
 

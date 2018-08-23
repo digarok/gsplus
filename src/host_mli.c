@@ -109,6 +109,121 @@ struct file_entry {
 struct file_entry files[MAX_FILES];
 
 
+
+
+#if _WIN32
+static word16 file_open(const char *path, struct file_entry *file) {
+
+  HANDLE h;
+
+  if (g_cfg_host_read_only) {
+    h = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  } else {
+    h = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) {
+      h = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    }
+  }
+
+  if (h == INVALID_HANDLE_VALUE) return host_map_win32_error(GetLastError());
+
+  file->h = h;
+  return 0;
+}
+
+static word16 file_close(struct file_entry *file) {
+
+  if (!file->type) return invalidRefNum;
+
+  if (file->h != INVALID_HANDLE_VALUE) CloseHandle(file->h);
+
+  if (file->directory_buffer) free(file->directory_buffer);
+  memset(file, 0, sizeof(*file));
+  file->h = INVALID_HANDLE_VALUE;
+
+  return 0;
+}
+
+static word16 file_flush(struct file_entry *file) {
+  if (!file->type) return invalidRefNum;
+
+  if (file->h != INVALID_HANDLE_VALUE)
+    FlushFileBuffers(file->h);
+
+  return 0;
+}
+
+static word16 file_eof(struct file_entry *file) {
+  LARGE_INTEGER li;
+  if (!GetFileSizeEx(file->h, &li))
+    return host_map_win32_error(GetLastError());
+  if (li.QuadPart > 0xffffff) {
+    file->eof = 0xffffff;
+    return outOfRange;
+  }
+  file->eof = li.QuadPart;
+  return 0;
+}
+
+
+#else
+
+static word16 file_open(const char *path, struct file_entry *file) {
+
+  int fd;
+
+  if (g_cfg_host_read_only) {
+    fd = open(path, O_RDONLY | O_NONBLOCK);
+  } else {
+    fd = open(path, O_RDWR | O_NONBLOCK);
+    if (fd < 0) {
+      fd = open(path, O_RDONLY | O_NONBLOCK);
+    }
+  }
+  if (fd < 0) return host_map_errno_path(errno, path);
+
+  file->fd = fd;
+  return 0;
+}
+
+static word16 file_close(struct file_entry *file) {
+
+  if (!file->type) return invalidRefNum;
+
+  if (file->fd >= 0) close(file->fd);
+
+  if (file->directory_buffer) free(file->directory_buffer);
+  memset(file, 0, sizeof(*file));
+  file->fd = -1;
+  return 0;
+}
+
+static word16 file_flush(struct file_entry *file) {
+  if (!file->type) return invalidRefNum;
+
+  if (file->fd >= 0)
+    fsync(file->fd);
+
+  return 0;
+}
+
+static word16 file_eof(struct file_entry *file) {
+  off_t eof;
+  eof = lseek(file->fd, 0, SEEK_END);
+  if (eof < 0) return host_map_errno(errno);
+  if (eof > 0xffffff) {
+    file->eof = 0xffffff;
+    return outOfRange;
+  }
+  file->eof = eof;
+  return 0;
+}
+
+#endif
+
+
+
+
 static char *get_pstr(word32 ptr) {
   if (!ptr) return NULL;
   int length = get_memory_c(ptr, 0);
@@ -737,33 +852,22 @@ static int mli_set_buf(unsigned dcb, struct file_entry *file) {
 
 static int mli_get_eof(unsigned dcb, struct file_entry *file) {
 
-  off_t eof = 0;
-#if _WIN32
-  LARGE_INTEGER tmp;
-#endif
-
+  word16 terr = 0;
 
   switch (file->type) {
     default:
       return invalidRefNum;
 
     case file_directory:
-      eof = file->eof;
       break;
 
     case file_regular:
-#if _WIN32
-      if (!GetFileSizeEx(file->h, &tmp))
-        return host_map_win32_error(GetLastError());
-      eof = tmp.QuadPart;
-#else
-      eof = lseek(file->fd, SEEK_END, 0);
-      if (eof < 0) return host_map_errno(errno);
-#endif
+      terr = file_eof(file);
+      if (terr) return terr;
       break;
-  }
-  if (eof > 0xffffff) return outOfRange;
-  set_memory24_c(dcb + 2, eof, 0);
+    }
+
+  set_memory24_c(dcb + 2, file->eof, 0);
   return 0;
 }
 
@@ -821,10 +925,7 @@ static int mli_get_mark(unsigned dcb, struct file_entry *file) {
 static int mli_set_mark(unsigned dcb, struct file_entry *file) {
 
   off_t eof = 0;
-
-#if _WIN32
-  LARGE_INTEGER tmp;
-#endif
+  word16 terr = 0;
 
   word32 position = get_memory24_c(dcb + 2, 0);
 
@@ -835,18 +936,12 @@ static int mli_set_mark(unsigned dcb, struct file_entry *file) {
       eof = file->eof;
       break;
     case file_regular:
-#if _WIN32
-      if (!GetFileSizeEx(file->h, &tmp))
-        return host_map_win32_error(GetLastError());
-      eof = tmp.QuadPart;
-#else
-      eof = lseek(file->fd, SEEK_END, 0);
-      if (eof < 0) return host_map_errno(errno);
-#endif
+      terr = file_eof(file);
+      if (terr) return terr;
       break;
   }
 
-  if (position > eof) return outOfRange;
+  if (position > file->eof) return outOfRange;
   file->mark = position;
 
   return 0;
@@ -860,53 +955,7 @@ static int mli_newline(unsigned dcb, struct file_entry *file) {
   return 0;
 }
 
-#ifdef _WIN32
-static word16 file_close(struct file_entry *file) {
 
-  if (!file->type) return invalidRefNum;
-
-  if (file->h != INVALID_HANDLE_VALUE) CloseHandle(file->h);
-
-  if (file->directory_buffer) free(file->directory_buffer);
-  memset(file, 0, sizeof(*file));
-  file->h = INVALID_HANDLE_VALUE;
-
-  return 0;
-}
-
-static word16 file_flush(struct file_entry *file) {
-  if (!file->type) return invalidRefNum;
-
-  if (file->h != INVALID_HANDLE_VALUE)
-    FlushFileBuffers(file->h);
-
-  return 0;
-}
-
-#else
-static word16 file_close(struct file_entry *file) {
-
-  if (!file->type) return invalidRefNum;
-
-  if (file->fd >= 0) close(file->fd);
-
-  if (file->directory_buffer) free(file->directory_buffer);
-  memset(file, 0, sizeof(*file));
-  file->fd = -1;
-  return 0;
-}
-
-static word16 file_flush(struct file_entry *file) {
-  if (!file->type) return invalidRefNum;
-
-  if (file->fd >= 0)
-    fsync(file->fd);
-
-  return 0;
-}
-
-
-#endif
 
 static int mli_close(unsigned dcb, struct file_entry *file) {
 
@@ -977,46 +1026,6 @@ static int mli_quit(unsigned dcb) {
 }
 
 
-#if _WIN32
-static word16 file_open(const char *path, struct file_entry *file) {
-
-  HANDLE h;
-
-  if (g_cfg_host_read_only) {
-    h = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-  } else {
-    h = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (h == INVALID_HANDLE_VALUE) {
-      h = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    }
-  }
-
-  if (h == INVALID_HANDLE_VALUE) return host_map_win32_error(GetLastError());
-
-  file->h = h;
-  return 0;
-}
-
-#else
-
-static word16 file_open(const char *path, struct file_entry *file) {
-
-  int fd;
-
-  if (g_cfg_host_read_only) {
-    fd = open(path, O_RDONLY | O_NONBLOCK);
-  } else {
-    fd = open(path, O_RDWR | O_NONBLOCK);
-    if (fd < 0) {
-      fd = open(path, O_RDONLY | O_NONBLOCK);
-    }
-  }
-  if (fd < 0) return host_map_errno_path(errno, path);
-
-  file->fd = fd;
-  return 0;
-}
-#endif
 
 
 static int mli_open(unsigned dcb, const char *name, const char *path) {
@@ -1237,6 +1246,30 @@ static const char *call_name(unsigned call) {
     default: return "";
   }
 }
+
+
+#ifdef __CYGWIN__
+
+#include <sys/cygwin.h>
+
+static char *expand_path(const char *path, word32 *error) {
+
+  char buffer[PATH_MAX];
+  if (!path) return path;
+
+  ssize_t ok = cygwin_conv_path(CCP_POSIX_TO_WIN_A, path, buffer, sizeof(buffer));
+  if (ok < 0) {
+    *error = fstError;
+    return NULL;
+  }
+  return host_gc_strdup(buffer);
+}
+
+
+#else
+#define expand_path(x, y) (x)
+#endif
+
 
 /*
  * mli head patch. called before ProDOS mli.
