@@ -924,7 +924,6 @@ static int mli_get_mark(unsigned dcb, struct file_entry *file) {
 
 static int mli_set_mark(unsigned dcb, struct file_entry *file) {
 
-  off_t eof = 0;
   word16 terr = 0;
 
   word32 position = get_memory24_c(dcb + 2, 0);
@@ -933,7 +932,6 @@ static int mli_set_mark(unsigned dcb, struct file_entry *file) {
     default:
       return invalidRefNum;
     case file_directory:
-      eof = file->eof;
       break;
     case file_regular:
       terr = file_eof(file);
@@ -1107,21 +1105,22 @@ static int mli_set_prefix(unsigned dcb, char *name, char *path) {
     return saved_prefix ? -2 : -1;
   }
 
-  int l;
-  struct stat st;
+  unsigned type;
+  word16 terr;
 
-  if (stat(path, &st) < 0)
-    return host_map_errno_path(errno, path);
-
-  if (!S_ISDIR(st.st_mode)) {
-    return badStoreType;
+  type = host_storage_type(path, &terr);
+  switch(type) {
+    case 0x0f:
+    case 0x0d:
+      break;
+    case 0: return terr;
+    default: return badStoreType;
   }
-
 
   /* /HOST/ was previously stripped... add it back. */
   name = host_gc_append_path("/HOST", name);
 
-  l = strlen(name);
+  int l = strlen(name);
   /* trim trailing / */
   while (l > 1 && name[l-1] == '/') --l;
   name[l] = 0;
@@ -1472,6 +1471,7 @@ void host_mli_head() {
 
   }
   fputs("\n", stderr);
+  fflush(stderr);
   host_gc_free();
 
 

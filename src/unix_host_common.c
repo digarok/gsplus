@@ -1,10 +1,12 @@
 
 #define _BSD_SOURCE
 
-#include <time.h>
-#include <sys/time.h>
-#include <dirent.h>
 #include <ctype.h>
+#include <dirent.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+#include <time.h>
 
 #if defined(__APPLE__)
 #include <sys/xattr.h>

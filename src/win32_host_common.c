@@ -2,6 +2,10 @@
 #define _WIN32_WINNT 0x0600 // vista+
 #include <Windows.h>
 
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "defc.h"
 #include "gsos.h"
 
@@ -530,7 +534,7 @@ word32 host_set_file_info(const char *path, struct file_info *fi) {
 
 
 static int qsort_callback(const void *a, const void *b) {
-  return stricmp(*(const char **)a, *(const char **)b);
+  return strcasecmp(*(const char **)a, *(const char **)b);
 }
 
 unsigned host_scan_directory(const char *path, char ***out, size_t *entries, unsigned p8) {
