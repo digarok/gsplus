@@ -33,7 +33,7 @@ specials: 8inst_s 16inst_s 8size 16size 8inst_c 16inst_c size_c size_s
 specials_clean:
 	rm -f 8inst_s 16inst_s 8size 16size 8inst_c 16inst_c size_c size_s
 
-# Linux/OSX SDL builds
+# Linux/OSX/RPi SDL builds
 gsplus: $(OBJECTS) compile_time.o
 	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)
 	echo $(OBJECTS)
