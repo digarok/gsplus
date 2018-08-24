@@ -23,7 +23,9 @@ unsigned int lastTime = 0, currentTime, frames;
 #ifdef HAVE_ICON    // Currently a flag because not supported outside of SDL builds.  Looking at full solution.
   #include "icongs.h"
 #endif
-
+#ifdef _WIN32
+  #include <unistd.h>
+#endif
 // BITMASKS
 #define ShiftMask       1
 #define ControlMask     4

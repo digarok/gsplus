@@ -639,7 +639,8 @@ int read_line(char *buf, int len)     {
   buf[0] = 0;
   ret = 0;
   while(space_left > 0) {
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(WIN_SDL)
+
     ret = win_nonblock_read_stdin(0, buf, 1);
 #else
     /* Unix */
