@@ -54,6 +54,8 @@ extern int g_fullscreen;
 extern int g_highdpi;
 extern int g_borderless;
 extern int g_resizeable;
+extern int g_novsync;
+extern int g_nohwaccel;
 extern int g_screen_redraw_skip_amt;
 extern int g_use_dhr140;
 extern int g_use_bw_hires;
@@ -206,6 +208,8 @@ Cfg_menu g_cfg_uiless_menu[] = {
   { "", KNMP(g_highdpi), CFGTYPE_INT },
   { "", KNMP(g_borderless), CFGTYPE_INT },
   { "", KNMP(g_resizeable), CFGTYPE_INT },
+  { "", KNMP(g_novsync), CFGTYPE_INT },
+  { "", KNMP(g_nohwaccel), CFGTYPE_INT },
   { "", KNMP(g_screen_redraw_skip_amt), CFGTYPE_INT },
   { "", KNMP(g_use_dhr140), CFGTYPE_INT },
   { "", KNMP(g_use_bw_hires), CFGTYPE_INT },

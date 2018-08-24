@@ -40,7 +40,7 @@ int g_win_status_debug_request = 0;     // Desired visibility of status lines.
 int g_screen_mdepth = 0;
 int kb_shift_control_state = 0;
 
-
+void debuginfo_renderer(SDL_Renderer *r);
 void x_take_screenshot(); // screenshot stuff
 int g_screenshot_requested = 0; // DB to know if we want to save a screenshot
 extern char g_config_gsplus_name[];
@@ -52,6 +52,8 @@ extern int g_fullscreen;  // only checked at start if set via CLI, otherwise it'
 extern int g_highdpi;
 extern int g_borderless;
 extern int g_resizeable;
+extern int g_novsync;
+extern int g_nohwaccel;
 extern int g_scanline_simulator;
 extern int g_startx;
 extern int g_starty;
@@ -333,7 +335,15 @@ void dev_video_init_sdl() {
   // SET WINDOW ICON
   do_icon();
 
-  renderer = SDL_CreateRenderer(window, -1, 0);
+  int renderer_hints = 0;
+  if (!g_novsync) {
+    renderer_hints |= SDL_RENDERER_PRESENTVSYNC;
+  }
+  if (!g_nohwaccel) {
+    renderer_hints |= SDL_RENDERER_ACCELERATED;
+  }
+  renderer = SDL_CreateRenderer(window, -1, renderer_hints);
+  debuginfo_renderer(renderer);
 
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  // make the scaled rendering look smoother.
   // SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");  // make the scaled rendering look smoother.
@@ -763,6 +773,29 @@ int x_show_alert(int is_fatal, const char *str) {
   return 0;
 }
 
+// This will help us determine how well and which drivers are supported on
+// different SDL platforms
+void debuginfo_renderer(SDL_Renderer *r) {
+  int n = SDL_GetNumRenderDrivers();
+  glogf("**--- SDL DEBUG ------ (%i) drivers", n);
+  for(int i = 0; i < n; i++) {
+      SDL_RendererInfo info;
+      SDL_GetRenderDriverInfo(i, &info);
+      glogf("*  '%s'", info.name);
+  }
+
+
+  SDL_RendererInfo info = {0};
+  if (SDL_GetRendererInfo(r,&info) == 0) {
+    glogf("* SDL_RENDERER_SOFTWARE: %d", (info.flags & SDL_RENDERER_SOFTWARE) > 0   );
+    glogf("* SDL_RENDERER_ACCELERATED: %d", (info.flags & SDL_RENDERER_ACCELERATED) > 0  );
+    glogf("* SDL_RENDERER_PRESENTVSYNC: %d", (info.flags & SDL_RENDERER_PRESENTVSYNC) > 0   );
+    glogf("* SDL_RENDERER_TARGETTEXTURE: %d", (info.flags & SDL_RENDERER_TARGETTEXTURE) > 0  );
+    glogf("* active renderer -> '%s'", info.name);
+  } else {
+    glog("NO Renderinfo");
+  }
+}
 
 
 // BELOW ARE FUNCTIONS THAT ARE EITHER UNIMPLEMENTED, OR AR NOT RELEVANT TO

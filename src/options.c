@@ -4,7 +4,7 @@
    See COPYRIGHT.txt for Copyright information
    See LICENSE.txt for license (GPL v2)
  */
- 
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,6 +39,10 @@ extern int g_highdpi;                 // defined in video.c
 extern int g_borderless;              // defined in video.c
 // Allow window resizing, dragging to scale - SDL2
 extern int g_resizeable;              // defined in video.c
+// Don't explicitly set vsync present flag on renderer - SDL2
+extern int g_novsync;              // defined in video.c
+// Don't explicitly set HW accelerator flag on renderer - SDL2
+extern int g_nohwaccel;              // defined in video.c
 // Enable Dagen's scanline simulator (SDL2)
 extern int g_scanline_simulator;      // defined in sim65816.c
 // Ethernet (interface?)
@@ -133,6 +137,12 @@ int parse_cli_options(int argc, char **argv) {
     } else if(!strcmp("-resizeable", argv[i])) {
       glogf("%s Window will be resizeable", parse_log_prefix);
       g_resizeable = 1;
+    } else if(!strcmp("-novsync", argv[i])) {
+      glogf("%s Renderer skipping vsync flag", parse_log_prefix);
+      g_novsync = 1;
+    } else if(!strcmp("-nohwaccel", argv[i])) {
+      glogf("%s Renderer skipping HW accel flag", parse_log_prefix);
+      g_nohwaccel = 1;
     } else if(!strcmp("-noignbadacc", argv[i])) {
       glogf("%s Not ignoring bad memory accesses", parse_log_prefix);
       g_ignore_bad_acc = 0;
