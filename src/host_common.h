@@ -1,3 +1,41 @@
+
+
+
+#ifdef _WIN32
+
+#include <stdint.h>
+
+#pragma pack(push, 2)
+struct AFP_Info {
+  uint32_t magic;
+  uint32_t version;
+  uint32_t file_id;
+  uint32_t backup_date;
+  uint8_t finder_info[32];
+  uint16_t prodos_file_type;
+  uint32_t prodos_aux_type;
+  uint8_t reserved[6];
+};
+#pragma pack(pop)
+
+void afp_init(struct AFP_Info *info, word16 file_type, word32 aux_type);
+BOOL afp_verify(struct AFP_Info *info);
+int afp_to_filetype(struct AFP_Info *info, word16 *file_type, word32 *aux_type);
+enum { prefer_prodos, prefer_hfs };
+void afp_synchronize(struct AFP_Info *info, int preference);
+
+#endif
+
+#ifdef _WIN32
+typedef FILETIME host_time_t;
+typedef struct AFP_Info host_finder_info_t;
+#else
+typedef time_t host_time_t;
+typedef unsigned char host_finder_info_t[32];
+#endif
+
+
+
 enum {
   file_non,
   file_regular,
@@ -15,8 +53,8 @@ enum {
 
 struct file_info {
 
-  time_t create_date;
-  time_t modified_date;
+  host_time_t create_date;
+  host_time_t modified_date;
   word16 access;
   word16 storage_type;
   word16 file_type;
@@ -25,9 +63,12 @@ struct file_info {
   word32 blocks;
   word32 resource_eof;
   word32 resource_blocks;
-  mode_t st_mode;
   int has_fi;
+  #ifdef _WIN32
+  struct AFP_Info afp;
+  #else
   byte finder_info[32];
+  #endif
 };
 
 
@@ -53,6 +94,7 @@ enum {
   N = 0x80
 };
 
+extern char *g_cfg_host_path;
 extern int g_cfg_host_read_only;
 extern int g_cfg_host_crlf;
 extern int g_cfg_host_merlin;
@@ -61,7 +103,11 @@ extern char *host_root;
 unsigned host_startup(void);
 void host_shutdown(void);
 
+#ifdef _WIN32
+int host_is_root(const BY_HANDLE_FILE_INFORMATION *info);
+#else
 int host_is_root(struct stat *);
+#endif
 
 /* garbage collected string routines */
 
@@ -82,23 +128,39 @@ word32 host_map_errno(int xerrno);
 word32 host_map_errno_path(int xerrno, const char *path);
 const char *host_error_name(word16 error);
 
-/* file info */
+#ifdef _WIN32
+word32 host_map_win32_error(DWORD);
+word32 host_map_win32_error_path(DWORD, const char *path);
+#endif
 
+/* file info */
+int host_finder_info_to_filetype(const byte *buffer, word16 *file_type, word32 *aux_type);
 int host_file_type_to_finder_info(byte *buffer, word16 file_type, word32 aux_type);
+
 void host_get_file_xinfo(const char *path, struct file_info *fi);
 word32 host_get_file_info(const char *path, struct file_info *fi);
 word32 host_set_file_info(const char *path, struct file_info *fi);
 
+/* guesses filetype/auxtype from extension */
+void host_synthesize_file_xinfo(const char *path, struct file_info *fi);
 
-void host_set_date_time_rec(word32 ptr, time_t time);
-void host_set_date_time(word32 ptr, time_t time);
+void host_set_date_time_rec(word32 ptr, host_time_t time);
+void host_set_date_time(word32 ptr, host_time_t time);
 
-time_t host_get_date_time(word32 ptr);
-time_t host_get_date_time_rec(word32 ptr);
+host_time_t host_get_date_time(word32 ptr);
+host_time_t host_get_date_time_rec(word32 ptr);
 
 /* convert to prodos date/time */
-word32 host_convert_date_time(time_t time);
+word32 host_convert_date_time(host_time_t time);
 
+
+/* scan a directory, return array of char * */
+unsigned host_scan_directory(const char *path, char ***out, size_t *entries, unsigned p8);
+void host_free_directory(char **data, size_t count);
+
+
+/* 0x01, 0x0d, 0x0f, 0 on error */ 
+unsigned host_storage_type(const char *path, word16 *error_ptr);
 
 void host_hexdump(word32 address, int size);
 void host_hexdump_native(void *data, unsigned address, int size);

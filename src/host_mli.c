@@ -1,18 +1,23 @@
 
 #define _BSD_SOURCE
 
-#include <unistd.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <errno.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <string.h>
-#include <time.h>
-#include <libgen.h>
+#ifdef _WIN32
+#include <Windows.h>
+#else
 
-#include <ctype.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <libgen.h>
+#include <time.h>
+#include <unistd.h>
+
+#endif
+
 #include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <string.h>
+
 
 #include "defc.h"
 #include "gsos.h"
@@ -75,47 +80,18 @@ enum {
   QUIT = 0x65
 };
 
-#if 0
-enum {
-  noError = 0x0000,
-  invalidCallNum = 0x01,
-  invalidPcount = 0x04,
-  intTableFull = 0x25,
-  ioError = 0x27,
-  noDevConnect = 0x28,
-  writeProtectErr = 0x2B,
-  diskSwitchErr = 0x2E,
-  badPathname = 0x40,
-  fcbFullErr = 0x42,
-  badFileRefNum = 0x43,
-  pathNotFound = 0x44,
-  volumeNotFound = 0x45,
-  fileNotFound = 0x46,
-  dupFileName = 0x47,
-  volumeFullErr = 0x48,
-  dirFullErr = 0x49,
-  versionErr = 0x4A,
-  badStoreType = 0x4B,
-  eofEncountered = 0x4C,
-  positionRangeErr = 0x4D,
-  accessErr = 0x4E,
-  fileOpenErr = 0x50,
-  dirDamaged = 0x51,
-  badVolType = 0x52,
-  paramRangeErr = 0x53,
-  vcbFullErr = 0x55,
-  badBufferAddress = 0x56,
-  dupVolumeErr = 0x57,
-  blkNumRangeErr = 0x5A
-};
-#endif
 #define badBufferAddress 0x56
-
 
 struct file_entry {
   unsigned type;
   unsigned translate;
+
+#ifdef _WIN32
+  HANDLE h;
+#else
   int fd;
+#endif
+
   unsigned buffer;
   unsigned level;
   unsigned newline_mask;
@@ -131,6 +107,121 @@ struct file_entry {
 #define MIN_FILE 0x40
 #define MAX_FILE 0x48
 struct file_entry files[MAX_FILES];
+
+
+
+
+#if _WIN32
+static word16 file_open(const char *path, struct file_entry *file) {
+
+  HANDLE h;
+
+  if (g_cfg_host_read_only) {
+    h = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  } else {
+    h = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) {
+      h = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    }
+  }
+
+  if (h == INVALID_HANDLE_VALUE) return host_map_win32_error(GetLastError());
+
+  file->h = h;
+  return 0;
+}
+
+static word16 file_close(struct file_entry *file) {
+
+  if (!file->type) return invalidRefNum;
+
+  if (file->h != INVALID_HANDLE_VALUE) CloseHandle(file->h);
+
+  if (file->directory_buffer) free(file->directory_buffer);
+  memset(file, 0, sizeof(*file));
+  file->h = INVALID_HANDLE_VALUE;
+
+  return 0;
+}
+
+static word16 file_flush(struct file_entry *file) {
+  if (!file->type) return invalidRefNum;
+
+  if (file->h != INVALID_HANDLE_VALUE)
+    FlushFileBuffers(file->h);
+
+  return 0;
+}
+
+static word16 file_eof(struct file_entry *file) {
+  LARGE_INTEGER li;
+  if (!GetFileSizeEx(file->h, &li))
+    return host_map_win32_error(GetLastError());
+  if (li.QuadPart > 0xffffff) {
+    file->eof = 0xffffff;
+    return outOfRange;
+  }
+  file->eof = li.QuadPart;
+  return 0;
+}
+
+
+#else
+
+static word16 file_open(const char *path, struct file_entry *file) {
+
+  int fd;
+
+  if (g_cfg_host_read_only) {
+    fd = open(path, O_RDONLY | O_NONBLOCK);
+  } else {
+    fd = open(path, O_RDWR | O_NONBLOCK);
+    if (fd < 0) {
+      fd = open(path, O_RDONLY | O_NONBLOCK);
+    }
+  }
+  if (fd < 0) return host_map_errno_path(errno, path);
+
+  file->fd = fd;
+  return 0;
+}
+
+static word16 file_close(struct file_entry *file) {
+
+  if (!file->type) return invalidRefNum;
+
+  if (file->fd >= 0) close(file->fd);
+
+  if (file->directory_buffer) free(file->directory_buffer);
+  memset(file, 0, sizeof(*file));
+  file->fd = -1;
+  return 0;
+}
+
+static word16 file_flush(struct file_entry *file) {
+  if (!file->type) return invalidRefNum;
+
+  if (file->fd >= 0)
+    fsync(file->fd);
+
+  return 0;
+}
+
+static word16 file_eof(struct file_entry *file) {
+  off_t eof;
+  eof = lseek(file->fd, 0, SEEK_END);
+  if (eof < 0) return host_map_errno(errno);
+  if (eof > 0xffffff) {
+    file->eof = 0xffffff;
+    return outOfRange;
+  }
+  file->eof = eof;
+  return 0;
+}
+
+#endif
+
+
 
 
 static char *get_pstr(word32 ptr) {
@@ -183,45 +274,6 @@ static char *is_host_path(unsigned pathname) {
 }
 
 
-
-static int scandir_sort(const struct dirent **a, const struct dirent **b) {
-  return strcasecmp((**a).d_name, (**b).d_name);
-}
-
-static int scandir_filter(const struct dirent *d) {
-  int i;
-  const char *name = d->d_name;
-
-  if (name[0] == '.') return 0;
-  for (i = 0;; ++i) {
-    unsigned char c = name[i];
-    if (c & 0x80) return 0;
-    if (c == 0) break;
-  }
-  if (i > 15) return 0;
-  return 1;
-}
-
-static int count_directory_entries(const char *path) {
-  DIR *dir;
-  int rv;
-
-  dir = opendir(path);
-  if (!dir) return 0;
-
-  for(rv = 0;;) {
-    struct dirent *dp = readdir(dir);
-    if (!dp) break;
-    if (!scandir_filter(dp)) continue;
-    ++rv;
-  }
-
-  closedir(dir);
-  return rv;
-}
-
-
-
 static unsigned lowercase_bits(const char *name) {
   unsigned rv = 0x8000;
   unsigned bit = 0x4000;
@@ -235,10 +287,10 @@ static unsigned lowercase_bits(const char *name) {
 
 /* name is relative to the host directory. */
 
-void *create_directory_file(const char *name, const char *path, unsigned *error_ptr, unsigned *block_ptr) {
+void *create_directory_file(const char *name, const char *path, word16 *error_ptr, unsigned *block_ptr) {
 
 
-  byte *data;
+  byte *data = NULL;
   int capacity = 0;
   int count = 0;
   unsigned offset = 0;
@@ -249,14 +301,13 @@ void *create_directory_file(const char *name, const char *path, unsigned *error_
 
   word32 w32;
 
-  struct dirent **entries = NULL;
-  int entry_count = 0;
-  entry_count = scandir(path, &entries, scandir_filter, scandir_sort);
-  if (entry_count < 0) {
-    *error_ptr =  host_map_errno_path(errno, path);
-    goto exit;
+  char **entries = NULL;
+  size_t entry_count = 0;
+  terr = host_scan_directory(path, &entries, &entry_count, 1);
+  if (terr) {
+    *error_ptr = terr;
+    return NULL;
   }
-
 
   /* also need space for volume/directory header */
   capacity = 1 + (1 + entry_count) / ENTRIES_PER_BLOCK;
@@ -276,8 +327,7 @@ void *create_directory_file(const char *name, const char *path, unsigned *error_
     goto exit;
   }
 
-  /* TODO -- this is wrong. */
-  /* trailing /s should be stripped */
+  /* trailing /s should already be stripped */
   const char *base_name = strchr(name, '/');
   base_name = base_name ? base_name + 1 : name;
   if (!base_name || !*base_name) base_name = "HOST";
@@ -351,7 +401,7 @@ void *create_directory_file(const char *name, const char *path, unsigned *error_
   blocks = 1;
   for (int j = 0; j < entry_count; ++j) {
 
-    char *name = entries[j]->d_name;
+    char *name = entries[j];
     int len = strlen(name);
     char *tmp = malloc(path_len + 2 + len);
     if (!tmp) continue;
@@ -428,12 +478,7 @@ void *create_directory_file(const char *name, const char *path, unsigned *error_
   *block_ptr = blocks;
 
 exit:
-  if (entries) {
-    for (i = 0; i < entry_count; ++i) {
-      free(entries[i]);
-    }
-    free(entries);
-  }
+  if (entries) host_free_directory(entries, entry_count);
   return data;
 }
 
@@ -560,10 +605,25 @@ static int mli_create(unsigned dcb, const char *path) {
   // todo -- remap access.
 
   if (fi.storage_type == 0x0d) {
-    int ok = mkdir(path, 0777);
-    if (ok < 0)
+#if _WIN32
+    if (!CreateDirectory(path, NULL))
+      return host_map_win32_error(GetLastError());
+#else
+    if (mkdir(path, 0777) < 0)
       return host_map_errno_path(errno, path);
+#endif
   } else {
+#if _WIN32
+    HANDLE h = CreateFile(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) return host_map_win32_error(GetLastError());
+
+    afp_init(&fi.afp, fi.file_type, fi.aux_type);
+    fi.has_fi = 1;
+
+    // set ftype, auxtype...
+    host_set_file_info(path, &fi);
+    CloseHandle(h);
+#else
     int fd = open(path, O_CREAT | O_EXCL | O_RDONLY, 0666);
     if (fd < 0)
       return host_map_errno_path(errno, path);
@@ -572,49 +632,69 @@ static int mli_create(unsigned dcb, const char *path) {
     fi.has_fi = 1;
     host_set_file_info(path, &fi);
     close(fd);
+#endif
   }
 
   return 0;
 }
 
 static int mli_destroy(unsigned dcb, const char *path) {
-  /* can't delete the root directory */
-  struct stat st;
-  if (stat(path, &st) < 0) {
-    return host_map_errno_path(errno, path);
+
+  word16 terr = 0;
+  unsigned type = host_storage_type(path, &terr);
+  if (type == 0) return terr;
+
+  switch(type) {
+    case 0: return terr;
+    case 0x0f: return badPathSyntax; /* root directory */
+    case 0x0d:
+#if _WIN32
+      if (!RemoveDirectory(path))
+        return host_map_win32_error(GetLastError());
+#else
+      if (rmdir(path) < 0)
+        return host_map_errno_path(errno, path); 
+#endif
+      break;
+    case 1:
+    case 2:
+    case 3:
+    case 5:
+#if _WIN32
+      if (!DeleteFile(path))
+        return host_map_win32_error(GetLastError());
+#else
+      if (unlink(path) < 0)
+        return host_map_errno_path(errno, path); 
+#endif
+    default:
+      return badStoreType;
   }
-
-  if (host_is_root(&st))
-    return badPathSyntax;
-
-  int ok = S_ISDIR(st.st_mode) ? rmdir(path) : unlink(path);
-
-  if (ok < 0) return host_map_errno(errno);
   return 0;
 }
 
 static int mli_rename(unsigned dcb, const char *path1, const char *path2) {
   /* can't rename the root directory */
-  struct stat st;
+  word16 terr = 0;
+  unsigned type;
 
   if (!path1 || !path2) return badPathSyntax;
 
-  if (stat(path1, &st) < 0) {
-    return host_map_errno_path(errno, path1);
-  }
 
-  if (host_is_root(&st))
-    return badPathSyntax;
+  type = host_storage_type(path1, &terr);
+  if (!type) return terr;
+  if (type == 0x0f) return badPathSyntax;
 
+  type = host_storage_type(path2, &terr);
+  if (type) return dupPathname;
 
-  if (stat(path2, &st) == 0) {
-    return dupPathname;
-  }
-  if (host_is_root(&st))
-    return badPathSyntax;
-
-  int ok = rename(path1, path2);
-  if (ok < 0) return host_map_errno(errno);
+#if _WIN32
+  if (!MoveFile(path1, path2))
+    return host_map_win32_error(GetLastError());
+#else
+  if (rename(path1, path2) < 0)
+    return host_map_errno(errno);
+#endif
   return 0;
 }
 
@@ -649,9 +729,18 @@ static int mli_write(unsigned dcb, struct file_entry *file) {
       break;
   }
 
+#if _WIN32
+  DWORD rv;
+  LARGE_INTEGER li;
+  li.QuadPart = file->mark;
+  if (!SetFilePointerEx(file->h, li, NULL, FILE_BEGIN))
+    return host_map_win32_error(GetLastError());
+  if (!WriteFile(file->h, data, request_count, &rv, NULL))
+    return host_map_win32_error(GetLastError());
+#else
   int rv = pwrite(file->fd, data, request_count, file->mark);
   if (rv < 0) return host_map_errno(errno);
-
+#endif
   set_memory16_c(dcb + 6, rv, 0);
   file->mark += rv;
 
@@ -700,8 +789,20 @@ static int mli_read(unsigned dcb, struct file_entry *file) {
   byte *data = host_gc_malloc(request_count);
   if (!data) return drvrIOError;
 
+#if _WIN32
+  LARGE_INTEGER li;
+  DWORD rv;
+  li.QuadPart = file->mark;
+  if (!SetFilePointerEx(file->h, li, NULL, FILE_BEGIN))
+    return host_map_win32_error(GetLastError());
+
+  if (!ReadFile(file->h, data, request_count, &rv, NULL))
+    return host_map_win32_error(GetLastError());
+#else
   int rv = pread(file->fd, data, request_count, file->mark);
   if (rv < 0) return host_map_errno(errno);
+#endif
+
   if (rv == 0) return eofEncountered;
   count = rv;
 
@@ -751,23 +852,22 @@ static int mli_set_buf(unsigned dcb, struct file_entry *file) {
 
 static int mli_get_eof(unsigned dcb, struct file_entry *file) {
 
-  off_t eof = 0;
+  word16 terr = 0;
 
   switch (file->type) {
     default:
       return invalidRefNum;
 
     case file_directory:
-      eof = file->eof;
       break;
 
     case file_regular:
-      eof = lseek(file->fd, SEEK_END, 0);
-      if (eof < 0) return host_map_errno(errno);
+      terr = file_eof(file);
+      if (terr) return terr;
       break;
-  }
-  if (eof > 0xffffff) return outOfRange;
-  set_memory24_c(dcb + 2, eof, 0);
+    }
+
+  set_memory24_c(dcb + 2, file->eof, 0);
   return 0;
 }
 
@@ -775,6 +875,9 @@ static int mli_get_eof(unsigned dcb, struct file_entry *file) {
 static int mli_set_eof(unsigned dcb, struct file_entry *file) {
 
   off_t eof = get_memory24_c(dcb + 2, 0);
+#if _WIN32
+  LARGE_INTEGER tmp;
+#endif
 
   switch (file->type) {
     default:
@@ -785,8 +888,16 @@ static int mli_set_eof(unsigned dcb, struct file_entry *file) {
       break;
 
     case file_regular:
+#if _WIN32
+      tmp.QuadPart = eof;
+      if (!SetFilePointerEx(file->h, tmp, NULL, FILE_BEGIN))
+        return host_map_win32_error(GetLastError());
+      if (!SetEndOfFile(file->h))
+        return host_map_win32_error(GetLastError());
+#else
       if (ftruncate(file->fd, eof) < 0)
         return host_map_errno(errno);
+#endif
       break;
   }
   return 0;
@@ -813,22 +924,22 @@ static int mli_get_mark(unsigned dcb, struct file_entry *file) {
 
 static int mli_set_mark(unsigned dcb, struct file_entry *file) {
 
-  off_t eof = 0;
+  word16 terr = 0;
+
   word32 position = get_memory24_c(dcb + 2, 0);
 
   switch (file->type) {
     default:
       return invalidRefNum;
     case file_directory:
-      eof = file->eof;
       break;
     case file_regular:
-      eof = lseek(file->fd, SEEK_END, 0);
-      if (eof < 0) return host_map_errno(errno);
+      terr = file_eof(file);
+      if (terr) return terr;
       break;
   }
 
-  if (position > eof) return outOfRange;
+  if (position > file->eof) return outOfRange;
   file->mark = position;
 
   return 0;
@@ -842,6 +953,8 @@ static int mli_newline(unsigned dcb, struct file_entry *file) {
   return 0;
 }
 
+
+
 static int mli_close(unsigned dcb, struct file_entry *file) {
 
   if (!file) {
@@ -851,18 +964,12 @@ static int mli_close(unsigned dcb, struct file_entry *file) {
       file = &files[i];
       if (!file->type) continue;
       if (file->level < level) continue;
-      mli_close(dcb, file);
+      file_close(file);
     }
     return -1;             /* pass to prodos mli */
   }
 
-  if (!file->type) return invalidRefNum;
-  if (file->fd >= 0) close(file->fd);
-  if (file->directory_buffer) free(file->directory_buffer);
-  memset(file, 0, sizeof(*file));
-  file->fd = -1;
-
-  return 0;
+  return file_close(file);
 }
 
 
@@ -876,16 +983,11 @@ static int mli_flush(unsigned dcb, struct file_entry *file) {
       if (!file->type) continue;
       if (file->level < level) continue;
 
-      if (file->fd >= 0)
-        fsync(file->fd);
+      file_flush(file);
     }
     return -1;             /* pass to prodos mli */
   }
-
-  if (!file->type) return invalidRefNum;
-  if (file->fd >= 0) fsync(file->fd);
-
-  return 0;
+  return file_flush(file);
 }
 
 
@@ -898,10 +1000,23 @@ static int mli_quit(unsigned dcb) {
   for (i = 0; i < MAX_FILES; ++i) {
     struct file_entry *file = &files[i];
     if (!file->type) continue;
-    if (file->fd >= 0) close(file->fd);
+
+#if _WIN32
+  if (file->h != INVALID_HANDLE_VALUE) CloseHandle(file->h);
+#else
+  if (file->fd >= 0) close(file->fd);
+#endif
+
     if (file->directory_buffer) free(file->directory_buffer);
     memset(file, 0, sizeof(*file));
-    file->fd = -1;
+
+#if _WIN32
+  file->h = INVALID_HANDLE_VALUE;
+#else
+  file->fd = -1;
+#endif
+
+
   }
   /* need a better way to know... */
   /* host_shutdown(); */
@@ -909,11 +1024,11 @@ static int mli_quit(unsigned dcb) {
 }
 
 
+
+
 static int mli_open(unsigned dcb, const char *name, const char *path) {
 
-  int fd;
   int refnum = 0;
-  unsigned type;
 
   struct file_entry *file = NULL;
   for (unsigned i = 0; i < MAX_FILES; ++i) {
@@ -929,44 +1044,24 @@ static int mli_open(unsigned dcb, const char *name, const char *path) {
   //if (buffer == 0) return badBufferAddress;
   if (buffer & 0xff) return badBufferAddress;
 
-
-  if (g_cfg_host_read_only) {
-    fd = open(path, O_RDONLY | O_NONBLOCK);
-  } else {
-    fd = open(path, O_RDWR | O_NONBLOCK);
-    if (fd < 0) {
-      if (errno == EACCES || errno == EISDIR)
-        fd = open(path, O_RDONLY | O_NONBLOCK);
-    }
-  }
-
-  if (fd < 0) {
-    return host_map_errno_path(errno, path);
-  }
-
   struct file_info fi;
-  unsigned terr = host_get_file_info(path, &fi);
-  if (terr) {
-    close(fd);
-    return terr;
-  }
+  word16 terr = host_get_file_info(path, &fi);
+  if (terr) return terr;
 
 
-  type = 0;
-  if (S_ISDIR(fi.st_mode)) {
-    unsigned blocks;
-    unsigned error;
-    void *tmp;
-    type = file_directory;
-    tmp = create_directory_file(name, path, &error, &blocks);
-    close(fd);
-    fd = -1;
-    if (!tmp) return error;
-    file->directory_buffer = tmp;
-    file->eof = blocks * 512;
-  } else if (S_ISREG(fi.st_mode)) {
+  if (fi.storage_type == 0x0f || fi.storage_type == 0x0d) {
+      unsigned blocks;
+      void *tmp;
+      tmp = create_directory_file(name, path, &terr, &blocks);
+      if (!tmp) return terr;
+      file->type = file_directory;
+      file->directory_buffer = tmp;
+      file->eof = blocks * 512;
+  } else {
+    terr = file_open(path, file);
+    if (terr) return terr;
 
-    type = file_regular;
+    file->type = file_regular;
 
     if (g_cfg_host_crlf) {
       if (fi.file_type == 0x04 || fi.file_type == 0xb0)
@@ -978,17 +1073,10 @@ static int mli_open(unsigned dcb, const char *name, const char *path) {
       if (n >= 3 && path[n-1] == 'S' && path[n-2] == '.')
         file->translate = translate_merlin;
     }
-
-  } else {
-    close(fd);
-    return badStoreType;
   }
 
-  file->type = type;
   file->level = get_memory_c(LEVEL, 0);
   file->buffer = buffer;
-  file->fd = fd;
-  file->type = type;
   file->mark = 0;
   set_memory_c(dcb + 5, refnum, 0);
   return 0;
@@ -1017,21 +1105,22 @@ static int mli_set_prefix(unsigned dcb, char *name, char *path) {
     return saved_prefix ? -2 : -1;
   }
 
-  int l;
-  struct stat st;
+  unsigned type;
+  word16 terr;
 
-  if (stat(path, &st) < 0)
-    return host_map_errno_path(errno, path);
-
-  if (!S_ISDIR(st.st_mode)) {
-    return badStoreType;
+  type = host_storage_type(path, &terr);
+  switch(type) {
+    case 0x0f:
+    case 0x0d:
+      break;
+    case 0: return terr;
+    default: return badStoreType;
   }
-
 
   /* /HOST/ was previously stripped... add it back. */
   name = host_gc_append_path("/HOST", name);
 
-  l = strlen(name);
+  int l = strlen(name);
   /* trim trailing / */
   while (l > 1 && name[l-1] == '/') --l;
   name[l] = 0;
@@ -1157,6 +1246,30 @@ static const char *call_name(unsigned call) {
   }
 }
 
+
+#ifdef __CYGWIN__
+
+#include <sys/cygwin.h>
+
+static char *expand_path(const char *path, word32 *error) {
+
+  char buffer[PATH_MAX];
+  if (!path) return path;
+
+  ssize_t ok = cygwin_conv_path(CCP_POSIX_TO_WIN_A, path, buffer, sizeof(buffer));
+  if (ok < 0) {
+    if (error) *error = fstError;
+    return NULL;
+  }
+  return host_gc_strdup(buffer);
+}
+
+
+#else
+#define expand_path(x, y) (x)
+#endif
+
+
 /*
  * mli head patch. called before ProDOS mli.
  * this call will either
@@ -1170,6 +1283,7 @@ void host_mli_head() {
   saved_call = get_memory_c(rts + 1, 0);
   saved_dcb = get_memory16_c(rts + 2, 0);
   saved_p = engine.psr;
+  word16 terr = 0;
 
   /* do pcount / path stuff here */
   char *path1 = NULL;
@@ -1198,26 +1312,29 @@ void host_mli_head() {
       path1 = is_host_path(get_memory16_c(saved_dcb + 1, 0));
       if (!path1) goto prodos_mli;
       path3 = host_gc_append_path(host_root, path1);
+      path3 = expand_path(path3, &terr);
       break;
+
     case RENAME:
       path1 = is_host_path(get_memory16_c(saved_dcb + 1,0));
       path2 = is_host_path(get_memory16_c(saved_dcb + 3,0));
       if (!path1 && !path2) goto prodos_mli;
       if (path1) path3 = host_gc_append_path(host_root, path1);
       if (path2) path4 = host_gc_append_path(host_root, path2);
+      path3 = expand_path(path3, &terr);
+      path4 = expand_path(path4, &terr);
       break;
 
     case SET_PREFIX:
       path1 = is_host_path(get_memory16_c(saved_dcb + 1,0));
       if (!path1 && !saved_prefix) goto prodos_mli;
       if (path1) path3 = host_gc_append_path(host_root, path1);
+      path3 = expand_path(path3, &terr);
       break;
-
 
     case GET_PREFIX:
       if (!saved_prefix) goto prodos_mli;
       break;
-
 
     /* refnum based */
     case NEWLINE:
@@ -1358,6 +1475,7 @@ void host_mli_head() {
 
   }
   fputs("\n", stderr);
+  fflush(stderr);
   host_gc_free();
 
 

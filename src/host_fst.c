@@ -893,7 +893,7 @@ static word32 fst_open(int class, const char *path) {
   if (access > 3) return paramRangeErr;
 
   // special access checks for directories.
-  if (S_ISDIR(fi.st_mode)) {
+  if (fi.storage_type == 0x0d || fi.storage_type == 0x0f) {
     if (resource_number) return resForkNotFound;
     switch (request_access) {
       case readEnableAllowWrite:
