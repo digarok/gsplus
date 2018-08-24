@@ -773,6 +773,10 @@ int x_show_alert(int is_fatal, const char *str) {
   return 0;
 }
 
+void xdriver_end() {
+  SDL_Quit();
+}
+
 // This will help us determine how well and which drivers are supported on
 // different SDL platforms
 void debuginfo_renderer(SDL_Renderer *r) {
@@ -816,5 +820,5 @@ void x_set_mask_and_shift(word32 x_mask, word32 *mask_ptr, int *shift_left_ptr, 
 void x_update_color(int col_num, int red, int green, int blue, word32 rgb) { }
 void x_update_physical_colormap() { }
 void show_xcolor_array() { }
-void xdriver_end() { }
+
 void x_push_done() { }
