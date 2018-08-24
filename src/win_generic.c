@@ -301,6 +301,9 @@ LRESULT CALLBACK win_event_handler(HWND hwnd, UINT umsg, WPARAM wParam, LPARAM l
       }
       DragFinish((HDROP)wParam);
       break;
+    case WM_KILLFOCUS:
+		  adb_all_keys_up(); // ALT-TAB doesn't send key-up messages
+		  break;
   }
   switch(umsg) {
     HANDLE_MSG(hwnd, WM_KEYUP, WIN_EVENT_KEY);
