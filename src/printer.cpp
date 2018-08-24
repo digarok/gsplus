@@ -1,23 +1,9 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2010 - 2011 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation; either version 2 of the License, or (at your
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- for more details.
-
- You should have received a copy of the GNU General Public License along
- with this program; if not, write to the Free Software Foundation, Inc.,
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-*/
+   GSPLUS - Advanced Apple IIGS Emulator Environment
+   Based on the KEGS emulator written by Kent Dickey
+   See COPYRIGHT.txt for Copyright information
+   See LICENSE.txt for license (GPL v2)
+ */
 
 /*
  *  Copyright (C) 2002-2004  The DOSBox Team
@@ -42,6 +28,7 @@
 
 #include "printer.h"
 #include <math.h>
+#include "glog.h"
 #include "support.h"
 //#include "png.h"
 //#pragma comment( lib, "libpng.lib" )
@@ -69,6 +56,7 @@ extern "C" char* g_printer_font_courier;
 extern "C" char* g_printer_font_prestige;
 extern "C" char* g_printer_font_script;
 extern "C" char* g_printer_font_ocra;
+
 Bit8u paramc = '0';
 
 #include "printer_charmaps.h"
@@ -366,9 +354,7 @@ void CPrinter::updateFont()
 
 	if (FT_New_Face(FTlib, fontName, 0, &curFont))
 	{
-
-		printf("Unable to load font\n");
-		//LOG_MSG("Unable to load font %s", fontName);
+		glogf("Unable to load font %s", fontName);
 		curFont = NULL;
 	}
 
@@ -1651,7 +1637,7 @@ static void findNextName(char* front, char* ext, char* fname)
 	do
 	{
 		strcpy(fname, document_path);
-		printf(fname);
+		printf("%s",fname);
 #ifdef WIN32
 		const char* const pathstring = ".\\%s%d%s";
 #else
@@ -1887,9 +1873,9 @@ SDL_FreeSurface(image);*/
 		if (psfile == NULL)
 		{
 			if (!multipageOutput)
-				findNextName("page", ".ps", &fname[0]);
+				findNextName((char *)"page", (char *)".ps", &fname[0]);
 			else
-				findNextName("doc", ".ps", &fname[0]);
+				findNextName((char *)"doc", (char *)".ps", &fname[0]);
 
 			psfile = fopen(fname, "wb");
 			if (!psfile)
@@ -1983,7 +1969,7 @@ SDL_FreeSurface(image);*/
 	else
 	{
 		// Find a page that does not exists
-		findNextName("page", ".bmp", &fname[0]);
+		findNextName((char *)"page", (char *)".bmp", &fname[0]);
 		SDL_SaveBMP(page, fname);
 	}
 }

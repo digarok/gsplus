@@ -1,13 +1,14 @@
-# GSport central makefile - you need a 'vars' file linked/copied from a 'vars_xxx' template to build.
+# GSplus central makefile - you need a 'vars' file linked/copied from a 'vars_xxx' template to build.
 #@todo: check for vars file and do something useful if missing :P
-
-OBJECTS1 = adb.o clock.o config.o dis.o engine_c.o scc.o iwm.o \
-	joystick_driver.o moremem.o paddles.o parallel.o printer.o \
-	sim65816.o smartport.o sound.o sound_driver.o video.o \
-	scc_socket_driver.o imagewriter.o scc_imagewriter.o scc_llap.o
-ATOBJ = atbridge/aarp.o atbridge/atbridge.o atbridge/elap.o atbridge/llap.o atbridge/port.o 
+#@todo: remove all packaging junk and move to packaging scripts in CI
+OBJECTS1 = adb.o clock.o config.o debug.o dis.o engine_c.o scc.o iwm.o \
+	joystick_driver.o moremem.o paddles.o parallel.o printer.o sim65816.o \
+	smartport.o sound.o sound_driver.o video.o scc_socket_driver.o glog.o \
+	imagewriter.o scc_imagewriter.o scc_llap.o options.o
+ATOBJ = atbridge/aarp.o atbridge/atbridge.o atbridge/elap.o atbridge/llap.o atbridge/port.o
 PCAPOBJ = atbridge/pcap_delay.o
 TFEOBJ = tfe/tfe.o tfe/tfearch.o tfe/tfesupp.o
+FSTOBJ = host_common.o host_fst.o host_mli.o
 
 include vars
 
@@ -32,12 +33,11 @@ specials: 8inst_s 16inst_s 8size 16size 8inst_c 16inst_c size_c size_s
 specials_clean:
 	rm -f 8inst_s 16inst_s 8size 16size 8inst_c 16inst_c size_c size_s
 
-# Linux/OSX SDL builds
+# Linux/OSX/RPi SDL builds
 gsplus: $(OBJECTS) compile_time.o
-	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) 
+	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)
 	echo $(OBJECTS)
 	cp gsplus ..
-	cp gsplus ../bin/osx
 
 # Linux/OSX XWindows builds
 gsplusx: $(OBJECTS) compile_time.o
@@ -45,28 +45,35 @@ gsplusx: $(OBJECTS) compile_time.o
 	echo $(OBJECTS)
 	mv gsplusx ..
 
-# NOT CURRENTLY SUPPORTED 
+# NOT CURRENTLY SUPPORTED
 # Linux framebuffer builds:
 gsplusfb: $(OBJECTS) compile_time.o
 	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)
 	echo $(OBJECTS)
 	mv gsplusfb ..
-	cp -f ../config.template ../config.txt 
 
-# Mingw32 (native windows) / Cygwin builds:
-gsplus.exe: $(OBJECTS) compile_time.o
+# Mingw32 / Cygwin builds:  The Win32 API version
+gsplus32.exe: $(OBJECTS) compile_time.o
 	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
-	mkdir -p ../GSplus.app/lib
-	cp -f gsplus.exe ../GSplus.app/GSplus.exe
-	cp -f ../config.template ../GSplus.app/config.txt
-	cp -f ../lib/*.ttf ../GSplus.app/lib
-	cp -f ../lib/arch/win32/*.dll ../GSplus.app
-	cp -f ../lib/NoBoot.po ../GSplus.app
-	cp -f GSplus.bat ../GSplus.app/GSplus.bat
-	cp -f parallel.rom ../GSplus.app
-	cp -f ../COPYING.txt ../GSplus.app
+	#mkdir -p ../GSplus.app/lib
+	#cp -f gsplus.exe ../GSplus.app/GSplus.exe
+	#cp -f ../config.template ../GSplus.app/config.txt
+	#cp -f ../lib/*.ttf ../GSplus.app/lib
+	#cp -f ../lib/arch/win32/*.dll ../GSplus.app
+	#cp -f ../lib/NoBoot.po ../GSplus.app
+	#cp -f GSplus.bat ../GSplus.app/GSplus.bat
+	#cp -f parallel.rom ../GSplus.app
+	#cp -f ../COPYING.txt ../GSplus.app
+	cp gsplus32.exe ..
 
-# NOT CURRENTLY SUPPORTED 
+# Mingw32 / Cygwin builds:  The SDL version (builds, but non-functioning)
+gsplus.exe: $(OBJECTS) compile_time.o
+	#g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
+	#g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)  -mwindows
+	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
+	cp gsplus.exe ..
+
+# NOT CURRENTLY SUPPORTED
 # Mac build - old style (deprecated)
 gsportmac: $(OBJECTS) compile_time.o
 	$(CC) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o gsport $(EXTRA_LIBS)
@@ -139,8 +146,8 @@ partls: partls.c
 to_pro: prodos.h prodos_protos.h to_pro.c
 	cc $(CCOPTS) $(XOPTS) $(OPTS) -o to_pro to_pro.c
 
-gsport32.o:   win32.rc winresource.h
-	windres win32.rc -o gsport32.o
+gsplus32.o:   win32.rc winresource.h
+	windres win32.rc -o gsplus32.o
 
 compile_time.o: $(OBJECTS)
 
@@ -183,7 +190,7 @@ macdriver.o: macdriver.c defc.h defcomm.h iwm.h protos.h protos_macdriver.h
 macdriver_console.o: macdriver_console.c defc.h defcomm.h iwm.h protos.h protos_macdriver.h
 macdriver_generic.o: macdriver_generic.c defc.h defcomm.h iwm.h protos.h protos_macdriver.h
 macsnd_driver.o: macsnd_driver.c defc.h defcomm.h iwm.h protos.h sound.h
-windriver.o: windriver.c defc.h defcomm.h iwm.h protos.h protos_windriver.h winresource.h gsport32.o
+windriver.o: windriver.c defc.h defcomm.h iwm.h protos.h protos_windriver.h winresource.h gsplus32.o
 win_console.o: win_console.c defc.h defcomm.h iwm.h protos.h protos_windriver.h winresource.h
 win_generic.o: win_generic.c defc.h defcomm.h iwm.h protos.h protos_windriver.h winresource.h
 win32snd_driver.o: win32snd_driver.c defc.h defcomm.h iwm.h protos.h sound.h

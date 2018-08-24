@@ -1,0 +1,66 @@
+## SOME NOTES ON SETTING UP GITLAB RUNNER TO BUILD ON WIN32 FOR SDL2 BUILDS
+
+## PREREQUISITE AKA SETTING UP A FRESH VM OR DEV COMPUTER
+#
+# Install your Win7/Win10 VM
+# Install VirtualBox additions in your VM
+#
+# (optional, but seems to help)  add build user
+# Make user an admin, give it service privs
+#  ... Local Security Policy -> Local Policies -> User Rights Assignment -> Log on as a service
+#
+# install Cygwin & SDL2 Libraries according to the steps in the Quickstart doc
+# add cygwin bin dir to env path
+
+## SOME NOTES ON SETTING UP GITLAB RUNNER TO BUILD ON WINDOWS
+
+## STEP 1 - Install Gitlab Runner
+# https://docs.gitlab.com/runner/install/windows.html
+# Download from page above, run CMD prompt as Administrator and then run the runner exe in there
+
+## STEP 2 - Register it with your server
+# First open Administrator CMD prompt then run the following commands.
+
+# REGISTER: Enter your Gitlab CI details - (Token is in Gitlab->Admin-Runners)
+gitlab-ci-multi-runner-windows-386.exe register
+# enter gitlab url
+# enter gitlab runner token
+# enter tag of "windows"
+gitlab-runner-windows-386.exe register -n \
+  --url http://yourgitlab.com/ci \
+  --registration-token UqGC2qvJmU1QBK3mx4b \
+  --executor shell \
+  --description "WinBuild"
+  --tag-list "windows"
+
+## STEP 3 - Install Service
+# Note the use of ".\builder" to indicate local account!
+gitlab-runner-windows-386.exe install --user .\builder --password builder
+
+## STEP 4 - Start service
+gitlab-runner-windows-386.exe start
+
+## STEP 4.5 - if you get a "failed due to logon" message above, you may need to grant "logon as a service" privs
+#To add the "Log on as a service" right to an account on your local computer
+#To open Local Security Policy, click Start, point to Control Panel, point to Administrative Tools, and then double-click Local Security Policy.
+#In the console tree, double-click Local Policies, and then click User Rights Assignment.
+#In the details pane, double-click Log on as a service.
+#Click Add User or Group, and then add the appropriate account to the list of accounts that possess the Log on as a service right.
+
+# If you have any other problems with the service not starting due to:
+# "Failed to start gitlab-runner: The service did not start due to a logon failure."
+# Try going to Services and edit the properties of the gitlab-runner service.
+# Go to the "Log On" tab and re-enter the password/credentials and see if
+# that helps.
+
+
+## STEP 5 - Make sure gitlab-runner is using the correct shell
+# It defaults to CMD, go to the directory where the gitlab-runner
+# commands were run and edit the "config.toml" file.  Under the line
+# that says:  executor = "shell"
+#       add:  shell = "bash"
+#
+# Also, make sure that if you type "bash" <enter>  from a CMD prompt,
+# that it runs the Cygwin shell.  If it can't find the bash command,
+# go to the Environment Variables Control Panel for your computer and
+# add "c:\cygwin\bin" to your PATH variable.

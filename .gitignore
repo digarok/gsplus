@@ -10,3 +10,19 @@ src/16inst_c.h
 src/8inst_c.h
 src/size_c.h
 
+gsplus
+gsportx
+gsport
+*.exe
+
+*.gsp
+
+# Storage for many disk images for testing the emulator.  
+# Games, demos, apps, etc.  Not part of the project.
+images/
+
+# Screenshot dir
+screens/
+
+# build tools that are often kept/tested locally as well as on the ci machines
+yoursway-create-dmg/

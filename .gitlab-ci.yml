@@ -1,7 +1,12 @@
-
 stages:
   - build
+  - package
+  - deploy
+  - updatewebsite
 
+
+
+# TARGET SYSTEM: UBUNTU X
 build-ubuntu-x:
   tags:
     - ubuntu
@@ -11,29 +16,119 @@ build-ubuntu-x:
     - cd src
     - ln -s vars_x86linux_x11 vars
     - make clean ; make
+  artifacts:
+    paths:
+      - gsplusx
+    expire_in: 10 minutes
+  only:
+    - master
 
+package-ubuntu-x:
+  tags:
+    - ubuntu
+  stage: package
+  script:
+    - cp src/config.txt .
+    - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
+    - cp LICENSE.txt doc/
+  artifacts:
+    paths:
+      - gsplusx
+      - config.txt
+      - doc/gsplusmanual.pdf
+      - doc/LICENSE.txt
+    expire_in: 10 minutes
+  only:
+    - master
+
+
+# TARGET SYSTEM: DEPRECATED, UBUNTU SDL
 build-ubuntu-sdl:
   tags:
     - ubuntu
   stage: build
   script:
-    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev
+    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev libsdl2-image-dev
     - cd src
     - ln -s vars_x86linux_sdl vars
     - make clean ; make
+  only:
+    - master
 
+
+# TARGET SYSTEM: REALLY ANY LINUX, BUT UBUNTU W SDL2
 build-ubuntu-sdl2:
   tags:
     - ubuntu
   stage: build
   script:
-    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev
+    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev libsdl2-image-dev
     - cd src
     - ln -s vars_x86linux_sdl2 vars
     - make clean ; make
+    - mv ../gsplus ../gsplus-ubuntu-sdl.bin
+  artifacts:
+    paths:
+      - gsplus-ubuntu-sdl.bin
+    expire_in: 10 minutes
+
+package-ubuntu-sdl2:
+  tags:
+    - ubuntu
+  stage: package
+  variables:
+    GIT_STRATEGY: fetch
+    PACKAGE_DIR: gsplus-ubuntu-sdl
+  script:
+    - mkdir $PACKAGE_DIR
+    - mkdir $PACKAGE_DIR/doc
+    - cp gsplus-ubuntu-sdl.bin $PACKAGE_DIR/gsplus
+    - cp src/config.txt $PACKAGE_DIR
+    - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> $PACKAGE_DIR/config.txt'
+    - cp src/parallel.rom %PACKAGE_DIR%
+    - cp LICENSE.txt $PACKAGE_DIR/doc/
+    - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
+    - cp doc/README.txt %PACKAGE_DIR%
+    - tar -cvjf gsplus-ubuntu-sdl.tar.bz2 $PACKAGE_DIR
+  artifacts:
+    paths:
+      - gsplus-ubuntu-sdl.tar.bz2
+    expire_in: 10 minutes
+
+package-ubuntu-sdl2-deb:
+  tags:
+    - ubuntu
+  stage: package
+  variables:
+    GIT_STRATEGY: fetch
+    PACKAGE_NAME: gsplus_$CI_VERSION-0
+  script:
+    - mkdir -p $PACKAGE_NAME/usr/local/bin
+    - mkdir -p $PACKAGE_NAME/DEBIAN
+    - cp gsplus-ubuntu-sdl.bin $PACKAGE_NAME/usr/local/bin/gsplus
+    - cp assets/control $PACKAGE_NAME/DEBIAN
+    - dpkg-deb --build $PACKAGE_NAME
+  artifacts:
+    paths:
+      - $PACKAGE_NAME.deb
+    expire_in: 10 minutes
+
+deploy-ubuntu:
+  tags:
+    - ubuntu
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+    PACKAGE_NAME: gsplus_$CI_VERSION-0
+
+  script:
+    - aws s3 cp gsplus-ubuntu-sdl.tar.bz2 s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/ubuntu-sdl/$CI_BUILD_ID/ --acl public-read
+    - aws s3 cp $PACKAGE_NAME.deb s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/ubuntu-sdl-deb/$CI_BUILD_ID/ --acl public-read
 
 
 
+
+# TARGET SYSTEM: OSX 10.SOMETHING
 build-osx:
   tags:
     - osx
@@ -42,14 +137,166 @@ build-osx:
     - cd src
     - ln -s vars_osx_sdl2 vars
     - make clean ; make
+    - mv ../gsplus ../gsplus-osx
+  artifacts:
+    paths:
+      - gsplus-osx
+    expire_in: 10 minutes
+
+package-osx:
+  tags:
+    - osx
+  stage: package
+  script:
+    - mv gsplus-osx gsplus
+    - cp src/config.txt .
+    - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
+    - chmod +x make_dist_mac.sh
+    - ./make_dist_mac.sh
+    - chmod +x make_dmg_mac.sh
+    - ./make_dmg_mac.sh
+  artifacts:
+    paths:
+      - GSplus-Install.dmg
+    expire_in: 10 minutes
+
+deploy-osx:
+  tags:
+    - osx
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - aws s3 cp GSplus-Install.dmg s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/osx/$CI_BUILD_ID/ --acl public-read
 
 
-
+# TARGET SYSTEM: WIN32 WIN API UNDER CYGWIN
 build-win32:
   tags:
     - windows
   stage: build
   script:
+    - bash -c "cd src; ln -s vars_win32 vars; make clean ; make"
+  artifacts:
+    paths:
+      - gsplus32.exe
+    expire_in: 10 minutes
+  only:
+    - master
+    - /^win.*/
+
+package-win32:
+  tags:
+    - windows
+  stage: package
+  script:
+    - cp src/config.txt .
+    - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
+    - cp LICENSE.txt doc/
+    - cp /bin/cyggcc_s-1.dll .
+    - cp /bin/cygstdc++-6.dll	.
+    - cp /bin/cygwin1.dll .
+    - cp /bin/cygfreetype-6.dll .
+  variables:
+    GIT_STRATEGY: fetch
+    PACKAGE_DIR: gsplus-win32
+  script:
+    - mkdir %PACKAGE_DIR%
+    - cp gsplus32.exe %PACKAGE_DIR%
+    - cp LICENSE.txt %PACKAGE_DIR%
+    - cp src/config.txt %PACKAGE_DIR%
+    - cp src/parallel.rom %PACKAGE_DIR%
+    - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
+    - cp doc/README.txt %PACKAGE_DIR%
+    - cp /bin/cyggcc_s-1.dll %PACKAGE_DIR%
+    - cp /bin/cygstdc++-6.dll %PACKAGE_DIR%
+    - cp /bin/cygwin1.dll %PACKAGE_DIR%
+    - cp /bin/cygfreetype-6.dll %PACKAGE_DIR%
+    - zip gsplus-win32.zip -r %PACKAGE_DIR%
+  artifacts:
+    paths:
+      - gsplus-win32.zip
+    expire_in: 10 minutes
+  only:
+    - master
+    - /^win.*/
+
+deploy-win32:
+  tags:
+    - windows
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - aws s3 cp gsplus-win32.zip s3://%AWS_BUCKET%/%CI_TAG%/%CI_VERSION%/%CI_PIPELINE_ID%/win32/%CI_BUILD_ID%/ --acl public-read
+  only:
+    - master
+    - /^win.*/
+
+# TARGET SYSTEM: WIN32 SDL2 UNDER CYGWIN W MINGW64 SDL2 LIBS
+build-win-sdl2:
+  tags:
+    - windows
+  stage: build
+  script:
     - cd src
-    - ln -s vars_win32 vars
-    - make clean ; make
+    - ln -s vars_win32_sdl2 vars
+    - make clean
+    - make
+  artifacts:
+    paths:
+      - gsplus.exe
+    expire_in: 10 minutes
+
+package-win-sdl2:
+  tags:
+    - windows
+  stage: package
+  variables:
+    GIT_STRATEGY: fetch
+    PACKAGE_DIR: gsplus-win-sdl
+  script:
+    - mkdir %PACKAGE_DIR%
+    - cp gsplus.exe %PACKAGE_DIR%
+    - cp LICENSE.txt %PACKAGE_DIR%
+    - cp src/config.txt %PACKAGE_DIR%
+    - cp src/parallel.rom %PACKAGE_DIR%
+    - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
+    - cp doc/README.txt %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygbz2-1.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygfreetype-6.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cyggcc_s-1.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygpng16-16.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygstdc++-6.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygwin1.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/cygwin/bin/cygz.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2.dll %PACKAGE_DIR%
+    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2_image.dll %PACKAGE_DIR%
+    - zip gsplus-win-sdl.zip -r %PACKAGE_DIR%
+  artifacts:
+    paths:
+      - gsplus-win-sdl.zip
+    expire_in: 10 minutes
+deploy-win-sdl2:
+  tags:
+    - windows
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - aws s3 cp gsplus-win-sdl.zip s3://%AWS_BUCKET%/%CI_TAG%/%CI_VERSION%/%CI_PIPELINE_ID%/win-sdl/%CI_BUILD_ID%/ --acl public-read
+
+update-website-universal:
+  tags:
+    - osx
+  stage: updatewebsite
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - aws s3 ls gsplus-artifacts/ --recursive > s3artifacts.txt
+    - php assets/updatewebsite.php s3artifacts.txt public > index.html
+    - php assets/updatewebsite.php s3artifacts.txt auto > index_auto.html
+    - aws s3 cp index.html s3://$AWS_BUCKET/ --acl public-read
+    - aws s3 cp index_auto.html s3://$AWS_BUCKET/ --acl public-read
