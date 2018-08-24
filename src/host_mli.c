@@ -1258,7 +1258,7 @@ static char *expand_path(const char *path, word32 *error) {
 
   ssize_t ok = cygwin_conv_path(CCP_POSIX_TO_WIN_A, path, buffer, sizeof(buffer));
   if (ok < 0) {
-    *error = fstError;
+    if (error) *error = fstError;
     return NULL;
   }
   return host_gc_strdup(buffer);
@@ -1283,6 +1283,7 @@ void host_mli_head() {
   saved_call = get_memory_c(rts + 1, 0);
   saved_dcb = get_memory16_c(rts + 2, 0);
   saved_p = engine.psr;
+  word16 terr = 0;
 
   /* do pcount / path stuff here */
   char *path1 = NULL;
@@ -1311,26 +1312,29 @@ void host_mli_head() {
       path1 = is_host_path(get_memory16_c(saved_dcb + 1, 0));
       if (!path1) goto prodos_mli;
       path3 = host_gc_append_path(host_root, path1);
+      path3 = expand_path(path3, &terr);
       break;
+
     case RENAME:
       path1 = is_host_path(get_memory16_c(saved_dcb + 1,0));
       path2 = is_host_path(get_memory16_c(saved_dcb + 3,0));
       if (!path1 && !path2) goto prodos_mli;
       if (path1) path3 = host_gc_append_path(host_root, path1);
       if (path2) path4 = host_gc_append_path(host_root, path2);
+      path3 = expand_path(path3, &terr);
+      path4 = expand_path(path4, &terr);
       break;
 
     case SET_PREFIX:
       path1 = is_host_path(get_memory16_c(saved_dcb + 1,0));
       if (!path1 && !saved_prefix) goto prodos_mli;
       if (path1) path3 = host_gc_append_path(host_root, path1);
+      path3 = expand_path(path3, &terr);
       break;
-
 
     case GET_PREFIX:
       if (!saved_prefix) goto prodos_mli;
       break;
-
 
     /* refnum based */
     case NEWLINE:
