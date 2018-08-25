@@ -181,8 +181,13 @@ int a2_key_to_sdlkeycode[][3] = {
   { 0x54,       SDLK_KP_2, SDLK_DOWN },
   { 0x55,       SDLK_KP_3, SDLK_PAGEDOWN },
   { 0x36,       SDLK_RCTRL, SDLK_LCTRL },
+  #if defined(__APPLE__)
   { 0x3a,       SDLK_LALT, SDLK_RALT },         /* Option */
   { 0x37,       SDLK_LGUI, SDLK_RGUI },         /* Command */
+  #else
+  { 0x3a,       SDLK_LGUI, SDLK_RGUI },         /* Command */
+  { 0x37,       SDLK_LALT, SDLK_RALT },         /* Option */
+  #endif
   { 0x31,       ' ', 0 },
   { 0x3b,       SDLK_LEFT, 0 },
   { 0x3d,       SDLK_DOWN, 0 },
