@@ -416,17 +416,9 @@ void sdl_push_kimage(Kimage *kimage_ptr, int destx, int desty, int srcx, int src
     pitch = BORDER_WIDTH+72;
   }
   SDL_UpdateTexture(texture, &dstrect, src_ptr, pitch*4 );
-  SDL_RenderClear(renderer);
-  SDL_RenderCopy(renderer, texture, NULL, NULL);
-  if (g_scanline_simulator) {
-    SDL_RenderCopy(renderer, overlay_texture, NULL, NULL);
-  }
-  SDL_RenderPresent(renderer);
 
-  if (g_screenshot_requested) {
-    x_take_screenshot();
-    g_screenshot_requested = 0;
-  }
+  // We now call the render step seperately in sdl_present_buffer once per frame
+  // SDL picks up the buffer and waits for VBLANK to send it
 }
 
 
@@ -806,6 +798,19 @@ void debuginfo_renderer(SDL_Renderer *r) {
   }
 }
 
+void sdl_present_buffer() {
+  SDL_RenderClear(renderer);
+  SDL_RenderCopy(renderer, texture, NULL, NULL);
+  if (g_scanline_simulator) {
+    SDL_RenderCopy(renderer, overlay_texture, NULL, NULL);
+  }
+
+  SDL_RenderPresent(renderer);
+  if (g_screenshot_requested) {
+    x_take_screenshot();
+    g_screenshot_requested = 0;
+  }
+}
 
 // BELOW ARE FUNCTIONS THAT ARE EITHER UNIMPLEMENTED, OR AR NOT RELEVANT TO
 // THIS DRIVER.
