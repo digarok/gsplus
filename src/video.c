@@ -640,7 +640,10 @@ void video_update() {
     video_update_through_line(0);
   }
 
-
+#if defined(HAVE_SDL)
+  extern void sdl_present_buffer();
+  sdl_present_buffer();
+#endif
 // OG Notify host that video has been uodated
 #if defined(ACTIVEGSPLUGIN) && defined(MAC)
   {
@@ -3473,13 +3476,6 @@ void video_update_color_array(int col_num, int a2_color)      {
   if(!full && palette == g_a2vid_palette) {
     return;
   }
-
-#if 0
-  if(g_screen_depth != 8) {
-    /* redraw whole superhires for now */
-    g_full_refresh_needed = -1;
-  }
-#endif
 
   video_update_color_raw(col_num, a2_color);
 }
