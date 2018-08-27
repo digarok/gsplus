@@ -395,8 +395,7 @@ void dev_video_init_sdl() {
 
   // Turn off host mouse cursor
   SDL_ShowCursor(SDL_DISABLE);
-  SDL_SetWindowGrab(window, true);
-  SDL_SetRelativeMouseMode(true);
+  //SDL_SetRelativeMouseMode(true);
 
 }
 
@@ -596,10 +595,12 @@ void handle_sdl_key_event(SDL_Event event) {
         if (!is_up) {
           if (!IsFullScreen(window)) {
             glog("Enable fullscreen");
+            SDL_SetWindowGrab(window, true);
             SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
           } else {
             glog("Disable fullscreen");
             SDL_SetWindowFullscreen(window, 0);
+            SDL_SetWindowGrab(window, false);
             SDL_SetWindowSize(window, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
           }
         }
