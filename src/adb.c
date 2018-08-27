@@ -1678,6 +1678,7 @@ void adb_physical_key_update(int a2code, int is_up) {
           g_hide_pointer = g_warp_pointer;
           x_hide_pointer(g_hide_pointer);
         }
+        glogf("g_warp_pointer is now %d",     g_warp_pointer);
         break;
       case 0x09:           /* F9 - swap paddles */
         if(SHIFT_DOWN) {

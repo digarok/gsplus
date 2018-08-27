@@ -85,7 +85,7 @@ static size_t g_clipboard_pos = 0;
 void dev_video_init_sdl();
 void handle_sdl_key_event(SDL_Event event);
 void check_input_events_sdl();
-int handle_sdl_mouse_motion_event(SDL_Event event);
+void handle_sdl_mouse_event(SDL_Event event);
 
 int g_num_a2_keycodes = 0;
 int a2_key_to_sdlkeycode[][3] = {
@@ -393,7 +393,11 @@ void dev_video_init_sdl() {
   // UPDATE A RECT OF THE APPLE II SCREEN TEXTURE
   SDL_UpdateTexture(overlay_texture, &dstrect, overlay_pixels, pitch*sizeof(Uint32) );
 
+  // Turn off host mouse cursor
   SDL_ShowCursor(SDL_DISABLE);
+  SDL_SetWindowGrab(window, true);
+  SDL_SetRelativeMouseMode(true);
+
 }
 
 
@@ -453,7 +457,6 @@ void check_input_events() {
 
 
 void check_input_events_sdl() {
-  int motion = 0;
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -469,13 +472,10 @@ void check_input_events_sdl() {
       case SDL_MOUSEMOTION:
       case SDL_MOUSEBUTTONUP:
       case SDL_MOUSEBUTTONDOWN:
-        motion |= handle_sdl_mouse_motion_event(event);
+        handle_sdl_mouse_event(event);
         break;
       case SDL_QUIT:
-        SDL_DestroyWindow(window);
-        iwm_shut();
-        // Clean up
-        SDL_Quit();
+        xdriver_end();
         my_exit(1);
         break;
       case SDL_DROPFILE:
@@ -615,15 +615,21 @@ void handle_sdl_key_event(SDL_Event event) {
 }
 
 
-int handle_sdl_mouse_motion_event(SDL_Event event) {
+void handle_sdl_mouse_event(SDL_Event event) {
   int x, y;
-  // @todo: FIX MOUSE BUTTON MAPPING, AT LEAST CLEAN UP AND DOCUMENT BEHAVIOR
-  x = event.motion.x - BASE_MARGIN_LEFT;
-  y = event.motion.y - BASE_MARGIN_TOP;
-  if (event.type == SDL_MOUSEBUTTONUP) {
-    return update_mouse(x, y, 0, event.motion.state &7 );
-  } else {
-    return update_mouse(x, y, event.motion.state, event.motion.state &7 );
+
+  x = event.motion.x * A2_WINDOW_WIDTH / BASE_WINDOW_WIDTH;
+  y = event.motion.y * A2_WINDOW_HEIGHT / BASE_WINDOW_HEIGHT;
+  switch (event.type) {
+    case SDL_MOUSEMOTION:
+      update_mouse(x, y, 0, 0);
+      break;
+    case SDL_MOUSEBUTTONUP:
+      update_mouse(x, y, 0, event.motion.state &7 );
+      break;
+    case SDL_MOUSEBUTTONDOWN:
+      update_mouse(x, y, event.motion.state &7, event.motion.state &7 );
+      break;
   }
 }
 
@@ -771,6 +777,9 @@ int x_show_alert(int is_fatal, const char *str) {
 }
 
 void xdriver_end() {
+  SDL_DestroyWindow(window);
+  iwm_shut();
+  // Clean up
   SDL_Quit();
 }
 
