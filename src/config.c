@@ -2576,48 +2576,16 @@ void cfg_file_add_dirent(Cfg_listhdr *listhdrptr, const char *nameptr, int is_di
   listhdrptr->last++;
 }
 
+/* Called by qsort to sort directory listings */
 int cfg_dirent_sortfn(const void *obj1, const void *obj2)     {
   const Cfg_dirent *direntptr1, *direntptr2;
   int ret;
 
-  /* Called by qsort to sort directory listings */
+  // all systems sort the file list case-insensitively
   direntptr1 = (const Cfg_dirent *)obj1;
   direntptr2 = (const Cfg_dirent *)obj2;
-#if defined(MAC) || defined(_WIN32)
-  // OG
-  ret = 0;
-//	ret = strcasecmp(direntptr1->name, direntptr2->name);
-#else
-  ret = strcmp(direntptr1->name, direntptr2->name);
-#endif
+  ret = strcasecmp(direntptr1->name, direntptr2->name);
   return ret;
-}
-
-int cfg_str_match(const char *str1, const char *str2, int len)     {
-  const byte *bptr1, *bptr2;
-  int c, c2;
-  int i;
-
-  /* basically, work like strcmp, except if str1 ends first, return 0 */
-
-  bptr1 = (const byte *)str1;
-  bptr2 = (const byte *)str2;
-  for(i = 0; i < len; i++) {
-    c = *bptr1++;
-    c2 = *bptr2++;
-    if(c == 0) {
-      if(i > 0) {
-        return 0;
-      } else {
-        return c - c2;
-      }
-    }
-    if(c != c2) {
-      return c - c2;
-    }
-  }
-
-  return 0;
 }
 
 void cfg_file_readdir(const char *pathptr)      {
@@ -2696,7 +2664,7 @@ void cfg_file_readdir(const char *pathptr)      {
     if(!strcmp("..", direntptr->d_name)) {
       continue;
     }
-    /* Else, see if it is a directory or a file */
+    // Else, see if it is a directory or a file
     snprintf(&g_cfg_tmp_path[0], CFG_PATH_MAX, "%s%s",
              &g_cfg_file_cachedreal[0], direntptr->d_name);
     ret = cfg_stat(&g_cfg_tmp_path[0], &stat_buf);
@@ -2715,7 +2683,7 @@ void cfg_file_readdir(const char *pathptr)      {
       fmt = stat_buf.st_mode & S_IFMT;
       size = stat_buf.st_size;
       if(fmt == S_IFDIR) {
-        /* it's a directory */
+        // it's a directory
         is_dir = 1;
       } else if((fmt == S_IFREG) && (is_gz == 0)) {
         if(g_cfg_slotdrive < 0xfff) {
@@ -2723,7 +2691,7 @@ void cfg_file_readdir(const char *pathptr)      {
             continue;                                           /* skip it */
           }
         } else {
-          /* see if there are size limits */
+          // see if there are size limits
           if((size < g_cfg_file_min_size) ||
              (size > g_cfg_file_max_size)) {
             continue;                                           /* skip it */
@@ -2736,15 +2704,13 @@ void cfg_file_readdir(const char *pathptr)      {
     cfg_file_add_dirent(&g_cfg_dirlist, direntptr->d_name, is_dir,
                         stat_buf.st_size, -1, -1);
   }
-  /* then sort the results (Mac's HFS+ is sorted, but other FS won't be)*/
-  qsort(&(g_cfg_dirlist.direntptr[0]), g_cfg_dirlist.last,
-        sizeof(Cfg_dirent), cfg_dirent_sortfn);
+  // always sort the results, all systems
+  qsort(&(g_cfg_dirlist.direntptr[0]), g_cfg_dirlist.last, sizeof(Cfg_dirent), cfg_dirent_sortfn);
   g_cfg_dirlist.curent = g_cfg_dirlist.last - 1;
   for(i = g_cfg_dirlist.last - 1; i >= 0; i--) {
-    ret = cfg_str_match(&g_cfg_file_match[0],
-                        g_cfg_dirlist.direntptr[i].name, CFG_PATH_MAX);
+    ret = strcasecmp(&g_cfg_file_match[0], g_cfg_dirlist.direntptr[i].name);
     if(ret <= 0) {
-      /* set cur ent to closest filename to the match name */
+      // set curent to closest filename to the match name
       g_cfg_dirlist.curent = i;
     }
   }
@@ -2974,6 +2940,7 @@ void cfg_file_draw()      {
   }
   cfg_putchar('\t');
 }
+
 void cfg_partition_selected()      {
   char    *str;
   const char *part_str;
@@ -3075,7 +3042,7 @@ void cfg_file_selected(int select_dir)      {
   }
 }
 
-void cfg_file_handle_key(int key)      {
+void cfg_file_handle_key(int key) {
   Cfg_listhdr *listhdrptr;
   int len;
   if(g_cfg_file_pathfield) {
@@ -3092,67 +3059,72 @@ void cfg_file_handle_key(int key)      {
   if(g_cfg_select_partition > 0) {
     listhdrptr = &g_cfg_partitionlist;
   }
+
+  // can't hotkey numbers because it falsely matches PGUP/PGDN
   if( (g_cfg_file_pathfield == 0) &&
       ((key >= 'a' && key <= 'z') || (key >= 'A' && key <= 'Z')) ) {
     /* jump to file starting with this letter */
     g_cfg_file_match[0] = key;
     g_cfg_file_match[1] = 0;
     g_cfg_dirlist.invalid = 1;                  /* re-read directory */
-  }
-  switch(key) {
-    case 0x1b:
-      if(g_cfg_slotdrive < 0xfff) {
-        eject_disk_by_num(g_cfg_slotdrive >> 8,
-                          g_cfg_slotdrive & 0xff);
-      }
-      g_cfg_slotdrive = -1;
-      g_cfg_select_partition = -1;
-      g_cfg_dirlist.invalid = 1;
-      break;
-    case 0x0a:          /* down arrow */
-      if(g_cfg_file_pathfield == 0) {
-        listhdrptr->curent++;
-        cfg_fix_topent(listhdrptr);
-      }
-      break;
-    case 0x0b:          /* up arrow */
-      if(g_cfg_file_pathfield == 0) {
-        listhdrptr->curent--;
-        cfg_fix_topent(listhdrptr);
-      }
-      break;
-    case 0x33:     /* pg dn */
-      if(g_cfg_file_pathfield == 0) {
-        listhdrptr->curent += CFG_PG_SCROLL_AMT;
-        cfg_fix_topent(listhdrptr);
-      }
-      break;
-    case 0x39:     /* pg up */
-      if(g_cfg_file_pathfield == 0) {
-        listhdrptr->curent -= CFG_PG_SCROLL_AMT;
-        cfg_fix_topent(listhdrptr);
-      }
-      break;
-    case 0x0d:          /* return */
-      cfg_file_selected(0);
-      break;
-    case 0x09:          /* tab */
-      g_cfg_file_pathfield = !g_cfg_file_pathfield;
-      break;
-    case 0x08:          /* left arrow */
-    case 0x7f:          /* delete key */
-      if(g_cfg_file_pathfield) {
-        len = strlen(&g_cfg_file_curpath[0]) - 1;
-        if(len >= 0) {
-          g_cfg_file_curpath[len] = 0;
+  } else {
+    switch(key) {
+      case 0x1b:
+        if(g_cfg_slotdrive < 0xfff) {
+          eject_disk_by_num(g_cfg_slotdrive >> 8, g_cfg_slotdrive & 0xff);
         }
-      }
-      break;
-    case 0x20:     /* space -- selects file/directory */
-      cfg_file_selected(g_cfg_file_dir_only);
-      break;
-    default:
-      glogf("Unhandled config key: 0x%02x", key);
+        g_cfg_slotdrive = -1;
+        g_cfg_select_partition = -1;
+        g_cfg_dirlist.invalid = 1;
+        break;
+      case 0x0a:          /* down arrow */
+        if(g_cfg_file_pathfield == 0) {
+          listhdrptr->curent++;
+          cfg_fix_topent(listhdrptr);
+        }
+        break;
+      case 0x0b:          /* up arrow */
+        if(g_cfg_file_pathfield == 0) {
+          listhdrptr->curent--;
+          cfg_fix_topent(listhdrptr);
+        }
+        break;
+      case 0x33:     /* pg dn */
+        if(g_cfg_file_pathfield == 0) {
+          listhdrptr->curent += CFG_PG_SCROLL_AMT;
+          cfg_fix_topent(listhdrptr);
+        }
+        break;
+      case 0x39:     /* pg up */
+        if(g_cfg_file_pathfield == 0) {
+          listhdrptr->curent -= CFG_PG_SCROLL_AMT;
+          cfg_fix_topent(listhdrptr);
+        }
+        break;
+      case 0x0d:          /* return */
+        cfg_file_selected(0);
+        break;
+      case 0x09:          /* tab */
+        g_cfg_file_pathfield = !g_cfg_file_pathfield;
+        break;
+      case 0x15:
+        glogf("You can't go right!"); /* eggs - DB */
+        break;
+      case 0x08:          /* left arrow */
+      case 0x7f:          /* delete key */
+        if(g_cfg_file_pathfield) {
+          len = strlen(&g_cfg_file_curpath[0]) - 1;
+          if(len >= 0) {
+            g_cfg_file_curpath[len] = 0;
+          }
+        }
+        break;
+      case 0x20:     /* space -- selects file/directory */
+        cfg_file_selected(g_cfg_file_dir_only);
+        break;
+      default:
+        glogf("Unhandled file config key: 0x%02x", key);
+    }
   }
 }
 

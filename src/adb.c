@@ -1645,7 +1645,7 @@ void adb_physical_key_update(int a2code, int is_up) {
         break;
       case 0x04:           /* F4 - emulator config panel */
         if (CMD_DOWN) {
-          glog("Quit!");
+          glog("Alt-F4 Quit!");
           iwm_shut();
           my_exit(1);
         }
