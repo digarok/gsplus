@@ -91,11 +91,15 @@ int g_use_dhr140 = 0;
 int g_use_bw_hires = 0;
 int g_startx = WINDOWPOS_UNDEFINED;
 int g_starty = WINDOWPOS_UNDEFINED;
+int g_startw = BASE_WINDOW_WIDTH;
+int g_starth = X_A2_WINDOW_HEIGHT;
 int g_highdpi = 0;
 int g_borderless = 0;
 int g_resizeable = 0;
+int g_noaspect = 0;
 int g_novsync = 0;
 int g_nohwaccel = 0;
+int g_fullscreen_desktop = 0;
 
 int g_a2_new_all_stat[200];
 int g_a2_cur_all_stat[200];
@@ -640,17 +644,6 @@ void video_update() {
     video_update_through_line(0);
   }
 
-#if defined(HAVE_SDL)
-  extern void sdl_present_buffer();
-  sdl_present_buffer();
-#endif
-// OG Notify host that video has been uodated
-#if defined(ACTIVEGSPLUGIN) && defined(MAC)
-  {
-    extern void x_need2refresh();
-    x_need2refresh();
-  }
-#endif
 }
 
 

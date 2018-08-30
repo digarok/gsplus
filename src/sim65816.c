@@ -1865,8 +1865,8 @@ extern int g_a2vid_palette;
 
 extern int g_status_refresh_needed;
 
-
-void update_60hz(double dcycs, double dtime_now)      {
+/* our main function that runs each 60Hz update cycle */
+void update_60hz(double dcycs, double dtime_now) {
   register word32 end_time;
   char status_buf[1024];
   char sim_mhz_buf[128];

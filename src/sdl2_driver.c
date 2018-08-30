@@ -52,11 +52,15 @@ extern int g_fullscreen;  // only checked at start if set via CLI, otherwise it'
 extern int g_highdpi;
 extern int g_borderless;
 extern int g_resizeable;
+extern int g_noaspect;
 extern int g_novsync;
 extern int g_nohwaccel;
+extern int g_fullscreen_desktop;
 extern int g_scanline_simulator;
 extern int g_startx;
 extern int g_starty;
+extern int g_startw;
+extern int g_starth;
 extern int g_screen_depth;
 extern int g_quit_sim_now;
 extern int g_border_sides_refresh_needed;
@@ -316,14 +320,13 @@ void dev_video_init_sdl() {
     more_flags |= SDL_WINDOW_RESIZABLE;
   }
 
-
   window = SDL_CreateWindow(
-    window_title,                         // window title (GSport vX.X)
+    window_title,                   // window title (GSport vX.X)
     startx,
     starty,
-    BASE_WINDOW_WIDTH,                 // width, in pixels
-    X_A2_WINDOW_HEIGHT,                // height, in pixels
-    SDL_WINDOW_OPENGL                  // flags - see below
+    g_startw,                       // width, in pixels
+    g_starth,                       // height, in pixels
+    SDL_WINDOW_OPENGL               // flags - see below
     | more_flags
     );
 
@@ -352,7 +355,9 @@ void dev_video_init_sdl() {
 
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  // make the scaled rendering look smoother.
   // SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");  // make the scaled rendering look smoother.
-  SDL_RenderSetLogicalSize(renderer, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
+  if (!g_noaspect) {
+    SDL_RenderSetLogicalSize(renderer, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
+  }
 
   texture = SDL_CreateTexture(renderer,
                               SDL_PIXELFORMAT_ARGB8888,
@@ -596,12 +601,13 @@ void handle_sdl_key_event(SDL_Event event) {
           if (!IsFullScreen(window)) {
             glog("Enable fullscreen");
             SDL_SetWindowGrab(window, true);
-            SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+            Uint32 fullmode = g_fullscreen_desktop ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN;
+            SDL_SetWindowFullscreen(window, fullmode);
           } else {
             glog("Disable fullscreen");
             SDL_SetWindowFullscreen(window, 0);
             SDL_SetWindowGrab(window, false);
-            SDL_SetWindowSize(window, BASE_WINDOW_WIDTH, X_A2_WINDOW_HEIGHT);
+            SDL_SetWindowSize(window, g_startw, g_starth);
           }
         }
       }
@@ -619,8 +625,8 @@ void handle_sdl_key_event(SDL_Event event) {
 void handle_sdl_mouse_event(SDL_Event event) {
   int x, y;
 
-  x = event.motion.x * A2_WINDOW_WIDTH / BASE_WINDOW_WIDTH;
-  y = event.motion.y * A2_WINDOW_HEIGHT / BASE_WINDOW_HEIGHT;
+  x = event.motion.x * A2_WINDOW_WIDTH / g_startw;
+  y = event.motion.y * A2_WINDOW_HEIGHT / g_starth;
   switch (event.type) {
     case SDL_MOUSEMOTION:
       update_mouse(x, y, 0, 0);
@@ -808,6 +814,17 @@ void debuginfo_renderer(SDL_Renderer *r) {
   }
 }
 
+// as this is triggered when new images were pushed to backing buffer,
+// this is when we want to update frames.
+// putting it in x_push_done means we can skip frames that weren't changed.
+// the emulator will still run at whatever specified speed.  but this way,
+// when running in faster 8mhz/unlimited modes, it won't be slowed down by
+// forcing every draw at 60FPS sync.
+void x_push_done() {
+  void sdl_present_buffer();
+  sdl_present_buffer();
+}
+
 void sdl_present_buffer() {
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, NULL, NULL);
@@ -822,6 +839,7 @@ void sdl_present_buffer() {
   }
 }
 
+
 // BELOW ARE FUNCTIONS THAT ARE EITHER UNIMPLEMENTED, OR AR NOT RELEVANT TO
 // THIS DRIVER.
 
@@ -832,13 +850,9 @@ void x_redraw_status_lines() { }
 void x_hide_pointer(int do_hide) { }
 void x_auto_repeat_on(int must) { }
 void x_auto_repeat_off(int must) { }
-// OG Adding release
 void x_release_kimage(Kimage* kimage_ptr) { }
-// OG Addding ratio
 int x_calc_ratio(float x,float y) { return 1; }
 void x_set_mask_and_shift(word32 x_mask, word32 *mask_ptr, int *shift_left_ptr, int *shift_right_ptr) { return; }
 void x_update_color(int col_num, int red, int green, int blue, word32 rgb) { }
 void x_update_physical_colormap() { }
 void show_xcolor_array() { }
-
-void x_push_done() { }
