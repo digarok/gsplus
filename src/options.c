@@ -33,16 +33,22 @@ extern int g_use_bw_hires;            // defined in video.c
 // Set starting X/Y positions
 extern int g_startx;                  // defined in video.c
 extern int g_starty;                  // defined in video.c
+extern int g_startw;                  // defined in video.c
+extern int g_starth;                  // defined in video.c
 // Use High DPI (Retina) display - SDL2
 extern int g_highdpi;                 // defined in video.c
 // Create borderless window - SDL2
 extern int g_borderless;              // defined in video.c
 // Allow window resizing, dragging to scale - SDL2
 extern int g_resizeable;              // defined in video.c
+// Allow the window scaling to be free from aspect contraints - SDL2
+extern int g_noaspect;
 // Don't explicitly set vsync present flag on renderer - SDL2
 extern int g_novsync;              // defined in video.c
 // Don't explicitly set HW accelerator flag on renderer - SDL2
 extern int g_nohwaccel;              // defined in video.c
+// Use SDL_WINDOW_FULLSCREEN_DESKTOP for fullscreen instead of switching modes
+extern int g_fullscreen_desktop;
 // Enable Dagen's scanline simulator (SDL2)
 extern int g_scanline_simulator;      // defined in sim65816.c
 // Ethernet (interface?)
@@ -137,12 +143,18 @@ int parse_cli_options(int argc, char **argv) {
     } else if(!strcmp("-resizeable", argv[i])) {
       glogf("%s Window will be resizeable", parse_log_prefix);
       g_resizeable = 1;
+    } else if(!strcmp("-noaspect", argv[i])) {
+      glogf("%s Window will scale freely, without locking the aspect ratio", parse_log_prefix);
+      g_noaspect = 1;
     } else if(!strcmp("-novsync", argv[i])) {
       glogf("%s Renderer skipping vsync flag", parse_log_prefix);
       g_novsync = 1;
     } else if(!strcmp("-nohwaccel", argv[i])) {
       glogf("%s Renderer skipping HW accel flag", parse_log_prefix);
       g_nohwaccel = 1;
+    } else if(!strcmp("-fulldesk", argv[i])) {
+      glogf("%s Using desktop fullscreen mode", parse_log_prefix);
+      g_fullscreen_desktop = 1;
     } else if(!strcmp("-noignbadacc", argv[i])) {
       glogf("%s Not ignoring bad memory accesses", parse_log_prefix);
       g_ignore_bad_acc = 0;
@@ -214,72 +226,72 @@ int parse_cli_options(int argc, char **argv) {
       glogf("%s Setting joystick number %d", parse_log_prefix, tmp1);
       g_joystick_number = tmp1;
       i++;
-    } else if(!strcmp("-joy_x", argv[i])) {
+    } else if(!strcmp("-joy-x", argv[i])) {
       if((i+1) >= argc) {
-        glogf("%s Error, option '-joy_x' missing argument", parse_log_prefix);
+        glogf("%s Error, option '-joy-x' missing argument", parse_log_prefix);
         exit(1);
       }
       tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
       glogf("%s Setting joystick X axis %d", parse_log_prefix, tmp1);
       g_joystick_x_axis = tmp1;
       i++;
-    } else if(!strcmp("-joy_y", argv[i])) {
+    } else if(!strcmp("-joy-y", argv[i])) {
       if((i+1) >= argc) {
-        glogf("%s Error, option '-joy_y' missing argument", parse_log_prefix);
+        glogf("%s Error, option '-joy-y' missing argument", parse_log_prefix);
         exit(1);
       }
       tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
       glogf("%s Setting joystick Y axis %d", parse_log_prefix, tmp1);
       g_joystick_y_axis = tmp1;
       i++;
-    } else if(!strcmp("-joy_x2", argv[i])) {
+    } else if(!strcmp("-joy-x2", argv[i])) {
         if((i+1) >= argc) {
-          glogf("%s Error, option '-joy_x2' missing argument", parse_log_prefix);
+          glogf("%s Error, option '-joy-x2' missing argument", parse_log_prefix);
           exit(1);
         }
         tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
         glogf("%s Setting joystick X2 axis %d", parse_log_prefix, tmp1);
         g_joystick_x2_axis = tmp1;
         i++;
-    } else if(!strcmp("-joy_y2", argv[i])) {
+    } else if(!strcmp("-joy-y2", argv[i])) {
         if((i+1) >= argc) {
-          glogf("%s Error, option '-joy_y2' missing argument", parse_log_prefix);
+          glogf("%s Error, option '-joy-y2' missing argument", parse_log_prefix);
           exit(1);
         }
         tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
         glogf("%s Setting joystick Y2 axis %d", parse_log_prefix, tmp1);
         g_joystick_y2_axis = tmp1;
         i++;
-    } else if(!strcmp("-joy_b0", argv[i])) {
+    } else if(!strcmp("-joy-b0", argv[i])) {
         if((i+1) >= argc) {
-          glogf("%s Error, option '-joy_b0' missing argument", parse_log_prefix);
+          glogf("%s Error, option '-joy-b0' missing argument", parse_log_prefix);
           exit(1);
         }
         tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
         glogf("%s Setting joystick Button 0 to Gamepad %d", parse_log_prefix, tmp1);
         g_joystick_button_0 = tmp1;
         i++;
-    } else if(!strcmp("-joy_b1", argv[i])) {
+    } else if(!strcmp("-joy-b1", argv[i])) {
         if((i+1) >= argc) {
-          glogf("%s Error, option '-joy_b1' missing argument", parse_log_prefix);
+          glogf("%s Error, option '-joy-b1' missing argument", parse_log_prefix);
           exit(1);
         }
         tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
         glogf("%s Setting joystick Button 1 to Gamepad %d", parse_log_prefix, tmp1);
         g_joystick_button_1 = tmp1;
         i++;
-    } else if(!strcmp("-joy_b2", argv[i])) {
+    } else if(!strcmp("-joy-b2", argv[i])) {
         if((i+1) >= argc) {
-          glogf("%s Error, option '-joy_b2' missing argument", parse_log_prefix);
+          glogf("%s Error, option '-joy-b2' missing argument", parse_log_prefix);
           exit(1);
         }
         tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
         glogf("%s Setting joystick Button 2 to Gamepad %d", parse_log_prefix, tmp1);
         g_joystick_button_2 = tmp1;
         i++;
-    } else if(!strcmp("-joy_b3", argv[i])) {
+    } else if(!strcmp("-joy-b3", argv[i])) {
         if((i+1) >= argc) {
-          glogf("%s Error, option '-joy_b3' missing argument", parse_log_prefix);
+          glogf("%s Error, option '-joy-b3' missing argument", parse_log_prefix);
           exit(1);
         }
         tmp1 = strtol(argv[i+1], 0, 0); // no bounds check, not sure what ids we get
@@ -329,6 +341,24 @@ int parse_cli_options(int argc, char **argv) {
       tmp1 = strtol(argv[i+1], 0, 0);
       glogf("%s Using %d as y val", parse_log_prefix, tmp1);
       g_starty = tmp1;
+      i++;
+    } else if(!strcmp("-sw", argv[i])) {
+      if((i+1) >= argc) {
+        glogf("%s Error, option '-sw' missing argument", parse_log_prefix);
+        exit(1);
+      }
+      tmp1 = strtol(argv[i+1], 0, 0);
+      glogf("%s Using %d as width val", parse_log_prefix, tmp1);
+      g_startw = tmp1;
+      i++;
+    } else if(!strcmp("-sh", argv[i])) {
+      if((i+1) >= argc) {
+        glogf("%s Error, option '-sh' missing argument", parse_log_prefix);
+        exit(1);
+      }
+      tmp1 = strtol(argv[i+1], 0, 0);
+      glogf("%s Using %d as height val", parse_log_prefix, tmp1);
+      g_starth = tmp1;
       i++;
     } else if(!strcmp("-config", argv[i])) {   // Config file passed
       if((i+1) >= argc) {
@@ -399,7 +429,12 @@ void help_exit() {
   printf("    -scanline value       Enable scanline simulator at value %%\n");
   printf("    -x value              Open emulator window at x value\n");
   printf("    -y value              Open emulator window at y value\n");
-  printf("    -v value              Set verbose flags to value\n\n");
+  printf("    -sw value             Scale window to sw pixels wide\n");
+  printf("    -sh value             Scale window to sh pixels high\n");
+  printf("    -novsync              Don't force emulator to sync each frame\n");
+  printf("    -fulldesk             Use desktop 'fake' fullscreen mode\n");
+
+  //printf("    -v value              Set verbose flags to value\n\n");
   printf("  Note: The final argument, if not a flag, will be tried as a mountable device.\n\n");
   exit(1);
 }

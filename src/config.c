@@ -54,14 +54,18 @@ extern int g_fullscreen;
 extern int g_highdpi;
 extern int g_borderless;
 extern int g_resizeable;
+extern int g_noaspect;
 extern int g_novsync;
 extern int g_nohwaccel;
+extern int g_fullscreen_desktop;
 extern int g_screen_redraw_skip_amt;
 extern int g_use_dhr140;
 extern int g_use_bw_hires;
 extern int g_scanline_simulator;
 extern int g_startx;
 extern int g_starty;
+extern int g_startw;
+extern int g_starth;
 extern int g_joystick_number;
 extern int g_joystick_x_axis;
 extern int g_joystick_y_axis;
@@ -208,14 +212,18 @@ Cfg_menu g_cfg_uiless_menu[] = {
   { "", KNMP(g_highdpi), CFGTYPE_INT },
   { "", KNMP(g_borderless), CFGTYPE_INT },
   { "", KNMP(g_resizeable), CFGTYPE_INT },
+  { "", KNMP(g_noaspect), CFGTYPE_INT },
   { "", KNMP(g_novsync), CFGTYPE_INT },
   { "", KNMP(g_nohwaccel), CFGTYPE_INT },
+  { "", KNMP(g_fullscreen_desktop), CFGTYPE_INT},
   { "", KNMP(g_screen_redraw_skip_amt), CFGTYPE_INT },
   { "", KNMP(g_use_dhr140), CFGTYPE_INT },
   { "", KNMP(g_use_bw_hires), CFGTYPE_INT },
   { "", KNMP(g_scanline_simulator), CFGTYPE_INT },
   { "", KNMP(g_startx), CFGTYPE_INT },
   { "", KNMP(g_starty), CFGTYPE_INT },
+  { "", KNMP(g_startw), CFGTYPE_INT },
+  { "", KNMP(g_starth), CFGTYPE_INT },
   { "", KNMP(g_joystick_number), CFGTYPE_INT },
   { "", KNMP(g_joystick_x_axis), CFGTYPE_INT },
   { "", KNMP(g_joystick_y_axis), CFGTYPE_INT },
