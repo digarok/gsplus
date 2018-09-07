@@ -42,6 +42,7 @@ int kb_shift_control_state = 0;
 
 void debuginfo_renderer(SDL_Renderer *r);
 void x_take_screenshot(); // screenshot stuff
+void x_grabmouse();
 int g_screenshot_requested = 0; // DB to know if we want to save a screenshot
 extern char g_config_gsplus_name[];
 extern char g_config_gsplus_screenshot_dir[];
@@ -49,6 +50,7 @@ int screenshot_index = 0;  // allows us to save time by not scanning from 0 each
 char screenshot_filename[256];
 
 extern int g_fullscreen;  // only checked at start if set via CLI, otherwise it's set via function call x_full_screen()
+extern int g_grabmouse;
 extern int g_highdpi;
 extern int g_borderless;
 extern int g_resizeable;
@@ -399,8 +401,6 @@ void dev_video_init_sdl() {
 
   // Turn off host mouse cursor
   SDL_ShowCursor(SDL_DISABLE);
-  //SDL_SetRelativeMouseMode(true);
-
 }
 
 
@@ -600,6 +600,8 @@ void handle_sdl_key_event(SDL_Event event) {
           if (!IsFullScreen(window)) {
             glog("Enable fullscreen");
             SDL_SetWindowGrab(window, true);
+            SDL_SetRelativeMouseMode(true);
+
             Uint32 fullmode = g_fullscreen_desktop ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN;
             SDL_SetWindowFullscreen(window, fullmode);
           } else {
@@ -607,6 +609,8 @@ void handle_sdl_key_event(SDL_Event event) {
             SDL_SetWindowFullscreen(window, 0);
             SDL_SetWindowGrab(window, false);
             SDL_SetWindowSize(window, g_startw, g_starth);
+            SDL_SetRelativeMouseMode(false);
+
           }
         }
       }
@@ -624,17 +628,24 @@ void handle_sdl_key_event(SDL_Event event) {
 void handle_sdl_mouse_event(SDL_Event event) {
   int x, y;
 
-  x = event.motion.x * A2_WINDOW_WIDTH / g_startw;
-  y = event.motion.y * A2_WINDOW_HEIGHT / g_starth;
+  int scaledmotion = 0;
+  if (scaledmotion) {
+    x = event.motion.x * A2_WINDOW_WIDTH / g_startw;
+    y = event.motion.y * A2_WINDOW_HEIGHT / g_starth;
+  } else {
+    x = event.motion.x - BASE_MARGIN_LEFT;
+    y = event.motion.y - BASE_MARGIN_TOP;
+  }
+  
   switch (event.type) {
     case SDL_MOUSEMOTION:
-      update_mouse(x, y, 0, 0);
+      update_mouse_w_delta(x, y, 0, 0, event.motion.xrel, event.motion.yrel);
       break;
     case SDL_MOUSEBUTTONUP:
-      update_mouse(x, y, 0, event.motion.state &7 );
+      update_mouse_w_delta(x, y, 0, event.motion.state &7, 0, 0);
       break;
     case SDL_MOUSEBUTTONDOWN:
-      update_mouse(x, y, event.motion.state &7, event.motion.state &7 );
+      update_mouse_w_delta(x, y, event.motion.state &7, event.motion.state &7 , 0, 0);
       break;
   }
 }
@@ -797,7 +808,7 @@ void debuginfo_renderer(SDL_Renderer *r) {
   for(int i = 0; i < n; i++) {
       SDL_RendererInfo info;
       SDL_GetRenderDriverInfo(i, &info);
-      glogf("*  '%s'", info.name);
+      glogf("*   '%s'", info.name);
   }
 
 
@@ -838,6 +849,10 @@ void sdl_present_buffer() {
   }
 }
 
+void x_grabmouse() {
+  SDL_SetWindowGrab(window, g_grabmouse);
+  SDL_SetRelativeMouseMode(g_grabmouse);
+}
 
 // BELOW ARE FUNCTIONS THAT ARE EITHER UNIMPLEMENTED, OR AR NOT RELEVANT TO
 // THIS DRIVER.

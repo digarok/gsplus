@@ -106,6 +106,7 @@ int read_adb_ram(word32 addr);
 void write_adb_ram(word32 addr, int val);
 int adb_get_keypad_xy(int get_y);
 int update_mouse(int x, int y, int button_states, int buttons_valid);
+int update_mouse_w_delta(int x, int y, int button_states, int buttons_valid, int delta_x, int delta_y);
 int mouse_read_c024(double dcycs);
 void mouse_compress_fifo(double dcycs);
 void adb_key_event(int a2code, int is_up);
