@@ -11,6 +11,7 @@
 #include "glog.h"
 
 int g_fullscreen = 0;
+int g_grabmouse = 0;
 
 extern int Verbose;
 extern word32 g_vbl_count;
@@ -99,9 +100,13 @@ STRUCT(Mouse_fifo) {
   int x;
   int y;
   int buttons;
+  int delta_x;
+  int delta_y;
+  int dxrd;
+  int dyrd;
 };
 
-Mouse_fifo g_mouse_fifo[ADB_MOUSE_FIFO] = { { 0, 0, 0, 0 } };
+Mouse_fifo g_mouse_fifo[ADB_MOUSE_FIFO] = { { 0, 0, 0, 0, 0, 0 ,0 ,0} };
 
 int g_mouse_warp_x = 0;
 int g_mouse_warp_y = 0;
@@ -1066,6 +1071,20 @@ int adb_get_keypad_xy(int get_y) {
   }
 }
 
+// stub in a wrapper to experiment with full delta movement
+int g_delta_x = 0;
+int g_delta_y = 0;
+int update_mouse_w_delta(int x, int y, int button_states, int buttons_valid, int delta_x, int delta_y) {
+  g_delta_x = delta_x;
+  g_delta_y = delta_y;
+  //glogf("dx: %d dy: %d but: %02x", delta_x, delta_y, button_states);
+  int ret = 0;
+  ret = update_mouse(x,y,button_states,buttons_valid);
+  g_delta_x = 0;
+  g_delta_y = 0;
+  return ret;
+}
+
 int update_mouse(int x, int y, int button_states, int buttons_valid) {
   double dcycs;
   int button1_changed;
@@ -1139,29 +1158,31 @@ int update_mouse(int x, int y, int button_states, int buttons_valid) {
          g_mouse_warp_x, g_mouse_warp_y, g_mouse_fifo[0].x,
          g_mouse_fifo[0].y, g_mouse_a2_x, g_mouse_a2_y);
 #endif
-
-  mouse_moved = (g_mouse_fifo[0].x != x) || (g_mouse_fifo[0].y != y);
+  if (!g_grabmouse) {
+    mouse_moved = ((g_mouse_fifo[0].x != x) || (g_mouse_fifo[0].y != y));
+  }
 
   g_mouse_a2_x += g_mouse_warp_x;
   g_mouse_a2_y += g_mouse_warp_y;
   g_mouse_fifo[0].x = x;
   g_mouse_fifo[0].y = y;
   g_mouse_fifo[0].dcycs = dcycs;
+  g_mouse_fifo[0].delta_x = g_delta_x;
+  g_mouse_fifo[0].delta_y = g_delta_y;
   g_mouse_warp_x = 0;
   g_mouse_warp_y = 0;
 
   button1_changed = (buttons_valid & 1) &&
-                    ((button_states & 1) != (g_mouse_fifo[0].buttons & 1));
+                    ((button_states & 1) != (g_mouse_fifo[0].buttons & 1));     //<- make sure fifo doesn't already have pending change to this state
 
-  if((button_states & 4) && !(g_mouse_fifo[0].buttons & 4) &&
-     (buttons_valid & 4)) {
-    /* right button pressed */
+
+  if((button_states & 4) && !(g_mouse_fifo[0].buttons & 4) &&                   // fifo check why?
+     (buttons_valid & 4)) {                                                     // right button pressed
     adb_increment_speed();
   }
-  if((button_states & 2) && !(g_mouse_fifo[0].buttons & 2) &&
+  if((button_states & 2) && !(g_mouse_fifo[0].buttons & 2) &&                   // fifo check why?
      (buttons_valid & 2)) {
-    /* middle button pressed */
-    adb_increment_speed();
+    adb_increment_speed();                                                      // middle button pressed
     //halt2_printf("Middle button pressed\n");
   }
 
@@ -1175,10 +1196,15 @@ int update_mouse(int x, int y, int button_states, int buttons_valid) {
       g_mouse_fifo[i + 1] = g_mouse_fifo[i];                    /* copy struct*/
     }
     g_mouse_fifo_pos = pos + 1;
-  }
 
+  }
   g_mouse_fifo[0].buttons = (button_states & buttons_valid) |
                             (g_mouse_fifo[0].buttons & ~buttons_valid);
+  if (g_grabmouse) {
+    if (pos > 0) {
+      mouse_moved = (g_mouse_fifo[0].delta_x || g_mouse_fifo[0].delta_y );
+    }
+  }
 
   if(mouse_moved || button1_changed) {
     if( (g_mouse_ctl_addr == g_mouse_dev_addr) &&
@@ -1192,6 +1218,7 @@ int update_mouse(int x, int y, int button_states, int buttons_valid) {
 }
 
 int mouse_read_c024(double dcycs) {
+
   word32 ret;
   word32 tool_start;
   int em_active;
@@ -1217,6 +1244,10 @@ int mouse_read_c024(double dcycs) {
   mouse_button = (g_mouse_fifo[pos].buttons & 1);
   delta_x = target_x - g_mouse_a2_x;
   delta_y = target_y - g_mouse_a2_y;
+  if (g_grabmouse) {
+    delta_x = g_mouse_fifo[pos].delta_x;
+    delta_y = g_mouse_fifo[pos].delta_y;
+  }
 
   clamped = 0;
   if(delta_x > 0x3f) {
@@ -1244,9 +1275,13 @@ int mouse_read_c024(double dcycs) {
 
   if(g_adb_mouse_coord) {
     /* y coord */
-    delta_x = 0;                /* clear unneeded x delta */
+    delta_x = 0;                    // clear unneeded x delta
+    g_mouse_fifo[pos].dyrd = 1;     // flag y delta as read
+    g_mouse_fifo[pos].delta_y = 0;  // clear y delta
   } else {
-    delta_y = 0;                /* clear unneeded y delta */
+    delta_y = 0;                    // clear unneeded y delta
+    g_mouse_fifo[pos].dxrd = 1;     // flag x delta as read
+    g_mouse_fifo[pos].delta_x = 0;  // clear x delta
   }
 
 
@@ -1320,9 +1355,16 @@ int mouse_read_c024(double dcycs) {
   g_mouse_a2_x = a2_x;
   g_mouse_a2_y = a2_y;
   if(g_mouse_fifo_pos) {
-    if((target_x == a2_x) && (target_y == a2_y) &&
-       (g_mouse_a2_button == mouse_button)) {
-      g_mouse_fifo_pos--;
+    if (!g_grabmouse) {
+      if((target_x == a2_x) && (target_y == a2_y) &&
+        (g_mouse_a2_button == mouse_button)) {
+        g_mouse_fifo_pos--;
+      }
+    } else {
+      if(g_mouse_fifo[pos].dxrd && g_mouse_fifo[pos].dyrd
+        && (g_mouse_a2_button == mouse_button)) {
+        g_mouse_fifo_pos--;
+      }
     }
   }
 
@@ -1336,11 +1378,20 @@ int mouse_read_c024(double dcycs) {
              g_slow_memory_ptr[0x10190], g_slow_memory_ptr[0x10192],
              g_slow_memory_ptr[0x10191], g_slow_memory_ptr[0x10193]);
 
-  if((g_mouse_fifo_pos == 0) && (g_mouse_fifo[0].x == a2_x) &&
-     (g_mouse_fifo[0].y == a2_y) &&
-     ((g_mouse_fifo[0].buttons & 1) == g_mouse_a2_button)) {
-    g_adb_mouse_valid_data = 0;
-    adb_clear_mouse_int();
+  if (g_grabmouse) {
+    if((g_mouse_fifo_pos == 0) && g_mouse_fifo[0].dxrd && g_mouse_fifo[0].dyrd
+      && ((g_mouse_fifo[0].buttons & 1) == g_mouse_a2_button)) {
+        g_adb_mouse_valid_data = 0;
+        adb_clear_mouse_int();
+      }
+
+  } else {
+    if((g_mouse_fifo_pos == 0) && (g_mouse_fifo[0].x == a2_x) &&
+       (g_mouse_fifo[0].y == a2_y) &&
+       ((g_mouse_fifo[0].buttons & 1) == g_mouse_a2_button)) {
+      g_adb_mouse_valid_data = 0;
+      adb_clear_mouse_int();
+    }
   }
 
   g_adb_mouse_coord = !g_adb_mouse_coord;
@@ -1656,7 +1707,12 @@ void adb_physical_key_update(int a2code, int is_up) {
         break;
       case 0x05:           /* F5 - emulator clipboard paste */
         if (SHIFT_DOWN) {
-          // reserved
+          g_grabmouse = !g_grabmouse;
+#ifdef HAVE_SDL
+          extern void x_grabmouse();
+          glogf("g_grabmouse = %d", g_grabmouse);
+          x_grabmouse();
+#endif
         } else {
           clipboard_paste();
         }
@@ -1707,7 +1763,6 @@ void adb_physical_key_update(int a2code, int is_up) {
         x_full_screen(g_fullscreen);
         break;
     }
-
     return;
   }
   /* Handle Keypad Joystick here partly...if keypad key pressed */

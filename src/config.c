@@ -501,7 +501,7 @@ Cfg_listhdr g_cfg_partitionlist = { 0 };
 
 int g_cfg_file_pathfield = 0;
 
-const char *g_gsplus_rom_names[] = { "ROM", "ROM", "ROM01", "ROM03", "ROM.01", "ROM.03", 0 };
+const char *g_gsplus_rom_names[] = { "ROM", "ROM", "ROM1", "ROM3", "ROM01", "ROM03", "ROM.01", "ROM.03", 0 };
 /* First entry is special--it will be overwritten by g_cfg_rom_path */
 
 const char *g_gsplus_c1rom_names[] = { "parallel.rom", 0 };

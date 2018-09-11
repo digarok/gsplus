@@ -217,7 +217,7 @@ int parse_cli_options(int argc, char **argv) {
     } else if(!strcmp("-noshm", argv[i])) {
       glogf("%s Not using X shared memory", parse_log_prefix);
       g_use_shmem = 0;
-    } else if(!strcmp("-joystick", argv[i])) {
+    } else if(!strcmp("-joy", argv[i])) {
       if((i+1) >= argc) {
         glogf("%s Error, option '-joy' missing argument", parse_log_prefix);
         exit(1);
@@ -411,7 +411,7 @@ void help_exit() {
   printf("    -noignbadacc          Don’t ignore bad memory accesses\n");
   printf("    -noignhalt            Don’t ignore code red halts\n");
   printf("    -test                 Allow testing\n");
-  printf("    -joystick             Ignore joystick option\n");
+  printf("    -joy                  Set joystick number\n");
   printf("    -bw                   Force B/W modes\n");
   printf("    -dhr140               Use simple double-hires color map\n");
   printf("    -fullscreen           Attempt to start emulator in fullscreen\n");
@@ -433,7 +433,6 @@ void help_exit() {
   printf("    -sh value             Scale window to sh pixels high\n");
   printf("    -novsync              Don't force emulator to sync each frame\n");
   printf("    -fulldesk             Use desktop 'fake' fullscreen mode\n");
-
   //printf("    -v value              Set verbose flags to value\n\n");
   printf("  Note: The final argument, if not a flag, will be tried as a mountable device.\n\n");
   exit(1);
