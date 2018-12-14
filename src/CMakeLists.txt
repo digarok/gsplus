@@ -95,6 +95,7 @@ add_executable(partls partls.c)
 
 add_subdirectory(atbridge)
 add_subdirectory(tfe)
+add_subdirectory(rawnet)
 
 if (DRIVER MATCHES "SDL")
 	set(driver_code sdl2_driver.c sdl2snd_driver.c)
