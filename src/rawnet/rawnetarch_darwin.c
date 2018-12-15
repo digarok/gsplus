@@ -63,6 +63,7 @@ int rawnet_arch_activate(const char *interface_name) {
 		if (status == VMNET_SUCCESS) {
 			const char *cp;
 			cp = xpc_dictionary_get_string(params, vmnet_mac_address_key);
+			fprintf(stderr, "vmnet mac: %s\n", cp);
 			sscanf(cp, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
 				&interface_mac[0],
 				&interface_mac[1],
@@ -74,6 +75,9 @@ int rawnet_arch_activate(const char *interface_name) {
 
 			interface_mtu = xpc_dictionary_get_uint64(params, vmnet_mtu_key);
 			interface_packet_size =  xpc_dictionary_get_uint64(params, vmnet_max_packet_size_key);
+
+			fprintf(stderr, "vmnet mtu: %u\n", (unsigned)interface_mtu);
+
 		}
 		dispatch_semaphore_signal(sem);
 	});
@@ -81,7 +85,7 @@ int rawnet_arch_activate(const char *interface_name) {
 
 
 	if (interface_status != VMNET_SUCCESS) {
-		log_message(rawnet_arch_log, "vmnet_start_interface failed\n");
+		log_message(rawnet_arch_log, "vmnet_start_interface failed");
 		if (interface) {
 			vmnet_stop_interface(interface, q, ^(vmnet_return_t status){
 				dispatch_semaphore_signal(sem);
@@ -143,9 +147,10 @@ void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_di
 
 	if (txlength == 0) return;
 	if (txlength > interface_packet_size) {
-		log_message(rawnet_arch_log, "packet is too big: %d\n", txlength);
+		log_message(rawnet_arch_log, "packet is too big: %d", txlength);
 		return;
 	}
+
 
 	iov.iov_base = txframe;
 	iov.iov_len = txlength;
@@ -154,10 +159,15 @@ void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_di
 	v.vm_pkt_iov = &iov;
 	v.vm_pkt_iovcnt = 1;
 	v.vm_flags = 0;
+
+
+	fprintf(stderr, "\rawnet_arch_transmit: %u\n", (unsigned)iov.iov_len);
+	rawnet_hexdump(iov.iov_base, iov.iov_len);
+
 	
 	st = vmnet_write(interface, &v, &count);
 	if (st != VMNET_SUCCESS) {
-		log_message(rawnet_arch_log, "vmnet_write failed!\n");
+		log_message(rawnet_arch_log, "vmnet_write failed!");
 	}
 	return;
 }
@@ -174,7 +184,7 @@ int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_in
 	struct iovec iov;
 
 
-	buffer = malloc(interface_packet_size);
+	buffer = calloc(interface_packet_size, 1);
 
 	iov.iov_base = buffer;
 	iov.iov_len = interface_packet_size;
@@ -186,20 +196,25 @@ int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_in
 
 	st = vmnet_read(interface, &v, &count);
 	if (st != VMNET_SUCCESS) {
-		log_message(rawnet_arch_log, "vmnet_write failed!\n");
+		log_message(rawnet_arch_log, "vmnet_write failed!");
 		free(buffer);
 		return 0;
 	}
 
-	if (count == 0) {
+	if (count < 1) {
 		free(buffer);
 		return 0;
 	}
-	xfer = iov.iov_len;
+
+	// iov.iov_len is not updated with the read count, apparently. 
+	fprintf(stderr, "\nrawnet_arch_receive: %u\n", (unsigned)v.vm_pkt_size);
+	rawnet_hexdump(iov.iov_base, v.vm_pkt_size);
+
+	xfer = v.vm_pkt_size;
 	if (xfer > *plen) xfer = *plen;
 	memcpy(pbuffer, buffer, xfer);
 
-	xfer = iov.iov_len;
+	xfer = v.vm_pkt_size;
 	if (xfer & 0x01) ++xfer; /* ??? */
 	*plen = xfer; /* actual frame size */
 
