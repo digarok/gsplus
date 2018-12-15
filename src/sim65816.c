@@ -21,9 +21,9 @@ extern char g_config_gsplus_screenshot_dir[];
   #define vsnprintf _vsnprintf
 #endif
 
-#ifdef HAVE_TFE
-  #include "tfe/tfesupp.h"
-  #include "tfe/protos_tfe.h"
+#ifdef HAVE_RAWNET
+  #include "rawnet/rawnet.h"
+  #include "rawnet/cs8900.h"
 #endif
 
 #if defined (_WIN32) && !defined(WIN_SDL)|| defined(__CYGWIN__) && !defined(WIN_SDL)
@@ -143,6 +143,7 @@ int g_serial_out_masking = 0;
 int g_serial_modem[2] = { 0, 1 };
 int g_ethernet = 0;
 int g_ethernet_interface = 0;
+int g_ethernet_enabled = 0;
 int g_parallel = 0;
 int g_parallel_out_masking = 0;
 int g_printer = 0;
@@ -945,31 +946,44 @@ int gsplusmain(int argc, char **argv) {
   }
   printer_init(g_printer_dpi,85,110,g_printer_output,g_printer_multipage != 0);
   //If ethernet is enabled in config.gsport, let's initialize it
-#ifdef HAVE_TFE
+#ifdef HAVE_RAWNET
+  g_ethernet_enabled = 0;
   if (g_ethernet == 1)
   {
-    int i = 0;
+    int i = -1;
+    int ok = 0;
     char *ppname = NULL;
     char *ppdes = NULL;
-    if (tfe_enumadapter_open())
+    if (rawnet_enumadapter_open())
     {
       //Loop through the available adapters until we reach the interface number specified in config.gsport
-      while(tfe_enumadapter(&ppname,&ppdes))
+      while(rawnet_enumadapter(&ppname,&ppdes))
       {
-        if (i == g_ethernet_interface) break;
-        i++;
+        ++i;
+        if (i == g_ethernet_interface) {
+
+          if (cs8900_init() >= 0 && cs8900_activate(ppname) >= 0) {
+            g_ethernet_enabled = 1;
+          } else {
+            fprintf(stderr, "Unable to start ethernet.\n");
+          }
+
+          free(ppname);
+          free(ppdes);
+
+          break;
+        }
+
+        free(ppname);
+        free(ppdes);
       }
-      tfe_enumadapter_close();
-      printf("Using host ethernet interface: %s\nUthernet support is ON.\n",ppdes);
+      rawnet_enumadapter_close();
     }
-    else
+
+    if (i < 0)
     {
-      printf("No ethernet host adapters found. Do you have PCap installed/enabled?\nUthernet support is OFF.\n");
+      fprintf(stderr, "No ethernet host adapters found. Do you have PCap installed/enabled?\nUthernet support is OFF.\n");
     }
-    set_tfe_interface(ppname);     //Connect the emulated ethernet device with the selected host adapter
-    lib_free(ppname);
-    lib_free(ppdes);
-    tfe_init();
   }
 #endif
 
@@ -1020,6 +1034,13 @@ int gsplusmain(int argc, char **argv) {
   fixed_memory_ptrs_shut();
   load_roms_shut_memory();
   clear_fatal_logs();
+
+#if HAVE_RAWNET
+  if (g_ethernet_enabled) {
+    cs8900_deactivate();
+    cs8900_shutdown();
+  }
+#endif
 
   // OG Not needed anymore : the emulator will quit gently
   //my_exit(0);

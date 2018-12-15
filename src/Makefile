@@ -9,6 +9,7 @@ ATOBJ = atbridge/aarp.o atbridge/atbridge.o atbridge/elap.o atbridge/llap.o atbr
 PCAPOBJ = atbridge/pcap_delay.o
 TFEOBJ = tfe/tfe.o tfe/tfearch.o tfe/tfesupp.o
 FSTOBJ = unix_host_common.o host_common.o host_fst.o host_mli.o
+RAWNETOBJ = rawnet/cs8900.o rawnet/rawnet.o rawnet/rawnetsupp.o
 
 include vars
 

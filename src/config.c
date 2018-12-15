@@ -16,9 +16,8 @@
 #include <dirent.h>
 #endif
 
-#ifdef HAVE_TFE
-#include "tfe/tfesupp.h"
-#include "tfe/protos_tfe.h"
+#ifdef HAVE_RAWNET
+#include "rawnet/rawnet.h"
 #endif
 
 #if defined _MSC_VER
@@ -76,6 +75,7 @@ extern int g_joystick_button_1;
 extern int g_joystick_button_2;
 extern int g_joystick_button_3;
 extern int g_ethernet;
+extern int g_ethernet_enabled;
 extern int g_halt_on_bad_read;
 extern int g_ignore_bad_acc;
 extern int g_ignore_halts;
@@ -695,24 +695,24 @@ void cfg_iwreset()      {
   imagewriter_init(g_imagewriter_dpi,g_imagewriter_paper,g_imagewriter_banner, g_imagewriter_output,g_imagewriter_multipage);
   return;
 }
-#ifdef HAVE_TFE
+#ifdef HAVE_RAWNET
 void cfg_get_tfe_name()      {
   int i = 0;
   char *ppname = NULL;
   char *ppdes = NULL;
   cfg_htab_vtab(0,11);
-  if (tfe_enumadapter_open())
+  if (rawnet_enumadapter_open())
   {
     cfg_printf("Interface List:\n---------------");
-    while(tfe_enumadapter(&ppname,&ppdes))
+    while(rawnet_enumadapter(&ppname,&ppdes))
     {
       cfg_htab_vtab(0, 13+i);
       cfg_printf("%2d: %s",i,ppdes);
       i++;
-      lib_free(ppname);
-      lib_free(ppdes);
+      free(ppname);
+      free(ppdes);
     }
-    tfe_enumadapter_close();
+    rawnet_enumadapter_close();
   }
   else
   {
@@ -3247,7 +3247,7 @@ void config_control_panel()      {
     if(g_cfg_slotdrive >= 0) {
       cfg_file_draw();
     }
-#ifdef HAVE_TFE
+#ifdef HAVE_RAWNET
     /*HACK eh, at least I think it is. Display the available ethernet interfaces
        when in the ethernet control panel. This is the only way one can customize a menu pane.
        Kent did it with the directory browser, so why not.*/

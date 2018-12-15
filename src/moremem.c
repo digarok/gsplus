@@ -7,8 +7,8 @@
 
 #include "defc.h"
 
-#ifdef HAVE_TFE
-#include "tfe/protos_tfe.h"
+#ifdef HAVE_RAWNET
+#include "rawnet/cs8900.h"
 #endif
 
 extern char const g_gsplus_version_str[];
@@ -33,6 +33,8 @@ extern int Verbose;
 extern int g_rom_version;
 extern int g_user_page2_shadow;
 extern int g_parallel;
+
+extern int g_ethernet_enabled;
 
 char c;
 /* from iwm.c */
@@ -1591,7 +1593,7 @@ int io_read(word32 loc, double *cyc_ptr)     {
           //case 0xb8:
           //	return 0;
           //	break;
-#ifdef HAVE_TFE
+#ifdef HAVE_RAWNET
         /*Uthernet read access on slot 3*/
         case 0xb0:
         case 0xb1:
@@ -1609,8 +1611,8 @@ int io_read(word32 loc, double *cyc_ptr)     {
         case 0xbd:
         case 0xbe:
         case 0xbf:
-          if (tfe_enabled) {
-            return tfe_read((word16)loc & 0xf);
+          if (g_ethernet_enabled) {
+            return cs8900_read((word16)loc & 0xf);
           }
           else
           {return 0;}
@@ -2326,7 +2328,7 @@ void io_write(word32 loc, int val, double *cyc_ptr)      {
           //case 0xb8: case 0xb9: case 0xba: case 0xbb:
           //case 0xbc: case 0xbd: case 0xbe: case 0xbf:
           //	UNIMPL_WRITE;
-#ifdef HAVE_TFE
+#ifdef HAVE_RAWNET
         /*Uthernet write access on slot 3*/
         case 0xb0:
         case 0xb1:
@@ -2344,9 +2346,9 @@ void io_write(word32 loc, int val, double *cyc_ptr)      {
         case 0xbd:
         case 0xbe:
         case 0xbf:
-          if (tfe_enabled)
+          if (g_ethernet_enabled)
           {
-            tfe_store((word16)loc & 0xf, (byte)val);
+            cs8900_store((word16)loc & 0xf, (byte)val);
             return;
           }
           else
