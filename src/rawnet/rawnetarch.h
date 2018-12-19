@@ -65,4 +65,8 @@ extern int rawnet_arch_enumadapter_close(void);
 
 extern char *rawnet_arch_get_standard_interface(void);
 
+
+extern int rawnet_arch_get_mtu(void);
+extern int rawnet_arch_get_mac(uint8_t mac[6]);
+
 #endif

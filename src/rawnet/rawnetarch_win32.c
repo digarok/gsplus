@@ -539,4 +539,13 @@ char *rawnet_arch_get_standard_interface(void)
 
     return dev;
 }
+
+extern int rawnet_arch_get_mtu(void) {
+    return -1;
+}
+
+extern int rawnet_arch_get_mac(uint8_t mac[6]) {
+    return -1;
+}
+
 #endif /* #ifdef HAVE_RAWNET */

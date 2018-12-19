@@ -268,3 +268,16 @@ int rawnet_arch_enumadapter_close(void) {
 char *rawnet_arch_get_standard_interface(void) {
 	return lib_stralloc("vmnet");
 }
+
+int rawnet_arch_get_mtu(void) {
+	return interface ? interface_mtu : -1;
+}
+
+int rawnet_arch_get_mac(uint8_t mac[6]) {
+	if (interface) {
+		memcpy(mac, interface_mac, 6);
+		return 1;
+	}
+	return -1;
+}
+
