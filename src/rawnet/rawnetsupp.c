@@ -150,22 +150,23 @@ unsigned long crc32_buf(const char *buffer, unsigned int len) {
   return ~crc;
 }
 
-void rawnet_hexdump(unsigned char *what, int count ) {
+void rawnet_hexdump(const void *what, int count) {
   static const char hex[] = "0123456789abcdef";
   char buffer1[16 * 3 + 1];
   char buffer2[16 + 1];
   unsigned offset;
+  unsigned char *cp = (unsigned char *)what;
 
 
   offset = 0;
-  while (count) {
-    unsigned char x = *what++;
+  while (count > 0) {
+    unsigned char x = *cp++;
 
     buffer1[offset * 3] = hex[x >> 4];
     buffer1[offset * 3 + 1] = hex[x & 0x0f];
     buffer1[offset * 3 + 2] = ' ';
 
-    buffer2[offset] = isprint(x) ? x : '.';
+    buffer2[offset] = (x < 0x80) && isprint(x) ? x : '.';
 
 
     --count;

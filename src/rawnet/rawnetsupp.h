@@ -52,7 +52,7 @@ extern int util_string_set(char **str, const char *new_value);
 
 extern unsigned long crc32_buf(const char *buffer, unsigned int len);
 
-void rawnet_hexdump(unsigned char *what, int count );
+extern void rawnet_hexdump(const void *what, int count);
 
 #define log_message(level,...) do { fprintf(stderr,__VA_ARGS__); fputs("\n", stderr); } while (0)
 #endif
