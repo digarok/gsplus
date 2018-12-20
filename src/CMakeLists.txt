@@ -151,8 +151,8 @@ SET_SOURCE_FILES_PROPERTIES(
   MACOSX_PACKAGE_LOCATION Resources
  )
 
-target_link_libraries(GSplus atbridge)
-target_link_libraries(GSplus tfe)
+# target_link_libraries(GSplus atbridge)
+target_link_libraries(GSplus rawnet)
 
 if (DRIVER MATCHES "WIN32")
 	target_link_libraries(GSplus comdlg32 Shlwapi IPHlpApi
@@ -166,7 +166,7 @@ if (DRIVER MATCHES "SDL")
 endif()
 
 if (APPLE)
-	target_link_libraries(GSplus "-framework Cocoa -framework vmnet")
+	target_link_libraries(GSplus "-framework Cocoa")
 endif()
 
 if (TOGGLE_STATUS)
