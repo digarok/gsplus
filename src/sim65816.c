@@ -885,9 +885,7 @@ void banner() {
 
 int gsplusmain(int argc, char **argv) {
   int diff;
-  int skip_amt;
   int tmp1;
-  int i;
   char    *final_arg = 0;
 
 
@@ -951,7 +949,6 @@ int gsplusmain(int argc, char **argv) {
   if (g_ethernet == 1)
   {
     int i = -1;
-    int ok = 0;
     char *ppname = NULL;
     char *ppdes = NULL;
     if (rawnet_enumadapter_open())
