@@ -3136,6 +3136,23 @@ void cfg_file_handle_key(int key) {
   }
 }
 
+
+static int config_read_key(void) {
+    int key = -1;
+    while(g_config_control_panel & !(halt_sim&HALT_WANTTOQUIT)) {
+      video_update();
+      key = adb_read_c000();
+      if(key & 0x80) {
+        key = key & 0x7f;
+        (void)adb_access_c010();
+        return key;
+      }
+      micro_sleep(1.0/60.0);
+      g_cfg_vbl_count++;
+    }
+    return -1;
+}
+
 void config_control_panel()      {
   void (*fn_ptr)();
   const char *str;
@@ -3144,10 +3161,10 @@ void config_control_panel()      {
   int print_eject_help;
   int line;
   int type;
-  int match_found;
   int menu_line;
   int menu_inc;
   int max_line;
+  int min_line;
   int key;
   int i, j;
   // First, save important text screen state
@@ -3188,10 +3205,39 @@ void config_control_panel()      {
     }
     cfg_home();
     line = 1;
-    max_line = 1;
-    match_found = 0;
     print_eject_help = 0;
     cfg_printf("%s\n\n", menuptr[0].str);
+
+    /* calc max/min items */
+    max_line = 0;
+    min_line = 0;
+    for (i = 0;;++i) {
+      const char *cp = menuptr[i].str;
+      if (!cp) break;
+      if (!*cp) continue; /* place holder */
+      if (!min_line) min_line = i;
+      max_line = i;
+    }
+
+    /* menu advancement */
+    if (menu_inc > 0) {
+      if (menu_line > max_line) menu_line = max_line;
+      for( ; menu_line < max_line; ++menu_line) {
+        const char *cp = menuptr[menu_line].str;
+        if (*cp) break;
+      }
+      menu_inc = 0;
+    }
+
+    if (menu_inc < 0) {
+      if (menu_line < min_line) menu_line = min_line;
+      for( ; menu_line > min_line; --menu_line) {
+        const char *cp = menuptr[menu_line].str;
+        if (*cp) break;
+      }
+      menu_inc = 0;
+    }
+
     while(line < 24) {
       str = menuptr[line].str;
       type = menuptr[line].cfgtype;
@@ -3203,27 +3249,11 @@ void config_control_panel()      {
         print_eject_help = 1;
       }
       cfg_parse_menu(menuptr, line, menu_line, 0);
-      if(line == menu_line) {
-        if(type != 0) {
-          match_found = 1;
-        } else if(menu_inc) {
-          menu_line++;
-        } else {
-          menu_line--;
-        }
-      }
-      if(line > max_line) {
-        max_line = line;
-      }
+
       cfg_printf("%s\n", g_cfg_opt_buf);
       line++;
     }
-    if((menu_line < 1) && !match_found) {
-      menu_line = 1;
-    }
-    if((menu_line >= max_line) && !match_found) {
-      menu_line = max_line;
-    }
+
     if(g_rom_version < 0) {
       cfg_htab_vtab(0, 21);
       cfg_printf("\bYOU MUST SELECT A VALID ROM FILE\b\n");
@@ -3264,36 +3294,19 @@ void config_control_panel()      {
       g_cfg_triggeriwreset = 1;
     }
 #endif
-    key = -1;
-    while(g_config_control_panel & !(halt_sim&HALT_WANTTOQUIT)) {
-      video_update();
-      key = adb_read_c000();
-      if(key & 0x80) {
-        key = key & 0x7f;
-        (void)adb_access_c010();
-        break;
-      } else {
-        key = -1;
-      }
-      micro_sleep(1.0/60.0);
-      g_cfg_vbl_count++;
-      if(!match_found) {
-        break;
-      }
-    }
+    key = config_read_key();
+    if (key < 0) break;
+
     if((key >= 0) && (g_cfg_slotdrive < 0)) {
       // Normal menu system
       switch(key) {
         case 0x0a:                 /* down arrow */
-          menu_line++;
+          if (menu_line < max_line) menu_line++;
           menu_inc = 1;
           break;
         case 0x0b:                 /* up arrow */
-          menu_line--;
-          menu_inc = 0;
-          if(menu_line < 1) {
-            menu_line = 1;
-          }
+          if (menu_line > 1) --menu_line;
+          menu_inc = -1;
           break;
         case 0x33:                 /* pg dn */
           menu_line += CFG_PG_SCROLL_AMT;
@@ -3301,10 +3314,7 @@ void config_control_panel()      {
           break;
         case 0x39:                 /* pg up */
           menu_line -= CFG_PG_SCROLL_AMT;
-          menu_inc = 0;
-          if(menu_line < 1) {
-            menu_line = 1;
-          }
+          menu_inc = -1;
           break;
         case 0x15:                 /* right arrow */
           cfg_parse_menu(menuptr, menu_line,menu_line,1);
