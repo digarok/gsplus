@@ -88,8 +88,8 @@ extern int g_joystick_button_0;
 extern int g_joystick_button_1;
 extern int g_joystick_button_2;
 extern int g_joystick_button_3;
-extern int g_ethernet;
-extern int g_ethernet_enabled;
+
+
 extern int g_halt_on_bad_read;
 extern int g_ignore_bad_acc;
 extern int g_ignore_halts;
@@ -114,7 +114,8 @@ extern int g_joystick_trim_amount_y;
 extern int g_swap_paddles;
 extern int g_invert_paddles;
 extern int g_ethernet;
-extern int g_ethernet_interface;
+extern int g_ethernet_enabled;
+extern char * g_ethernet_interface;
 extern int g_appletalk_bridging;
 extern int g_appletalk_turbo;
 extern int g_appletalk_diagnostics;
@@ -213,6 +214,8 @@ int g_cfg_file_dir_only = 0;
 
 #define MAX_PARTITION_BLK_SIZE          65536
 
+void display_rawnet_menu(const char *name, const char **value);
+
 extern Cfg_menu g_cfg_main_menu[];
 
 #define KNMP(a)         &a, #a, 0
@@ -247,7 +250,6 @@ Cfg_menu g_cfg_uiless_menu[] = {
   { "", KNMP(g_joystick_button_1), CFGTYPE_INT },
   { "", KNMP(g_joystick_button_2), CFGTYPE_INT },
   { "", KNMP(g_joystick_button_3), CFGTYPE_INT },
-  { "", KNMP(g_ethernet), CFGTYPE_INT },
   { "", KNMP(g_halt_on_bad_read), CFGTYPE_INT },
   { "", KNMP(g_ignore_bad_acc), CFGTYPE_INT },
   { "", KNMP(g_ignore_halts), CFGTYPE_INT },
@@ -366,8 +368,8 @@ Cfg_menu g_cfg_parallel_menu[] = {
 
 Cfg_menu g_cfg_ethernet_menu[] = {
   { "Ethernet Card Configuration", g_cfg_ethernet_menu, 0, 0, CFGTYPE_MENU },
-  { "Use Interface Number,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10",
-    KNMP(g_ethernet_interface), CFGTYPE_INT },
+  { "Interface",
+    KNMP(g_ethernet_interface), CFGTYPE_STR_FUNC, display_rawnet_menu },
   { "", 0, 0, 0, 0 },
   { "Uthernet Card in Slot 3,0,Off,1,On",
     KNMP(g_ethernet), CFGTYPE_INT },
@@ -483,15 +485,14 @@ Cfg_menu g_cfg_main_menu[] = {
   { "Expansion Mem Size,0,0MB,0x100000,1MB,0x200000,2MB,0x300000,3MB,"
     "0x400000,4MB,0x600000,6MB,0x800000,8MB,0xa00000,10MB,0xc00000,12MB,"
     "0xe00000,14MB", KNMP(g_mem_size_exp), CFGTYPE_INT },
-  { "Dump text screen to file", (void *)cfg_text_screen_dump, 0, 0, CFGTYPE_FUNC},
+  { "Dump text screen to file", 0, 0, 0, CFGTYPE_FUNC, cfg_text_screen_dump},
 #ifdef HAVE_SDL
-  { "Reset Virtual ImageWriter", (void *)cfg_iwreset, 0, 0, CFGTYPE_FUNC },
+  { "Reset Virtual ImageWriter", 0, 0, 0, CFGTYPE_FUNC, cfg_iwreset },
 #endif
   { "", 0, 0, 0, 0 },
-  { "Save changes to configuration file", (void *)config_write_config_gsplus_file, 0, 0,
-    CFGTYPE_FUNC },
+  { "Save changes to configuration file", 0, 0, 0, CFGTYPE_FUNC, config_write_config_gsplus_file },
   { "", 0, 0, 0, 0 },
-  { "Exit Config (or press F4)", (void *)cfg_exit, 0, 0, CFGTYPE_FUNC },
+  { "Exit Config (or press F4)", 0, 0, 0, CFGTYPE_FUNC, cfg_exit },
   { 0, 0, 0, 0, 0 },
 };
 
@@ -609,6 +610,7 @@ void config_init_menus(Cfg_menu *menuptr)      {
         case CFGTYPE_STR:
         case CFGTYPE_FILE:
         case CFGTYPE_DIR:
+        case CFGTYPE_STR_FUNC:
           str_ptr = (char **)menuptr->ptr;
           str = *str_ptr;
           // We need to malloc this string since all
@@ -709,36 +711,7 @@ void cfg_iwreset()      {
   imagewriter_init(g_imagewriter_dpi,g_imagewriter_paper,g_imagewriter_banner, g_imagewriter_output,g_imagewriter_multipage);
   return;
 }
-#ifdef HAVE_RAWNET
-void cfg_get_tfe_name()      {
-  int i = 0;
-  char *ppname = NULL;
-  char *ppdes = NULL;
-  cfg_htab_vtab(0,11);
-  if (rawnet_enumadapter_open())
-  {
-    cfg_printf("Interface List:\n---------------");
-    while(rawnet_enumadapter(&ppname,&ppdes))
-    {
-      cfg_htab_vtab(0, 13+i);
-      cfg_printf("%2d: %s",i,ppdes);
-      i++;
-      free(ppname);
-      free(ppdes);
-    }
-    rawnet_enumadapter_close();
-  }
-  else
-  {
-                #if defined(_WIN32) || defined(__CYGWIN__)
-    cfg_printf("ERROR: Install/Enable WinPcap for Ethernet Support!!");
-                #else
-    cfg_printf("ERROR: Install/Enable LibPcap for Ethernet Support!!");
-                #endif
-  }
-  return;
-}
-#endif
+
 
 void config_vbl_update(int doit_3_persec)      {
   if(doit_3_persec) {
@@ -824,6 +797,7 @@ void config_parse_option(char *buf, int pos, int len, int line)      {
     case CFGTYPE_STR:
     case CFGTYPE_FILE:
     case CFGTYPE_DIR:
+    case CFGTYPE_STR_FUNC:
       strptr = (char **)menuptr->ptr;
       if(strptr && *strptr) {
         free(*strptr);
@@ -1347,6 +1321,7 @@ void config_write_config_gsplus_file()      {
       case CFGTYPE_STR:
       case CFGTYPE_FILE:
       case CFGTYPE_DIR:
+      case CFGTYPE_STR_FUNC:
         curstr = *((char **)menuptr->ptr);
         defstr = *((char **)menuptr->defptr);
         if(strcmp(curstr, defstr) != 0) {
@@ -2073,6 +2048,11 @@ void cfg_putchar(int c)      {
   g_cfg_curs_x = x;
 }
 
+void cfg_puts(const char *str, int nl) {
+  for(;*str; ++str) cfg_putchar(*str);
+    if (nl) cfg_putchar('\n');
+}
+
 void cfg_printf(const char *fmt, ...)      {
   va_list ap;
   int c;
@@ -2274,6 +2254,7 @@ void cfg_parse_menu(Cfg_menu *menuptr, int menu_pos, int highlight_pos, int chan
     case CFGTYPE_STR:
     case CFGTYPE_FILE:
     case CFGTYPE_DIR:
+    case CFGTYPE_STR_FUNC:
       str_ptr = (char **)menuptr->ptr;
       curstr = *str_ptr;
       str_ptr = (char **)menuptr->defptr;
@@ -2306,6 +2287,7 @@ void cfg_parse_menu(Cfg_menu *menuptr, int menu_pos, int highlight_pos, int chan
     case CFGTYPE_INT:
     case CFGTYPE_FILE:
     case CFGTYPE_DIR:
+    case CFGTYPE_STR_FUNC:
       g_cfg_opt_buf[bufpos++] = ' ';
       g_cfg_opt_buf[bufpos++] = '=';
       g_cfg_opt_buf[bufpos++] = ' ';
@@ -2385,6 +2367,7 @@ void cfg_parse_menu(Cfg_menu *menuptr, int menu_pos, int highlight_pos, int chan
         snprintf(str, CFG_OPT_MAXSTR, "%d", curval);
         break;
       case CFGTYPE_STR:
+      case CFGTYPE_STR_FUNC:
         str = &(g_cfg_opts_strs[0][0]);
         //printf("curstr is: %s str is: %s\n", curstr,str);
         snprintf(str, CFG_OPT_MAXSTR, "%s", curstr);
@@ -3190,11 +3173,11 @@ void config_display_file_menu(void) {
 
 }
 
-void config_control_panel()      {
-  void (*fn_ptr)();
+void config_control_panel() {
   const char *str;
   Cfg_menu *menuptr;
   void    *ptr;
+  void    *cookie;
   int line;
   int type;
   int menu_line;
@@ -3305,13 +3288,7 @@ void config_control_panel()      {
 #endif
 
 #ifdef HAVE_RAWNET
-    /*HACK eh, at least I think it is. Display the available ethernet interfaces
-       when in the ethernet control panel. This is the only way one can customize a menu pane.
-       Kent did it with the directory browser, so why not.*/
-    if(menuptr == g_cfg_ethernet_menu)
-    {
-      cfg_get_tfe_name();
-    }
+
 #endif
 
 
@@ -3347,6 +3324,7 @@ void config_control_panel()      {
         type = menuptr[menu_line].cfgtype;
         ptr = menuptr[menu_line].ptr;
         str = menuptr[menu_line].str;
+        cookie = menuptr[menu_line].cookie;
         switch(type & 0xf) {
           case CFGTYPE_MENU:
             menuptr = (Cfg_menu *)ptr;
@@ -3361,11 +3339,13 @@ void config_control_panel()      {
 #endif
             break;
 
-          case CFGTYPE_FUNC:
-            fn_ptr = (void (*)())ptr;
-            (*fn_ptr)();
+          case CFGTYPE_FUNC: {
+            void (*fn)(void);
+            fn = (void (*)(void))cookie;
+            if (fn) fn();
             adb_all_keys_up();                           //Needed otherwise menu function will continue to repeat until we move selection up or down
             break;
+          }
 
           case CFGTYPE_DISK:
             g_cfg_slotdrive = type >> 4;
@@ -3386,6 +3366,15 @@ void config_control_panel()      {
             g_cfg_file_dir_only = 1;
             config_display_file_menu();
             break;
+
+          case CFGTYPE_STR_FUNC: {
+            void (*fn)(const char *, char **);
+            fn = (void (*)(const char *, char **))cookie;
+            if (fn) fn(str, (char **)ptr);
+            adb_all_keys_up();
+            break;
+          }
+
         }
         break;
       case KEY_ESC:
@@ -3429,3 +3418,113 @@ void x_clk_setup_bram_version() {
     g_bram_ptr = (&g_bram[1][0]);               // ROM 03
   }
 }
+
+
+#ifdef HAVE_RAWNET
+
+void display_rawnet_menu(const char *name, const char **value) {
+
+  char *entries[20];
+  int i;
+  int index = -1;
+  int count = 0;
+  char *ppname = NULL;
+  char *ppdes = NULL;
+
+  memset(entries, 0, sizeof(entries));
+
+  if (rawnet_enumadapter_open()) {
+    count = 0;
+    while(rawnet_enumadapter(&ppname,&ppdes)) {
+      entries[count] = ppname;
+      free(ppdes);
+
+      if (index < 0 && !strcmp(*value, ppname)) index = count;
+      ++count;
+      if (count == 20) break;
+    }
+    rawnet_enumadapter_close();
+  }
+
+  if (index < 0) index = 0;
+
+  for(;;) {
+    int key;
+
+    cfg_home();
+    cfg_puts(name, 1);
+    for (i = 0; i < 20; ++i) {
+      char *cp = entries[i];
+      if (!cp) break;
+
+      cfg_htab_vtab(4, i + 2);
+      if (i == index) cfg_putchar('\b'); /* inverse */
+      cfg_puts(cp, 1);
+      if (i == index) cfg_putchar('\b');
+    }
+
+    cfg_htab_vtab(0, 23);
+    cfg_puts("Move: \tJ\t \tK\t Change: \tM",1);
+
+    key = config_read_key();
+    switch(key) {
+      case KEY_UP_ARROW:
+        if (index) --index;
+        break;
+      case KEY_DOWN_ARROW:
+        if (index < count - 1) ++index;
+        break;
+      case KEY_PAGE_UP:
+        index -= CFG_PG_SCROLL_AMT;
+        if (index < 0) index = 0;
+        break;
+      case KEY_PAGE_DOWN:
+        index += CFG_PG_SCROLL_AMT;
+        if (index >= count) index = count - 1;
+        break;
+      case KEY_RETURN:
+        if (index < count) {
+          *value = strdup(entries[index]);
+        }
+        key = -1;
+        break;
+      case KEY_ESC:
+        key = -1;
+        break;
+    }
+    if (key < 0) break;
+  }
+
+  for (i = 0; i < 20; ++i) free(entries[i]);
+}
+
+
+void cfg_get_tfe_name()      {
+  int i = 0;
+  char *ppname = NULL;
+  char *ppdes = NULL;
+  cfg_htab_vtab(0,11);
+  if (rawnet_enumadapter_open())
+  {
+    cfg_printf("Interface List:\n---------------");
+    while(rawnet_enumadapter(&ppname,&ppdes))
+    {
+      cfg_htab_vtab(0, 13+i);
+      cfg_printf("%2d: %s",i,ppdes);
+      i++;
+      free(ppname);
+      free(ppdes);
+    }
+    rawnet_enumadapter_close();
+  }
+  else
+  {
+                #if defined(_WIN32) || defined(__CYGWIN__)
+    cfg_printf("ERROR: Install/Enable WinPcap for Ethernet Support!!");
+                #else
+    cfg_printf("ERROR: Install/Enable LibPcap for Ethernet Support!!");
+                #endif
+  }
+  return;
+}
+#endif

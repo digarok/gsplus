@@ -191,6 +191,7 @@ STRUCT(Cfg_menu) {
 								const char *name_str;
 								void *defptr;
 								int cfgtype;
+								void *cookie;
 };
 
 STRUCT(Cfg_dirent) {
