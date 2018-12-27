@@ -23,6 +23,7 @@ static uint8_t interface_mac[6];
 static uint8_t interface_fake_mac[6];
 static uint64_t interface_mtu;
 static uint64_t interface_packet_size;
+static uint8_t *interface_buffer = NULL;
 static vmnet_return_t interface_status;
 
 int rawnet_arch_init(void) {
@@ -85,8 +86,9 @@ int rawnet_arch_activate(const char *interface_name) {
 	});
 	dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
 
-
-	if (interface_status != VMNET_SUCCESS) {
+	if (interface_status == VMNET_SUCCESS) {
+		interface_buffer = (uint8_t *)malloc(interface_packet_size);
+	} else {
 		log_message(rawnet_arch_log, "vmnet_start_interface failed");
 		if (interface) {
 			vmnet_stop_interface(interface, q, ^(vmnet_return_t status){
@@ -122,6 +124,8 @@ void rawnet_arch_deactivate(void) {
 		interface = NULL;
 		interface_status = 0;
 	}
+	free(interface_buffer);
+	interface_buffer = NULL;
 
 }
 
@@ -350,7 +354,6 @@ void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_di
 	vmnet_return_t st;
 	struct vmpktdesc v;
 	struct iovec iov;
-	uint8_t *buffer;
 
 	if (txlength == 0) return;
 	if (txlength > interface_packet_size) {
@@ -364,11 +367,10 @@ void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_di
 	}
 
 	/* copy the buffer and fix the source mac address. */
-	buffer = (uint8_t *)calloc(txlength, 1);
-	memcpy(buffer, txframe, txlength);
-	fix_outgoing_packet(buffer, txlength, interface_mac, interface_fake_mac);
+	memcpy(interface_buffer, txframe, txlength);
+	fix_outgoing_packet(interface_buffer, txlength, interface_mac, interface_fake_mac);
 
-	iov.iov_base = buffer;
+	iov.iov_base = interface_buffer;
 	iov.iov_len = txlength;
 
 	v.vm_pkt_size = txlength;
@@ -378,11 +380,11 @@ void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_di
 
 
 	fprintf(stderr, "\nrawnet_arch_transmit: %u\n", (unsigned)iov.iov_len);
-	rawnet_hexdump(buffer, v.vm_pkt_size);
+	rawnet_hexdump(interface_buffer, v.vm_pkt_size);
 
 	
 	st = vmnet_write(interface, &v, &count);
-	free(buffer);
+
 	if (st != VMNET_SUCCESS) {
 		log_message(rawnet_arch_log, "vmnet_write failed!");
 	}
@@ -391,8 +393,6 @@ void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_di
 
 int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_index, int *prx_ok, int *pcorrect_mac, int *pbroadcast, int *pcrc_error) {
 
-	uint8_t *buffer;
-	//unsigned hashreg;
 
 	int count = 1;
 	int xfer;
@@ -400,10 +400,7 @@ int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_in
 	struct vmpktdesc v;
 	struct iovec iov;
 
-
-	buffer = (uint8_t *)calloc(interface_packet_size, 1);
-
-	iov.iov_base = buffer;
+	iov.iov_base = interface_buffer;
 	iov.iov_len = interface_packet_size;
 
 	v.vm_pkt_size = interface_packet_size;
@@ -414,26 +411,24 @@ int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_in
 	st = vmnet_read(interface, &v, &count);
 	if (st != VMNET_SUCCESS) {
 		log_message(rawnet_arch_log, "vmnet_write failed!");
-		free(buffer);
 		return 0;
 	}
 
 	if (count < 1) {
-		free(buffer);
 		return 0;
 	}
 
-	fix_incoming_packet(buffer, v.vm_pkt_size, interface_mac, interface_fake_mac);
+	fix_incoming_packet(interface_buffer, v.vm_pkt_size, interface_mac, interface_fake_mac);
 
 	// iov.iov_len is not updated with the read count, apparently. 
-	if (!is_multicast(buffer, v.vm_pkt_size)) { /* multicast crap */
+	if (!is_multicast(interface_buffer, v.vm_pkt_size)) { /* multicast crap */
 		fprintf(stderr, "\nrawnet_arch_receive: %u\n", (unsigned)v.vm_pkt_size);
-		rawnet_hexdump(buffer, v.vm_pkt_size);
+		rawnet_hexdump(interface_buffer, v.vm_pkt_size);
 	}
 
 	xfer = v.vm_pkt_size;
 	if (xfer > *plen) xfer = *plen;
-	memcpy(pbuffer, buffer, xfer);
+	memcpy(pbuffer, interface_buffer, xfer);
 
 	xfer = v.vm_pkt_size;
 	if (xfer & 0x01) ++xfer; /* ??? */
@@ -447,13 +442,13 @@ int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_in
 
 	*prx_ok = 1;
 	#if 0
-	*pcorrect_mac = memcmp(buffer, interface_mac, 6) == 0;
-	*pbroadcast = memcmp(buffer, broadcast_mac, 6) == 0;
+	*pcorrect_mac = memcmp(interface_buffer, interface_mac, 6) == 0;
+	*pbroadcast = memcmp(interface_buffer, broadcast_mac, 6) == 0;
 	#endif
 
 	/* vmnet won't send promiscuous packets */
 	#if 0
-	hashreg = (~crc32_buf(buffer, 6) >> 26) & 0x3f;
+	hashreg = (~crc32_buf(interface_buffer, 6) >> 26) & 0x3f;
 	if (hash_mask[hashreg >= 32] & (1 << (hashreg & 0x1F))) {
 		*phashed = 1;
 		*phash_index = hashreg;
@@ -463,7 +458,6 @@ int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_in
 	}
 	#endif
 
-	free(buffer);
 	return 1;
 }
 
