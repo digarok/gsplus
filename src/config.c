@@ -7,6 +7,7 @@
 
 #include "defc.h"
 #include <stdarg.h>
+#include <ctype.h>
 #include "config.h"
 #include "glog.h"
 #include "imagewriter.h"
@@ -3065,9 +3066,7 @@ void cfg_file_handle_key(int key) {
     listhdrptr = &g_cfg_partitionlist;
   }
 
-  // can't hotkey numbers because it falsely matches PGUP/PGDN
-  if( (g_cfg_file_pathfield == 0) &&
-      ((key >= 'a' && key <= 'z') || (key >= 'A' && key <= 'Z')) ) {
+  if( (g_cfg_file_pathfield == 0) && isalnum(key)) {
     /* jump to file starting with this letter */
     g_cfg_file_match[0] = key;
     g_cfg_file_match[1] = 0;
