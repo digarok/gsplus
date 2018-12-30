@@ -228,6 +228,8 @@ static int rawnet_pcap_open_adapter(const char *interface_name)
     /* Check the link layer. We support only Ethernet for simplicity. */
     if (pcap_datalink(rawnet_pcap_fp) != DLT_EN10MB) {
         log_message(rawnet_arch_log, "ERROR: TFE works only on Ethernet networks.");
+        pcap_close(rawnet_pcap_fp);
+        rawnet_pcap_fp = NULL;
         return 0;
     }
 

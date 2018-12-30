@@ -45,6 +45,7 @@
 #include "rawnetsupp.h"
 
 typedef pcap_t *(*pcap_open_live_t)(const char *, int, int, int, char *);
+typedef void *(*pcap_close_t)(pcap_if_t *);
 typedef int (*pcap_dispatch_t)(pcap_t *, int, pcap_handler, u_char *);
 typedef int (*pcap_setnonblock_t)(pcap_t *, int, char *);
 typedef int (*pcap_datalink_t)(pcap_t *);
@@ -61,6 +62,7 @@ typedef char *(*pcap_lookupdev_t)(char *);
 #define RAWNET_DEBUG_WARN 1 /* this should not be deactivated */
 
 static pcap_open_live_t p_pcap_open_live;
+static pcap_close_t p_pcap_close;
 static pcap_dispatch_t p_pcap_dispatch;
 static pcap_setnonblock_t p_pcap_setnonblock;
 static pcap_findalldevs_t p_pcap_findalldevs;
@@ -117,6 +119,7 @@ static void EthernetPcapFreeLibrary(void)
         pcap_library = NULL;
 
         p_pcap_open_live = NULL;
+        p_pcap_close = NULL;
         p_pcap_dispatch = NULL;
         p_pcap_setnonblock = NULL;
         p_pcap_findalldevs = NULL;
@@ -161,6 +164,7 @@ static BOOL EthernetPcapLoadLibrary(void)
         }
 
         GET_PROC_ADDRESS_AND_TEST(pcap_open_live);
+        GET_PROC_ADDRESS_AND_TEST(pcap_close);
         GET_PROC_ADDRESS_AND_TEST(pcap_dispatch);
         GET_PROC_ADDRESS_AND_TEST(pcap_setnonblock);
         GET_PROC_ADDRESS_AND_TEST(pcap_findalldevs);
@@ -288,6 +292,8 @@ static BOOL EthernetPcapOpenAdapter(const char *interface_name)
     if ((*p_pcap_datalink)(EthernetPcapFP) != DLT_EN10MB) {
         log_message(rawnet_arch_log, "ERROR: Ethernet works only on Ethernet networks.");
         rawnet_enumadapter_close();
+        *(p_pcap_close(EthernetPcapFP));
+        EthernetPcapFP = NULL;
         return FALSE;
     }
 
