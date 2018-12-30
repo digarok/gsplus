@@ -498,3 +498,8 @@ int rawnet_arch_get_mac(uint8_t mac[6]) {
 	return -1;
 }
 
+
+int rawnet_arch_status(void) {
+	return interface ? 1 : 0;
+}
+

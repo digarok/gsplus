@@ -307,3 +307,7 @@ int rawnet_arch_get_mac(uint8_t mac[6]) {
 
 }
 
+int rawnet_arch_status(void) {
+	return interface_fd >= 0 ? 1 : 0;
+}
+

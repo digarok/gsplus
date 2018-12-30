@@ -72,4 +72,6 @@ extern int rawnet_enumadapter(char **ppname, char **ppdescription);
 extern int rawnet_enumadapter_close(void);
 extern char *rawnet_get_standard_interface(void);
 
+extern int rawnet_status(void);
+
 #endif

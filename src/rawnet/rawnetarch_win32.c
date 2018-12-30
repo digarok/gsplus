@@ -562,4 +562,9 @@ extern int rawnet_arch_get_mac(uint8_t mac[6]) {
     return -1;
 }
 
+int rawnet_arch_status(void) {
+    return EthernetPcapFP ? 1 : 0;
+}
+
+
 #endif /* #ifdef HAVE_RAWNET */
