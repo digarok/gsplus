@@ -138,7 +138,21 @@ static void EthernetPcapFreeLibrary(void)
 
 static BOOL EthernetPcapLoadLibrary(void)
 {
+    /*
+     * npcap is c:\System32\Npcap\wpcap.dll
+     * winpcap is c:\System32\wpcap.dll
+     *
+     */
     if (!pcap_library) {
+        /* This inserts c:\System32\Npcap\ into the search path. */ 
+        char buffer[512];
+        unsigned length;
+        length = GetSystemDirectory(buffer, sizeof(buffer) - sizeof("\\Npcap"));
+        if (length) {
+            strcat(buffer + length, "\\Npcap");
+            SetDllDirectory(buffer);
+        }
+
         pcap_library = LoadLibrary(TEXT("wpcap.dll"));
 
         if (!pcap_library) {
