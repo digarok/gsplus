@@ -438,23 +438,29 @@ static int rawnet_arch_receive_frame(Ethernet_PCAP_internal_t *pinternal)
     return ret;
 }
 
-/* int force       - FORCE: Delete waiting frames in transmit buffer */
-/* int onecoll     - ONECOLL: Terminate after just one collision */
-/* int inhibit_crc - INHIBITCRC: Do not append CRC to the transmission */
-/* int tx_pad_dis  - TXPADDIS: Disable padding to 60 Bytes */
-/* int txlength    - Frame length */
-/* uint8_t *txframe   - Pointer to the frame to be transmitted */
 
-void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_dis, int txlength, uint8_t *txframe)
-{
-#ifdef RAWNET_DEBUG_ARCH
-    log_message(rawnet_arch_log, "rawnet_arch_transmit() called, with: force = %s, onecoll = %s, inhibit_crc=%s, tx_pad_dis=%s, txlength=%u",
-                force ? "TRUE" : "FALSE",
-                onecoll ? "TRUE" : "FALSE",
-                inhibit_crc ? "TRUE" : "FALSE",
-                tx_pad_dis ?  "TRUE" : "FALSE",
-                txlength);
-#endif
+int rawnet_arch_read(void *buffer, int nbyte) {
+
+    int len;
+
+    Ethernet_PCAP_internal_t internal;
+
+    internal.len = nbyte;
+    internal.buffer = (uint8_t *)buffer;
+
+    len = rawnet_arch_receive_frame(&internal);
+
+    if (len <= 0) return len;
+
+#ifdef RAWNET_DEBUG_PKTDUMP
+    debug_output("Received frame: ", internal.buffer, internal.len);
+#endif /* #ifdef RAWNET_DEBUG_PKTDUMP */
+    return len;
+
+}
+
+
+int rawnet_arch_write(const void *buffer, int nbyte) {
 
 #ifdef RAWNET_DEBUG_PKTDUMP
     debug_output("Transmit frame: ", txframe, txlength);
@@ -462,8 +468,11 @@ void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_di
 
     if ((*p_pcap_sendpacket)(EthernetPcapFP, txframe, txlength) == -1) {
         log_message(rawnet_arch_log, "WARNING! Could not send packet!");
+        return -1;
     }
+    return nbyte;
 }
+
 
 /*
   rawnet_arch_receive()

@@ -142,23 +142,12 @@ void rawnet_arch_line_ctl(int bEnableTransmitter, int bEnableReceiver) {
 	/* NOP */
 }
 
-void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_dis, int txlength, uint8_t *txframe) {
-
-	ssize_t ok = write(interface_fd, txframe, txlength);
+int rawnet_arch_read(void *buffer, int nbyte) {
+	return read(interface_fd, buffer, nbyte);
 }
 
-
-int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_index, int *prx_ok, int *pcorrect_mac, int *pbroadcast, int *pcrc_error) {
-
-	int count = *plen;
-	ssize_t ok = read(interface_fd, pbuffer, count);
-	if (ok < 0) return 0;
-	if (ok & 0x01) ++ok; /* ??? */
-	*plen = ok;
-	*prx_ok = 1;
-	*phashed = *pcorrect_mac = *pbroadcast = *pcrc_error = 0;
-
-	return 1;
+int rawnet_arch_write(const void *buffer, int nbyte) {
+	return write(interface_fd, buffer, nbyte);
 }
 
 

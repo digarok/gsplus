@@ -347,52 +347,7 @@ static void fix_outgoing_packet(uint8_t *packet, unsigned size, const uint8_t re
 
 }
 
-
-void rawnet_arch_transmit(int force, int onecoll, int inhibit_crc, int tx_pad_dis, int txlength, uint8_t *txframe) {
-
-	int count = 1;
-	vmnet_return_t st;
-	struct vmpktdesc v;
-	struct iovec iov;
-
-	if (txlength == 0) return;
-	if (txlength > interface_packet_size) {
-		log_message(rawnet_arch_log, "packet is too big: %d", txlength);
-		return;
-	}
-
-	if (txlength < 12) {
-		log_message(rawnet_arch_log, "packet is too small: %d", txlength);
-		return;
-	}
-
-	/* copy the buffer and fix the source mac address. */
-	memcpy(interface_buffer, txframe, txlength);
-	fix_outgoing_packet(interface_buffer, txlength, interface_mac, interface_fake_mac);
-
-	iov.iov_base = interface_buffer;
-	iov.iov_len = txlength;
-
-	v.vm_pkt_size = txlength;
-	v.vm_pkt_iov = &iov;
-	v.vm_pkt_iovcnt = 1;
-	v.vm_flags = 0;
-
-
-	fprintf(stderr, "\nrawnet_arch_transmit: %u\n", (unsigned)iov.iov_len);
-	rawnet_hexdump(interface_buffer, v.vm_pkt_size);
-
-	
-	st = vmnet_write(interface, &v, &count);
-
-	if (st != VMNET_SUCCESS) {
-		log_message(rawnet_arch_log, "vmnet_write failed!");
-	}
-	return;
-}
-
-int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_index, int *prx_ok, int *pcorrect_mac, int *pbroadcast, int *pcrc_error) {
-
+int rawnet_arch_read(void *buffer, int nbyte) {
 
 	int count = 1;
 	int xfer;
@@ -410,8 +365,8 @@ int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_in
 
 	st = vmnet_read(interface, &v, &count);
 	if (st != VMNET_SUCCESS) {
-		log_message(rawnet_arch_log, "vmnet_write failed!");
-		return 0;
+		log_message(rawnet_arch_log, "vmnet_read failed!");
+		return -1;
 	}
 
 	if (count < 1) {
@@ -427,39 +382,53 @@ int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_in
 	}
 
 	xfer = v.vm_pkt_size;
-	if (xfer > *plen) xfer = *plen;
-	memcpy(pbuffer, interface_buffer, xfer);
+	memcpy(buffer, interface_buffer, xfer);
 
-	xfer = v.vm_pkt_size;
-	if (xfer & 0x01) ++xfer; /* ??? */
-	*plen = xfer; /* actual frame size */
-
-	*phashed =
-	*phash_index =
-	*pbroadcast = 
-	*pcorrect_mac =
-	*pcrc_error = 0;
-
-	*prx_ok = 1;
-	#if 0
-	*pcorrect_mac = memcmp(interface_buffer, interface_mac, 6) == 0;
-	*pbroadcast = memcmp(interface_buffer, broadcast_mac, 6) == 0;
-	#endif
-
-	/* vmnet won't send promiscuous packets */
-	#if 0
-	hashreg = (~crc32_buf(interface_buffer, 6) >> 26) & 0x3f;
-	if (hash_mask[hashreg >= 32] & (1 << (hashreg & 0x1F))) {
-		*phashed = 1;
-		*phash_index = hashreg;
-	} else {
-		*phashed = 0;
-		*phash_index = 0;
-	}
-	#endif
-
-	return 1;
+	return xfer;
 }
+
+int rawnet_arch_write(const void *buffer, int nbyte) {
+
+	int count = 1;
+	vmnet_return_t st;
+	struct vmpktdesc v;
+	struct iovec iov;
+
+	if (nbyte <= 0) return 0;
+
+	if (nbyte > interface_packet_size) {
+		log_message(rawnet_arch_log, "packet is too big: %d", nbyte);
+		return -1;
+	}
+
+	/* copy the buffer and fix the source mac address. */
+	memcpy(interface_buffer, buffer, nbyte);
+	fix_outgoing_packet(interface_buffer, nbyte, interface_mac, interface_fake_mac);
+
+	iov.iov_base = interface_buffer;
+	iov.iov_len = nbyte;
+
+	v.vm_pkt_size = nbyte;
+	v.vm_pkt_iov = &iov;
+	v.vm_pkt_iovcnt = 1;
+	v.vm_flags = 0;
+
+
+	fprintf(stderr, "\nrawnet_arch_transmit: %u\n", (unsigned)iov.iov_len);
+	rawnet_hexdump(interface_buffer, v.vm_pkt_size);
+
+	
+	st = vmnet_write(interface, &v, &count);
+
+	if (st != VMNET_SUCCESS) {
+		log_message(rawnet_arch_log, "vmnet_write failed!");
+		return -1;
+	}
+	return nbyte;
+}
+
+
+
 
 static unsigned adapter_index = 0;
 int rawnet_arch_enumadapter_open(void) {
