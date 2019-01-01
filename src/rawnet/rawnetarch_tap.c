@@ -1,6 +1,39 @@
 /* tun/tap support */
 /* for Linux, *BSD */
 
+/*
+ * tap is a virtual ethernet devices.
+ * open the device, configure, and read/write ethernet frames.
+ *
+ * Linux setup: (from Network Programmability and Automation, Appendix A)
+ *
+ * Notes:
+ * - this assumes eth0 is your main interface device 
+ * - may need to install the iproute/iproute2 package (ip command)
+ * - do this stuff as root.
+ *
+ * 1. create a tap interface
+ * $ ip tuntap add tap65816 mode tap user YOUR_USER_NAME
+ * $ ip link set tap65816 up
+ *
+ * 2. create a network bridge
+ * $ ip link add name br0 type bridge
+ * $ ip link set br0 up
+ *
+ * 3. bridge the physical network and virtual network.
+ * $ ip link set eth0 master br0
+ * $ ip link set tap65816 master br0
+ *
+ * 4. remove ip address from physical device (This will kill networking)
+ * ip address flush dev eth0
+ *
+ * 5. and add the ip address to the bridge 
+ * dhclient br0 # if using dhcp
+ * ip address add 192.168.1.1/24 dev eth0 # if using static ip address.
+ */
+
+
+
 #define _GNU_SOURCE
 
 #include <errno.h>
@@ -25,15 +58,15 @@
 #include "rawnetsupp.h"
 
 #if defined(__linux__)
-const char *default_interface_name = "/dev/net/tun";
+#define TAP_DEVICE "/dev/net/tun"
 #endif
 
 #if defined(__FreeBSD__)
-const char *default_interface_name = "/dev/tap";
+#define TAP_DEVICE "/dev/tap"
 #endif
 
 static int interface_fd = -1;
-
+static char *interface_dev = NULL;
 
 int rawnet_arch_init(void) {
 	interface_fd = -1;
@@ -48,35 +81,25 @@ void rawnet_arch_post_reset(void) {
 }
 
 
-/* interface name may be a full path (/dev/tap0) or relative (tap0) */
+#if defined(__linux__)
+/* interface name. default is tap65816. */
 int rawnet_arch_activate(const char *interface_name) {
 
 	struct ifreq ifr;
 
 	int ok;
-	char *tmp = NULL;
 	int one = 1;
 	int fd;
 
 	if (!interface_name || !*interface_name) {
-		interface_name = default_interface_name;
-	}
-	if (interface_name[0] != '/') {
-		ok = asprintf(&tmp, "/dev/%s", interface_name);
-		if (ok < 0) {
-			perror("rawnet_arch_activate: asprintf");
-			return 0;
-		}
-		interface_name = tmp;
+		interface_name = "tap65816";
 	}
 
-	fd = open(interface_name, O_RDWR);
+	fd = open(TAP_DEVICE, O_RDWR);
 	if (fd < 0) {
-		fprintf(stderr, "rawnet_arch_activate: open(%s): %s\n", interface_name, strerror(errno));
-		free(tmp);
+		fprintf(stderr, "rawnet_arch_activate: open(%s): %s\n", TAP_DEVICE, strerror(errno));
 		return 0;
 	}
-	free(tmp);
 
 	ok = ioctl(fd, FIONBIO, &one);
 	if (ok < 0) {
@@ -85,8 +108,8 @@ int rawnet_arch_activate(const char *interface_name) {
 		return 0;
 	}
 
-	#if defined(__linux__)
 	memset(&ifr, 0, sizeof(ifr));
+	strcpy(&if.ifr_name, interface_name);
 	ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 	ok = ioctl(fd, TUNSETIFF, (void *) &ifr);
 	if (ok < 0) {
@@ -94,15 +117,60 @@ int rawnet_arch_activate(const char *interface_name) {
 		close(fd);
 		return 0;
 	}
-	#endif
 
+	interface_dev = strdup(interface_name);
 	interface_fd = fd;
 	return 1;
 }
+#endif
+
+#if defined(__FreeBSD__)
+/* man tap(4) */
+/* interface name. default is tap65816. */
+int rawnet_arch_activate(const char *interface_name) {
+
+	struct ifreq ifr;
+
+	int ok;
+	int one = 1;
+	int fd;
+	char *path[64];
+
+	if (!interface_name || !*interface_name) {
+		interface_name = "tap65816";
+	}
+
+	ok = snprintf(path, sizeof(path), "/dev/%s", interface_name);
+	if (ok >= sizeof(path)) return 0;
+
+	fd = open(path, O_RDWR);
+	if (fd < 0) {
+		fprintf(stderr, "rawnet_arch_activate: open(%s): %s\n", path, strerror(errno));
+		return 0;
+	}
+
+	ok = ioctl(fd, FIONBIO, &one);
+	if (ok < 0) {
+		perror("ioctl(FIONBIO");
+		close(fd);
+		return 0;
+	}
+
+	interface_dev = strdup(interface_name);
+	interface_fd = fd;
+	return 1;
+}
+#endif
+
+
+
 
 void rawnet_arch_deactivate(void) {
 	if (interface_fd >= 0)
 		close(interface_fd);
+	free(interface_dev);
+
+	interface_dev = NULL;
 	interface_fd = -1;
 }
 
@@ -177,6 +245,9 @@ int rawnet_arch_enumadapter_open(void) {
 	devices = (char **)malloc(sizeof(char *) * capacity);
 	if (!devices) return 0;
 
+
+#if defined(__linux__)
+
 	dp = opendir("/sys/class/net/");
 	if (!dp) goto fail;
 
@@ -196,7 +267,7 @@ int rawnet_arch_enumadapter_open(void) {
 		if (cp) {
 			/* expect 0x1002 */
 			int flags = strtol(cp, (char **)NULL, 16);
-			if (flags == IFF_TAP | IFF_NO_PI) {
+			if ((flags & TUN_TYPE_MASK) == IFF_TAP) {
 
 				devices[count++] = strdup(d->d_name);
 				if (count == capacity) {
@@ -212,6 +283,32 @@ int rawnet_arch_enumadapter_open(void) {
 
 	}
 	closedir(dp);
+#endif
+
+#if defined(__FreeBSD__)
+	/* dev/tapxxxx */
+	dp = opendir("/dev/");
+	if (!dp) goto fail;
+	for(;;) {
+		struct dirent *d = readdir(dp);
+		if (!d) break;
+
+		if (d->d_name[0] == '.') continue;
+		if (strncmp(d->d_name, "tap", 3) == 0 && isdigit(d->d_name[3])) {
+
+			devices[count++] = strdup(d->d_name);
+			if (count == capacity) {
+				char **tmp;
+				capacity *= 2;
+				tmp = (char **)realloc(devices, sizeof(char *) * capacity);
+				if (tmp) devices = tmp;
+				else break; /* no mem? */
+			}
+		}
+
+	}
+	closedir(dp);
+#endif
 
 	/* sort them ... */
 	qsort(devices, count, sizeof(char *), cmp);
@@ -253,16 +350,17 @@ int rawnet_arch_enumadapter(char **ppname, char **ppdescription) {
 
 
 char *rawnet_arch_get_standard_interface(void) {
-	return lib_stralloc(default_interface_name);
+	return lib_stralloc("tap65816");
 }
 
 int rawnet_arch_get_mtu(void) {
 	if (interface_fd < 0) return -1;
 
 	#if defined(__linux__)
-
+	/* n.b. linux tap driver doesn't actually support SIOCGIFMTU */
 	struct ifreq ifr;
-	if (ioctl(interface_fd, TUNGETIFF, (void *) &ifr) < 0) return -1; /* ? */
+	memset(&ifr, 0, sizeof(ifr));
+	if (ioctl(interface_fd, SIOCGIFMTU, (void *) &ifr) < 0) return -1; /* ? */
 	return ifr.ifr_mtu;
 	#endif
 
@@ -282,6 +380,7 @@ int rawnet_arch_get_mac(uint8_t mac[6]) {
 
     #if defined(__linux__)
     struct ifreq ifr;
+	memset(&ifr, 0, sizeof(ifr));
     if (ioctl(interface_fd, SIOCGIFHWADDR, (void *)&ifr) < 0) return -1;
     memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
     return 0;
