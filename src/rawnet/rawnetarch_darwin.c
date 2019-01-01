@@ -330,15 +330,6 @@ static void fix_outgoing_packet(uint8_t *packet, unsigned size, const uint8_t re
 
 	/* dhcp request - fix the hardware address */
 	if (is_broadcast(packet, size) && is_dhcp_out(packet, size)) {
-		/* set source ip to 0 - LL bug? */
-		/* fixed in link layer as of 2018-12-17 */
-#if 0
-		unsigned ck;
-		memset(packet + 26, 0, 4);
-		ck = ip_checksum(packet);
-		packet[eth_data + ip_header_cksum + 0] = ck >> 8;
-		packet[eth_data + ip_header_cksum + 1] = ck;
-#endif
 
 		if (!memcmp(packet + 70, fake_mac, 6))
 			memcpy(packet + 70, real_mac, 6);
