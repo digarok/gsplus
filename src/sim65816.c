@@ -142,7 +142,7 @@ int g_iw2_emul = 0;
 int g_serial_out_masking = 0;
 int g_serial_modem[2] = { 0, 1 };
 int g_ethernet = 0;
-int g_ethernet_interface = 0;
+char* g_ethernet_interface = "";
 int g_ethernet_enabled = 0;
 int g_parallel = 0;
 int g_parallel_out_masking = 0;
@@ -946,41 +946,21 @@ int gsplusmain(int argc, char **argv) {
   //If ethernet is enabled in config.gsport, let's initialize it
 #ifdef HAVE_RAWNET
   g_ethernet_enabled = 0;
-  if (g_ethernet == 1)
+  /* todo - pass device name via cmd line? */
+  if (g_ethernet)
   {
-    int i = -1;
-    char *ppname = NULL;
-    char *ppdes = NULL;
-    if (rawnet_enumadapter_open())
-    {
-      //Loop through the available adapters until we reach the interface number specified in config.gsport
-      while(rawnet_enumadapter(&ppname,&ppdes))
-      {
-        ++i;
-        if (i == g_ethernet_interface) {
+    if (!g_ethernet_interface || !*g_ethernet_interface) {
+      g_ethernet_interface = rawnet_get_standard_interface();
+    }
 
-          if (cs8900_init() >= 0 && cs8900_activate(ppname) >= 0) {
-            g_ethernet_enabled = 1;
-          } else {
-            fprintf(stderr, "Unable to start ethernet.\n");
-          }
-
-          free(ppname);
-          free(ppdes);
-
-          break;
+    if (g_ethernet_interface && *g_ethernet_interface) {
+        if (cs8900_init() >= 0 && cs8900_activate(g_ethernet_interface) >= 0) {
+          g_ethernet_enabled = 1;
+        } else {
+          glogf("Unable to start ethernet (%s).\n", g_ethernet_interface);
         }
-
-        free(ppname);
-        free(ppdes);
-      }
-      rawnet_enumadapter_close();
     }
 
-    if (i < 0)
-    {
-      fprintf(stderr, "No ethernet host adapters found. Do you have PCap installed/enabled?\nUthernet support is OFF.\n");
-    }
   }
 #endif
 
