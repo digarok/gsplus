@@ -110,6 +110,7 @@ static pcap_if_t *rawnet_pcap_dev_list = NULL;
 
 
 static pcap_t *rawnet_pcap_fp = NULL;
+static char *rawnet_device_name = NULL;
 
 
 /** \brief  Buffer for pcap error messages
@@ -232,6 +233,7 @@ static int rawnet_pcap_open_adapter(const char *interface_name)
         rawnet_pcap_fp = NULL;
         return 0;
     }
+    rawnet_device_name = strdup(interface_name);
 
     return 1;
 }
@@ -448,10 +450,50 @@ char *rawnet_arch_get_standard_interface(void)
 }
 
 extern int rawnet_arch_get_mtu(void) {
+
+    #if defined(__linux__)
+    int fd;
+    int ok;
+    struct ifreq ifr;
+
+    if (!rawnet_device_name) return -1;
+
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return -1;
+
+    memset(&ifr, 0, sizeof(ifr));
+    strcpy(ifr.ifr_name, rawnet_device_name);
+    ok = ioctl(fd, SIOCGIFMTU, (void *)&ifr);
+    close(fd);
+    if (ok < 0) return -1;
+    return ifr.ifr_mtu;
+    #endif
+
     return -1;
 }
 
 extern int rawnet_arch_get_mac(uint8_t mac[6]) {
+
+    #if defined(__linux__)
+
+    int fd;
+    struct ifreq ifr;
+    int ok;
+
+    if (!rawnet_device_name) return -1;
+
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return -1;
+
+    memset(&ifr, 0, sizeof(ifr));
+    strcpy(ifr.ifr_name, rawnet_device_name);
+    ok = ioctl(fd, SIOCGIFHWADDR, &ifr);
+    close(fd);
+    if (ok < 0) return -1;
+    memcpy(mac, &ifr.ifr_hwaddr.sa_data, 6);
+    return 0;
+    #endif
+
     return -1;
 }
 
