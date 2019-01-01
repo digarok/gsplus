@@ -315,15 +315,6 @@ int parse_cli_options(int argc, char **argv) {
       glogf("%s Setting scanline simulator darkness to %d%%", parse_log_prefix, tmp1);
       g_scanline_simulator = tmp1;
       i++;
-    } else if(!strcmp("-enet", argv[i])) {
-      if((i+1) >= argc) {
-        glogf("%s Error, option '-enet' missing argument", parse_log_prefix);
-        exit(1);
-      }
-      tmp1 = strtol(argv[i+1], 0, 0);
-      glogf("%s Using %d as ethernet enable val", parse_log_prefix, tmp1);
-      g_ethernet = tmp1;
-      i++;
     } else if(!strcmp("-x", argv[i])) {
       if((i+1) >= argc) {
         glogf("%s Error, option '-x' missing argument", parse_log_prefix);
@@ -422,7 +413,6 @@ void help_exit() {
   printf("    -skip value           Set skip_amt to value\n");
   printf("    -audio value          Set audio enable to value\n");
   printf("    -arate value          Set preferred audio rate to value\n");
-  printf("    -enet value           Set ethernet to value\n");
   printf("    -config value         Set config file to value\n");
   printf("    -debugport value      Set debugport to value\n");
   printf("    -ssdir value          Set screenshot save directory to value\n");
