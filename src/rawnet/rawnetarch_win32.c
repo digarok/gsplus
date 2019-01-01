@@ -574,6 +574,19 @@ extern int rawnet_arch_get_mtu(void) {
 }
 
 extern int rawnet_arch_get_mac(uint8_t mac[6]) {
+
+    char buffer[sizeof(PACKET_OID_DATA) + 6];
+    PPACKET_OID_DATA data = (PPACKET_OID_DATA)data;
+    
+    /* 802.5 = token ring, 802.3 = wired ethernet */
+    data->Oid = OID_802_3_CURRENT_ADDRESS; // OID_802_3_CURRENT_ADDRESS ? OID_802_3_PERMANENT_ADDRESS ?
+    data->Length = 6;
+
+    if (PacketRequest(EthernetPcapFP, FALSE, data)) {
+        memcpy(mac, data->Data, 6);
+        return 0;
+    }
+
     return -1;
 }
 
