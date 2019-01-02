@@ -20,7 +20,7 @@
 extern Scc scc_stat[2];
 extern int g_serial_modem[];
 
-#if !(defined _MSC_VER || defined __CYGWIN__)
+#if !(defined _WIN32)
 extern int h_errno;
 #else
 #define socklen_t int

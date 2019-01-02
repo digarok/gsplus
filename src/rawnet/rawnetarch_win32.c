@@ -31,7 +31,17 @@
 
 /* #define WPCAP */
 
+
+
 #include <pcap.h>
+/* prevent bpf redeclaration in packet32 */
+#ifndef BPF_MAJOR_VERSION
+#define BPF_MAJOR_VERSION
+#endif
+#include <Packet32.h>
+#include <Windows.h>
+#include <Ntddndis.h>
+
 
 #include <assert.h>
 #include <stdio.h>
@@ -45,7 +55,7 @@
 #include "rawnetsupp.h"
 
 typedef pcap_t *(*pcap_open_live_t)(const char *, int, int, int, char *);
-typedef void *(*pcap_close_t)(pcap_if_t *);
+typedef void *(*pcap_close_t)(pcap_t *);
 typedef int (*pcap_dispatch_t)(pcap_t *, int, pcap_handler, u_char *);
 typedef int (*pcap_setnonblock_t)(pcap_t *, int, char *);
 typedef int (*pcap_datalink_t)(pcap_t *);
@@ -53,6 +63,13 @@ typedef int (*pcap_findalldevs_t)(pcap_if_t **, char *);
 typedef void (*pcap_freealldevs_t)(pcap_if_t *);
 typedef int (*pcap_sendpacket_t)(pcap_t *p, u_char *buf, int size);
 typedef char *(*pcap_lookupdev_t)(char *);
+
+
+typedef VOID (*PacketCloseAdapter_t)(LPADAPTER lpAdapter);
+typedef LPADAPTER (*PacketOpenAdapter_t)(PCHAR AdapterName);
+typedef BOOLEAN (*PacketSendPacket_t)(LPADAPTER AdapterObject, LPPACKET pPacket, BOOLEAN Sync);
+typedef BOOLEAN (*PacketRequest_t)(LPADAPTER  AdapterObject, BOOLEAN Set, PPACKET_OID_DATA  OidData);
+
 
 /** #define RAWNET_DEBUG_ARCH 1 **/
 /** #define RAWNET_DEBUG_PKTDUMP 1 **/
@@ -71,7 +88,13 @@ static pcap_sendpacket_t p_pcap_sendpacket;
 static pcap_datalink_t p_pcap_datalink;
 static pcap_lookupdev_t p_pcap_lookupdev;
 
+static PacketCloseAdapter_t p_PacketCloseAdapter;
+static PacketOpenAdapter_t p_PacketOpenAdapter;
+static PacketSendPacket_t p_PacketSendPacket;
+static PacketRequest_t p_PacketRequest;
+
 static HINSTANCE pcap_library = NULL;
+static HINSTANCE packet_library = NULL;
 
 /* ------------------------------------------------------------------------- */
 /*    variables needed                                                       */
@@ -81,6 +104,7 @@ static HINSTANCE pcap_library = NULL;
 static pcap_if_t *EthernetPcapNextDev = NULL;
 static pcap_if_t *EthernetPcapAlldevs = NULL;
 static pcap_t *EthernetPcapFP = NULL;
+static char *rawnet_device_name = NULL;
 
 static char EthernetPcapErrbuf[PCAP_ERRBUF_SIZE];
 
@@ -118,6 +142,9 @@ static void EthernetPcapFreeLibrary(void)
         }
         pcap_library = NULL;
 
+        if (packet_library) FreeLibrary(packet_library);
+        packet_library = NULL;
+
         p_pcap_open_live = NULL;
         p_pcap_close = NULL;
         p_pcap_dispatch = NULL;
@@ -127,12 +154,17 @@ static void EthernetPcapFreeLibrary(void)
         p_pcap_sendpacket = NULL;
         p_pcap_datalink = NULL;
         p_pcap_lookupdev = NULL;
+
+        p_PacketOpenAdapter = NULL;
+        p_PacketCloseAdapter = NULL;
+        p_PacketSendPacket = NULL;
+        p_PacketRequest = NULL;
     }
 }
 
 /* since I don't like typing too much... */
 #define GET_PROC_ADDRESS_AND_TEST( _name_ )                              \
-    p_##_name_ = (_name_##_t) GetProcAddress(pcap_library, #_name_);     \
+    p_##_name_ = (_name_##_t) GetProcAddress(x, #_name_);     \
     if (!p_##_name_ ) {                                                  \
         log_message(rawnet_arch_log, "GetProcAddress " #_name_ " failed!"); \
         EthernetPcapFreeLibrary();                                            \
@@ -146,6 +178,7 @@ static BOOL EthernetPcapLoadLibrary(void)
      * winpcap is c:\System32\wpcap.dll
      *
      */
+    HINSTANCE x = NULL;
     if (!pcap_library) {
         /* This inserts c:\System32\Npcap\ into the search path. */ 
         char buffer[512];
@@ -163,6 +196,7 @@ static BOOL EthernetPcapLoadLibrary(void)
             return FALSE;
         }
 
+        x = pcap_library;
         GET_PROC_ADDRESS_AND_TEST(pcap_open_live);
         GET_PROC_ADDRESS_AND_TEST(pcap_close);
         GET_PROC_ADDRESS_AND_TEST(pcap_dispatch);
@@ -172,6 +206,21 @@ static BOOL EthernetPcapLoadLibrary(void)
         GET_PROC_ADDRESS_AND_TEST(pcap_sendpacket);
         GET_PROC_ADDRESS_AND_TEST(pcap_datalink);
         GET_PROC_ADDRESS_AND_TEST(pcap_lookupdev);
+    }
+
+    if (!packet_library) {
+        packet_library = LoadLibrary(TEXT("Packet.dll"));
+
+        if (!packet_library) {
+            log_message(rawnet_arch_log, "LoadLibrary Packet.dll failed!");
+            return FALSE;
+        }
+
+        x = packet_library;
+        GET_PROC_ADDRESS_AND_TEST(PacketOpenAdapter);
+        GET_PROC_ADDRESS_AND_TEST(PacketCloseAdapter);
+        GET_PROC_ADDRESS_AND_TEST(PacketSendPacket);
+        GET_PROC_ADDRESS_AND_TEST(PacketRequest);
     }
 
     return TRUE;
@@ -230,6 +279,10 @@ int rawnet_arch_enumadapter(char **ppname, char **ppdescription)
     *ppname = lib_stralloc(EthernetPcapNextDev->name);
     *ppdescription = lib_stralloc(EthernetPcapNextDev->description);
 
+    printf("%s: %s\n",
+        EthernetPcapNextDev->name ? EthernetPcapNextDev->name : "",
+        EthernetPcapNextDev->description ? EthernetPcapNextDev->description : ""
+        );
     EthernetPcapNextDev = EthernetPcapNextDev->next;
 
     return 1;
@@ -284,19 +337,20 @@ static BOOL EthernetPcapOpenAdapter(const char *interface_name)
         return FALSE;
     }
 
-    if ((*p_pcap_setnonblock)(EthernetPcapFP, 1, EthernetPcapErrbuf) < 0) {
-        log_message(rawnet_arch_log, "WARNING: Setting PCAP to non-blocking failed: '%s'", EthernetPcapErrbuf);
-    }
-
     /* Check the link layer. We support only Ethernet for simplicity. */
     if ((*p_pcap_datalink)(EthernetPcapFP) != DLT_EN10MB) {
         log_message(rawnet_arch_log, "ERROR: Ethernet works only on Ethernet networks.");
         rawnet_enumadapter_close();
-        *(p_pcap_close(EthernetPcapFP));
+        (*p_pcap_close)(EthernetPcapFP);
         EthernetPcapFP = NULL;
         return FALSE;
     }
 
+    if ((*p_pcap_setnonblock)(EthernetPcapFP, 1, EthernetPcapErrbuf) < 0) {
+        log_message(rawnet_arch_log, "WARNING: Setting PCAP to non-blocking failed: '%s'", EthernetPcapErrbuf);
+    }
+
+    rawnet_device_name = strdup(EthernetPcapDevice->name);
     rawnet_enumadapter_close();
     return TRUE;
 }
@@ -463,98 +517,16 @@ int rawnet_arch_read(void *buffer, int nbyte) {
 int rawnet_arch_write(const void *buffer, int nbyte) {
 
 #ifdef RAWNET_DEBUG_PKTDUMP
-    debug_output("Transmit frame: ", txframe, txlength);
+    debug_output("Transmit frame: ", buffer, nbyte);
 #endif /* #ifdef RAWNET_DEBUG_PKTDUMP */
 
-    if ((*p_pcap_sendpacket)(EthernetPcapFP, txframe, txlength) == -1) {
+    if ((*p_pcap_sendpacket)(EthernetPcapFP, (u_char *)buffer, nbyte) == -1) {
         log_message(rawnet_arch_log, "WARNING! Could not send packet!");
         return -1;
     }
     return nbyte;
 }
 
-
-/*
-  rawnet_arch_receive()
-
-  This function checks if there was a frame received.
-  If so, it returns 1, else 0.
-
-  If there was no frame, none of the parameters is changed!
-
-  If there was a frame, the following actions are done:
-
-  - at maximum *plen byte are transferred into the buffer given by pbuffer
-  - *plen gets the length of the received frame, EVEN if this is more
-    than has been copied to pbuffer!
-  - if the dest. address was accepted by the hash filter, *phashed is set, else
-    cleared.
-  - if the dest. address was accepted by the hash filter, *phash_index is
-    set to the number of the rule leading to the acceptance
-  - if the receive was ok (good CRC and valid length), *prx_ok is set, 
-    else cleared.
-  - if the dest. address was accepted because it's exactly our MAC address
-    (set by rawnet_arch_set_mac()), *pcorrect_mac is set, else cleared.
-  - if the dest. address was accepted since it was a broadcast address,
-    *pbroadcast is set, else cleared.
-  - if the received frame had a crc error, *pcrc_error is set, else cleared
-*/
-
-/* uint8_t *pbuffer     - where to store a frame */
-/* int *plen         - IN: maximum length of frame to copy; 
-                       OUT: length of received frame 
-                            OUT can be bigger than IN if received frame was
-                            longer than supplied buffer */
-/* int *phashed      - set if the dest. address is accepted by the hash filter */
-/* int *phash_index  - hash table index if hashed == TRUE */
-/* int *prx_ok       - set if good CRC and valid length */
-/* int *pcorrect_mac - set if dest. address is exactly our IA */
-/* int *pbroadcast   - set if dest. address is a broadcast address */
-/* int *pcrc_error   - set if received frame had a CRC error */
-
-int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int *phashed, int *phash_index, int *prx_ok, int *pcorrect_mac, int *pbroadcast, int *pcrc_error)
-{
-    int len;
-
-    Ethernet_PCAP_internal_t internal;
-
-    internal.len = *plen;
-    internal.buffer = pbuffer;
-
-#ifdef RAWNET_DEBUG_ARCH
-    log_message(rawnet_arch_log, "rawnet_arch_receive() called, with *plen=%u.", *plen);
-#endif
-
-    assert((*plen & 1) == 0);
-
-    len = rawnet_arch_receive_frame(&internal);
-
-    if (len != -1) {
-
-#ifdef RAWNET_DEBUG_PKTDUMP
-        debug_output("Received frame: ", internal.buffer, internal.len);
-#endif /* #ifdef RAWNET_DEBUG_PKTDUMP */
-
-        if (len & 1) {
-            ++len;
-        }
-
-        *plen = len;
-
-        /* we don't decide if this frame fits the needs;
-         * by setting all zero, we let ethernet.c do the work
-         * for us
-         */
-        *phashed = *phash_index = *pbroadcast = *pcorrect_mac = *pcrc_error = 0;
-
-        /* this frame has been received correctly */
-        *prx_ok = 1;
-
-        return 1;
-    }
-
-    return 0;
-}
 
 char *rawnet_arch_get_standard_interface(void)
 {
@@ -575,19 +547,28 @@ extern int rawnet_arch_get_mtu(void) {
 
 extern int rawnet_arch_get_mac(uint8_t mac[6]) {
 
+    int rv = -1;
+    LPADAPTER outp = NULL;
     char buffer[sizeof(PACKET_OID_DATA) + 6];
-    PPACKET_OID_DATA data = (PPACKET_OID_DATA)data;
+    PPACKET_OID_DATA data = (PPACKET_OID_DATA)buffer;
     
+
+    if (!packet_library) return -1;
+
     /* 802.5 = token ring, 802.3 = wired ethernet */
     data->Oid = OID_802_3_CURRENT_ADDRESS; // OID_802_3_CURRENT_ADDRESS ? OID_802_3_PERMANENT_ADDRESS ?
     data->Length = 6;
 
-    if (PacketRequest(EthernetPcapFP, FALSE, data)) {
-        memcpy(mac, data->Data, 6);
-        return 0;
-    }
 
-    return -1;
+    outp = p_PacketOpenAdapter(rawnet_device_name);
+    if (!outp || outp->hFile == INVALID_HANDLE_VALUE) return -1;
+
+    if (p_PacketRequest(outp, FALSE, data)) {
+        memcpy(mac, data->Data, 6);
+        rv = 0;
+    }
+    p_PacketCloseAdapter(outp);
+    return rv;
 }
 
 int rawnet_arch_status(void) {

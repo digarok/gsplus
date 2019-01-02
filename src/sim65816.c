@@ -33,6 +33,20 @@ extern char g_config_gsplus_screenshot_dir[];
 extern void get_cwd(LPTSTR buffer, int size);
 #endif
 
+#ifndef ENABLE_DEBUGGER
+int g_dbg_step = 0;
+int g_dbg_enable_port = 0;
+
+void debug_server_poll(void) { }
+int debug_events_waiting(void) { return 0; }
+void debug_handle_event(void) { }
+void debug_init(void) { }
+void do_go_debug(void) { }
+
+#endif
+
+
+
 #define PC_LOG_LEN      (8*1024)
 
 int g_speed_fast;       // OG Expose fast parameter

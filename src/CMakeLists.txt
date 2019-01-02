@@ -52,6 +52,8 @@ set(DRIVER "SDL" CACHE STRING "Driver (SDL, X11, WIN32, FB, or HEADLESS")
 option(DEBUGGER "Enable the debugger" ON)
 option(HOST_FST "Enable host fst support" ON)
 option(TOGGLE_STATUS "Enable F10 Toggle Status support (win32/x11)" OFF)
+option(WITH_RAWNET "Enable Uthernet emulation" OFF)
+option(WITH_ATBRIDGE "Enable AT Bridge" OFF)
 
 
 set(generated_headers 8inst_c.h 16inst_c.h 8inst_s.h 16inst_s.h size_c.h size_s.h 8size_s.h 16size_s.h)
@@ -82,7 +84,8 @@ if(CYGWIN OR MSYS)
 endif()
 
 if(WIN32)
-	add_definitions(-D__USE_W32_SOCKETS -D_WINSOCK2API_)
+	# WTF?
+	#add_definitions(-D__USE_W32_SOCKETS -D_WINSOCK2API_)
 endif()
 
 if(MSVC)
@@ -151,13 +154,19 @@ SET_SOURCE_FILES_PROPERTIES(
   MACOSX_PACKAGE_LOCATION Resources
  )
 
-# target_link_libraries(GSplus atbridge)
-target_link_libraries(GSplus rawnet)
+if (WITH_RAWNET)
+	target_link_libraries(GSplus rawnet)
+endif()
+
+if (WITH_ATBRIDGE)
+	target_link_libraries(GSplus atbridge)
+endif()
 
 if (DRIVER MATCHES "WIN32")
 	target_link_libraries(GSplus comdlg32 Shlwapi IPHlpApi
 		winmm gdi32 dsound comctl32 ws2_32 shell32
 	)
+	target_compile_definitions(GSplus PRIVATE WIN_SOUND)
 endif()
 
 if (DRIVER MATCHES "SDL")
@@ -170,8 +179,14 @@ if (APPLE)
 endif()
 
 if (TOGGLE_STATUS)
-	target_compile_options(GSplus PUBLIC -DTOGGLE_STATUS)
+	target_compile_definitions(GSplus PUBLIC TOGGLE_STATUS)
 endif()
+
+if (DEBUGGER)
+	target_compile_definitions(GSplus PRIVATE GSPLUS_DEBUGGER)
+endif()
+
+
 
 #if (APPLE AND DRIVER MATCHES "SDL")
 #	target_compile_options(GSplus PRIVATE -F${CMAKE_CURRENT_SOURCE_DIR} )

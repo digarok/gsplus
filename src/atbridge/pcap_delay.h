@@ -15,7 +15,7 @@ Feel free to extend the wrapper.
 */
 
 #ifdef WIN32
-#include "../arch/win32/pcap.h"
+#include <pcap.h>
 #elif __linux__
 #include <pcap.h>
 #elif __APPLE__

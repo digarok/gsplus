@@ -411,10 +411,10 @@ int rawnet_arch_read(void *buffer, int nbyte) {
 int rawnet_arch_write(const void *buffer, int nbyte) {
 
 #ifdef RAWNET_DEBUG_PKTDUMP
-    debug_output("Transmit frame: ", txframe, txlength);
+    debug_output("Transmit frame: ", buffer, nbyte);
 #endif /* #ifdef RAWNET_DEBUG_PKTDUMP */
 
-    if (pcap_sendpacket(rawnet_pcap_fp, txframe, txlength) < 0) {
+    if (pcap_sendpacket(rawnet_pcap_fp, buffer, nbyte) < 0) {
         log_message(rawnet_arch_log, "WARNING! Could not send packet!");
         return -1;
     }

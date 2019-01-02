@@ -14,6 +14,8 @@ target_compile_definitions(rawnet PUBLIC HAVE_RAWNET)
 target_compile_definitions(rawnet PRIVATE CS8900_DEBUG RAWNET_DEBUG_FRAMES)
 
 if(WIN32)
+	target_include_directories(rawnet PRIVATE include)
+	target_link_libraries(rawnet ws2_32) # winsock2
 elseif(APPLE)
 	#target_link_libraries(rawnet PRIVATE pcap)
 	target_link_libraries(rawnet PRIVATE "-framework vmnet")
