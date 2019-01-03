@@ -30,6 +30,20 @@
  * 5. and add the ip address to the bridge 
  * dhclient br0 # if using dhcp
  * ip address add 192.168.1.1/24 dev eth0 # if using static ip address.
+ *
+ * *BSD:
+ * - assumes eth0 is your main interface device.
+ * $ ifconfig bridge0 create
+ * $ ifconfig tap65816 create
+ * $ ifconfig bridge0 addm eth0 addm tap65816 up
+ * 
+ * allow normal users to open tap devices?
+ * $ sysctl net.link.tap.user_open=1
+ * $ sysctl net.link.tap.up_on_open=1
+ *
+ * set permissions
+ * $ chown YOUR_USER_NAME /dev/tap65816
+ * $ chmod 660 /dev/tap65816
  */
 
 
