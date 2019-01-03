@@ -5,6 +5,5 @@ add_library(atbridge aarp.c atbridge.c elap.c llap.c pcap_delay.c port.c)
 target_compile_definitions(atbridge PUBLIC HAVE_ATBRIDGE)
 
 if(WIN32)
-	target_include_directories(atbridge PRIVATE ../rawnet/include)
 	target_link_libraries(atbridge ws2_32) # winsock2
 endif()

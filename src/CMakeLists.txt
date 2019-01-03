@@ -1,9 +1,3 @@
-cmake_minimum_required(VERSION 3.1)
-project(gsplus VERSION 0.14)
-
-#
-# cmake -DCMAKE_BUILD_TYPE=Release
-#
 
 INCLUDE (CheckFunctionExists)
 INCLUDE (CheckLibraryExists)
@@ -49,8 +43,8 @@ pkg_check_modules(FREETYPE2 freetype2)
 # run ccmake, cmake -LH, or cmake -D...
 #
 set(DRIVER "SDL" CACHE STRING "Driver (SDL, X11, WIN32, FB, or HEADLESS")
-option(DEBUGGER "Enable the debugger" ON)
-option(HOST_FST "Enable host fst support" ON)
+option(WITH_DEBUGGER "Enable the debugger" ON)
+option(WITH_HOST_FST "Enable host fst support" ON)
 option(TOGGLE_STATUS "Enable F10 Toggle Status support (win32/x11)" OFF)
 option(WITH_RAWNET "Enable Uthernet emulation" OFF)
 option(WITH_ATBRIDGE "Enable AT Bridge" OFF)
@@ -77,20 +71,6 @@ add_custom_command(
 	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/size_tab.h 
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
-
-if(CYGWIN OR MSYS)
-	set(WIN32 1)
-	add_definitions(-DWIN32 -D_WIN32)
-endif()
-
-if(WIN32)
-	# WTF?
-	#add_definitions(-D__USE_W32_SOCKETS -D_WINSOCK2API_)
-endif()
-
-if(MSVC)
-	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-endif()
 
 
 add_executable(to_pro to_pro.c)
@@ -137,8 +117,8 @@ add_executable(GSplus WIN32 MACOSX_BUNDLE
 	smartport.c sound.c sound_driver.c video.c scc_socket_driver.c glog.c
 	imagewriter.cpp scc_imagewriter.c scc_llap.c options.c
 
-	$<$<BOOL:${DEBUGGER}>:debug.c>
-	$<$<BOOL:${HOST_FST}>:${host_fst_code}>
+	$<$<BOOL:${WITH_DEBUGGER}>:debug.c>
+	$<$<BOOL:${WITH_HOST_FST}>:${host_fst_code}>
 	${driver_code}
 	${generated_headers}
 
@@ -182,7 +162,7 @@ if (TOGGLE_STATUS)
 	target_compile_definitions(GSplus PUBLIC TOGGLE_STATUS)
 endif()
 
-if (DEBUGGER)
+if (WITH_DEBUGGER)
 	target_compile_definitions(GSplus PRIVATE GSPLUS_DEBUGGER)
 endif()
 

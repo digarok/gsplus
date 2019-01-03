@@ -11,11 +11,8 @@
 #include "config.h"
 #include "glog.h"
 #include "imagewriter.h"
-#if defined(_MSC_VER)
-#include "arch\win32\dirent-win32.h"
-#else
+
 #include <dirent.h>
-#endif
 
 #ifdef HAVE_RAWNET
 #include "rawnet/rawnet.h"
@@ -367,6 +364,7 @@ Cfg_menu g_cfg_parallel_menu[] = {
   { 0, 0, 0, 0, 0 },
 };
 
+#ifdef HAVE_RAWNET
 Cfg_menu g_cfg_ethernet_menu[] = {
   { "Ethernet Card Configuration", g_cfg_ethernet_menu, 0, 0, CFGTYPE_MENU },
   { "Interface",
@@ -385,6 +383,8 @@ Cfg_menu g_cfg_ethernet_menu[] = {
   { "Back to Main Config", g_cfg_main_menu, 0, 0, CFGTYPE_MENU },
   { 0, 0, 0, 0, 0 },
 };
+#endif
+
 #ifdef HAVE_SDL
 Cfg_menu g_cfg_printer_menu[] = {
   { "Virtual Epson Configuration", g_cfg_printer_menu, 0, 0, CFGTYPE_MENU },
@@ -474,7 +474,9 @@ Cfg_menu g_cfg_main_menu[] = {
   { "ROM File Selection", g_cfg_rom_menu, 0, 0, CFGTYPE_MENU },
   { "HOST FST Configuration", g_cfg_host_menu, 0, 0, CFGTYPE_MENU },
   { "Serial Port Configuration", g_cfg_serial_menu, 0, 0, CFGTYPE_MENU },
+#ifdef HAVE_RAWNET
   { "Ethernet Card Configuration", g_cfg_ethernet_menu, 0, 0, CFGTYPE_MENU },
+#endif
   { "Parallel Card Configuration", g_cfg_parallel_menu, 0, 0, CFGTYPE_MENU },
 #ifdef HAVE_SDL
   { "Virtual Epson Configuration", g_cfg_printer_menu, 0, 0, CFGTYPE_MENU },
