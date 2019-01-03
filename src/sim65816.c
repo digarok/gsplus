@@ -33,7 +33,7 @@ extern char g_config_gsplus_screenshot_dir[];
 extern void get_cwd(LPTSTR buffer, int size);
 #endif
 
-#ifndef ENABLE_DEBUGGER
+#ifndef GSPLUS_DEBUGGER
 int g_dbg_step = 0;
 int g_dbg_enable_port = 0;
 
