@@ -8,9 +8,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include "options.h"
 #include "glog.h"
 #include "defc.h"
+
+#ifdef _MSC_VER
+#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
 
 // config is parsed in config.c :: config_parse_config_gsplus_file()
 // cli is parsed here.  would be nice to reuse some code

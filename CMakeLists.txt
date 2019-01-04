@@ -12,6 +12,7 @@ endif()
 if(MSVC)
 	include_directories(include/msvc)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+	add_compile_options(/wd4996)
 endif()
 
 # add pcap headers for win32. assume os/x, linux, etc, already have them.

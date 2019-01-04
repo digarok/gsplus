@@ -19,9 +19,12 @@
 #endif
 
 #if defined _MSC_VER
-#include <direct.h>
-#define snprintf _snprintf
+
 typedef unsigned int mode_t;
+
+#define strcasecmp stricmp
+#define strncasecmp strnicmp
+
 #endif
 
 

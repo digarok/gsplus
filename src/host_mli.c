@@ -26,6 +26,11 @@
 
 #include "host_common.h"
 
+#ifdef _MSC_VER
+#define strcasecmp stricmp
+#define strncasecmp strnicmp
+#endif
+
 
 #define LEVEL 0xBFD8                            // current file level
 #define DEVNUM 0xBF30                           // last slot / drive

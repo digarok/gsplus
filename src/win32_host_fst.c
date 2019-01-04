@@ -20,6 +20,12 @@
 
 #include "host_common.h"
 
+#ifdef _MSC_VER
+#define strcasecmp stricmp
+#define strncasecmp strnicmp
+#endif
+
+
 extern Engine_reg engine;
 
 
@@ -62,7 +68,7 @@ static struct directory *read_directory(const char *path, word16 *error);
 
 #define COOKIE_BASE 0x8000
 
-static word32 cookies[32] = {};
+static word32 cookies[32] = { 0 };
 
 static int alloc_cookie() {
   for (int i = 0; i < 32; ++i) {
@@ -746,7 +752,7 @@ static struct directory *read_directory(const char *path, word16 *error) {
       size = sizeof(struct directory) + capacity * sizeof(char *);
       struct directory * tmp = realloc(dd, size);
       if (!tmp) {
-        *error = host_map_errno(errno);
+		  *error = outOfMem;
         free_directory(dd);
         FindClose(h);
         return NULL;
