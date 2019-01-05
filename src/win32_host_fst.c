@@ -1213,11 +1213,11 @@ static word16 win_seek(HANDLE h, word16 base, word32 displacement, LARGE_INTEGER
       break;
     case markMinus:
       m = FILE_CURRENT;
-      d.QuadPart = -displacement;
+      d.QuadPart = -(LONGLONG)displacement;
       break;
     case eofMinus:
       m = FILE_END;
-      d.QuadPart = -displacement;
+      d.QuadPart = -(LONGLONG)displacement;
       break;
 
     default:
