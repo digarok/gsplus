@@ -121,7 +121,7 @@ int rawnet_arch_receive(uint8_t *pbuffer, int *plen, int  *phashed,
     assert((*plen & 1) == 0);
 
     ok = rawnet_arch_read(pbuffer, *plen);
-    if (ok < 0) return 0;
+    if (ok <= 0) return 0;
 
     if (ok & 1) ++ok;
     *plen = ok;

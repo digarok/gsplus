@@ -77,10 +77,9 @@ char *rawnet_get_standard_interface(void)
     return rawnet_arch_get_standard_interface();
 }
 
-extern int rawnet_status(void)
+int rawnet_status(void)
 {
     return rawnet_arch_status();
 }
-
 
 #endif /* #ifdef HAVE_RAWNET */

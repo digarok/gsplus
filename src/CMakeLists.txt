@@ -134,6 +134,18 @@ SET_SOURCE_FILES_PROPERTIES(
   MACOSX_PACKAGE_LOCATION Resources
  )
 
+if(APPLE)
+	add_custom_command(TARGET GSplus POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${CMAKE_CURRENT_BINARY_DIR}/rawnet/vmnet_helper"
+		"${CMAKE_CURRENT_BINARY_DIR}/GSplus.app/Contents/MacOS/vmnet_helper"
+		# COMMAND sudo chown root "${CMAKE_CURRENT_BINARY_DIR}/GSplus.app/Contents/MacOS/vmnet_helper"
+		# COMMAND sudo chmod +s "${CMAKE_CURRENT_BINARY_DIR}/GSplus.app/Contents/MacOS/vmnet_helper"
+		DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rawnet/vmnet_helper)
+endif()
+# SET_SOURCE_FILES_PROPERTIES(vmnet_helper PROPERTIES MACOSX_PACKAGE_LOCATION MacOS)
+
+
 if (WITH_RAWNET)
 	target_link_libraries(GSplus rawnet)
 endif()
