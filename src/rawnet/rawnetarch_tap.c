@@ -82,6 +82,12 @@
 static int interface_fd = -1;
 static char *interface_dev = NULL;
 
+static uint8_t interface_mac[6];
+static uint8_t interface_fake_mac[6];
+
+static uint8_t *interface_buffer = NULL;
+static int interface_buffer_size = 0;
+
 int rawnet_arch_init(void) {
 	interface_fd = -1;
 	return 1;
@@ -94,6 +100,18 @@ void rawnet_arch_post_reset(void) {
 	/* NOP */
 }
 
+/* memoized buffer for ethernet packets, etc */
+static int make_buffer(int size) {
+	if (size <= interface_buffer_size) return 0;
+	if (interface_buffer) free(interface_buffer);
+	if (size < 1500) size = 1500; /* good mtu size */
+	interface_buffer_size = 0;
+	size *= 2;
+	interface_buffer = malloc(size);
+	if (!interface_buffer) return -1;
+	interface_buffer_size = size;
+	return 0;
+}
 
 #if defined(__linux__)
 /* interface name. default is tap65816. */
@@ -131,6 +149,15 @@ int rawnet_arch_activate(const char *interface_name) {
 		close(fd);
 		return 0;
 	}
+
+	if (rawnet_arch_get_mac(interface_mac) < 0) {
+		perror("rawnet_arch_get_mac");
+		close(fd);
+		return 0;
+	}
+	/* copy mac to fake mac */
+	memcpy(interface_fake_mac, interface_mac, 6);
+
 
 	interface_dev = strdup(interface_name);
 	interface_fd = fd;
@@ -170,6 +197,16 @@ int rawnet_arch_activate(const char *interface_name) {
 		return 0;
 	}
 
+	if (rawnet_arch_get_mac(interface_mac) < 0) {
+		perror("rawnet_arch_get_mac");
+		close(fd);
+		return 0;
+	}
+	/* copy mac to fake mac */
+	memcpy(interface_fake_mac, interface_mac, 6);
+
+
+
 	interface_dev = strdup(interface_name);
 	interface_fd = fd;
 	return 1;
@@ -184,6 +221,10 @@ void rawnet_arch_deactivate(void) {
 		close(interface_fd);
 	free(interface_dev);
 
+	free(interface_buffer);
+	interface_buffer = 0;
+	interface_buffer_size = 0;
+
 	interface_dev = NULL;
 	interface_fd = -1;
 }
@@ -194,6 +235,14 @@ void rawnet_arch_set_mac(const uint8_t mac[6]) {
 #ifdef RAWNET_DEBUG_ARCH
     log_message( rawnet_arch_log, "New MAC address set: %02X:%02X:%02X:%02X:%02X:%02X.", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
 #endif
+
+    memcpy(interface_fake_mac, mac, 6);
+
+    /* in theory,  SIOCSIFHWADDR (linux) or SIOCSIFADDR (bsd) will set the mac address. */
+    /* in testing, (linux) I get EBUSY or EOPNOTSUPP */
+
+
+#if 0
     if (interface_fd < 0) return;
 
 
@@ -209,8 +258,7 @@ void rawnet_arch_set_mac(const uint8_t mac[6]) {
     if (ioctl(interface_fd, SIOCSIFADDR, mac) < 0)
     	perror("ioctl(SIOCSIFADDR)");
     #endif
-
-
+#endif
 }
 void rawnet_arch_set_hashfilter(const uint32_t hash_mask[2]) {
 	/* NOP */
@@ -225,11 +273,29 @@ void rawnet_arch_line_ctl(int bEnableTransmitter, int bEnableReceiver) {
 }
 
 int rawnet_arch_read(void *buffer, int nbyte) {
-	return read(interface_fd, buffer, nbyte);
+	int ok;
+
+	if (make_buffer(nbyte) < 0) return -1;
+
+	ok = read(interface_fd, interface_buffer, nbyte);
+	if (ok <= 0) return -1;
+
+	rawnet_fix_incoming_packet(interface_buffer, ok, interface_mac, interface_fake_mac);
+	memcpy(buffer, interface_buffer, ok);
+	return ok;
 }
 
 int rawnet_arch_write(const void *buffer, int nbyte) {
-	return write(interface_fd, buffer, nbyte);
+	int ok;
+
+	if (make_buffer(nbyte) < 0) return -1;
+
+
+	memcpy(interface_buffer, buffer, nbyte);
+	rawnet_fix_outgoing_packet(interface_buffer, nbyte, interface_mac, interface_fake_mac);
+
+	ok = write(interface_fd, interface_buffer, nbyte);
+	return ok;
 }
 
 

@@ -53,6 +53,9 @@ extern int util_string_set(char **str, const char *new_value);
 extern unsigned long crc32_buf(const char *buffer, unsigned int len);
 
 extern void rawnet_hexdump(const void *what, int count);
+extern void rawnet_fix_incoming_packet(uint8_t *packet, unsigned size, const uint8_t real_mac[6], const uint8_t fake_mac[6]);
+extern void rawnet_fix_outgoing_packet(uint8_t *packet, unsigned size, const uint8_t real_mac[6], const uint8_t fake_mac[6]);
+
 
 #define log_message(level,...) do { fprintf(stderr,__VA_ARGS__); fputs("\n", stderr); } while (0)
 #endif
