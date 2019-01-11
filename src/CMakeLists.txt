@@ -139,9 +139,8 @@ if(APPLE)
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${CMAKE_CURRENT_BINARY_DIR}/rawnet/vmnet_helper"
 		"${CMAKE_CURRENT_BINARY_DIR}/GSplus.app/Contents/MacOS/vmnet_helper"
-		# COMMAND sudo chown root "${CMAKE_CURRENT_BINARY_DIR}/GSplus.app/Contents/MacOS/vmnet_helper"
-		# COMMAND sudo chmod +s "${CMAKE_CURRENT_BINARY_DIR}/GSplus.app/Contents/MacOS/vmnet_helper"
-		DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rawnet/vmnet_helper)
+		)
+	add_dependencies(GSplus vmnet_helper)
 endif()
 # SET_SOURCE_FILES_PROPERTIES(vmnet_helper PROPERTIES MACOSX_PACKAGE_LOCATION MacOS)
 
@@ -185,14 +184,6 @@ endif()
 #	target_link_libraries(GSplus -F${CMAKE_CURRENT_SOURCE_DIR} "-framework SDL2" -Wl,-rpath,@executable_path/../Frameworks)
 #endif()
 
-# if (APPLE AND CMAKE_BUILD_TYPE MATCHES "Release")
-# 	add_custom_command(TARGET GSplus
-# 		POST_BUILD
-# 		COMMAND dylibbundler -od -b -x GSplus.app/Contents/MacOS/GSplus -d GSplus.app/Contents/libs
-# 		#COMMAND cp to_pro partls GSplus.app/Contents/Resources/
-# 		COMMENT bundling libraries...
-# 	)
-# endif()
 
 if (APPLE)
 	add_custom_target(bundle
@@ -200,4 +191,9 @@ if (APPLE)
 		COMMAND dylibbundler -od -b -x GSplus.app/Contents/MacOS/GSplus -d GSplus.app/Contents/libs
 		COMMENT bundling libraries...
 	)
+	add_custom_target(setuid
+		COMMAND sudo chown root GSplus.app/Contents/MacOS/vmnet_helper
+		COMMAND sudo chmod +s GSplus.app/Contents/MacOS/vmnet_helper
+		USES_TERMINAL)
+	add_dependencies(setuid vmnet_helper)
 endif()
