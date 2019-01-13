@@ -144,8 +144,8 @@ int a2_key_to_sdlkeycode[][3] = {
   { 0x22,       SDLK_i,         'I' },
   { 0x1f,       SDLK_o,         'O' },
   { 0x23,       SDLK_p,         'P' },
-  { 0x21,       SDLK_RIGHTBRACKET, '{' },
-  { 0x1e,       SDLK_LEFTBRACKET, '}' },
+  { 0x21,       SDLK_LEFTBRACKET, '{' },
+  { 0x1e,       SDLK_RIGHTBRACKET, '}' },
   { 0x2a,       SDLK_BACKSLASH, '|' },    /* backslash, bar */
   { 0x75,       SDLK_DELETE,    0 },
   { 0x77,       SDLK_END,       0 },
