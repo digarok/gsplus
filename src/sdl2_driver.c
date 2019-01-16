@@ -127,7 +127,7 @@ int a2_key_to_sdlkeycode[][3] = {
   { 0x18,       SDLK_EQUALS, SDLK_PLUS },
   { 0x33,       SDLK_BACKSPACE, 0 },
   { 0x72,       SDLK_INSERT,    0 },       /* Help? XK_Help  */
-  /*	{ 0x73,	XK_Home, 0 },		alias XK_Home to be XK_KP_Equal! */
+  { 0x73,       SDLK_HOME,      0 },
   { 0x74,       SDLK_PAGEUP,    0 },
   { 0x47,       SDLK_NUMLOCKCLEAR, 0 }, /* Clear, XK_Clear */
   { 0x51,       SDLK_KP_EQUALS, 0 },            /* Note XK_Home alias! XK_Home */
