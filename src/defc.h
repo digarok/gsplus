@@ -7,6 +7,8 @@
 
 #include "defcomm.h"
 
+#include <stdint.h>
+
 // OG redirect printf to console
 #ifdef ACTIVEGS
 #include <stdio.h>
@@ -18,14 +20,11 @@ extern "C" int fOutputInfo(FILE*,const char* format,...);
 
 #define STRUCT(a) typedef struct _ ## a a; struct _ ## a
 
-typedef unsigned char byte;
-typedef unsigned short word16;
-typedef unsigned int word32;
-#if _MSC_VER
-typedef unsigned __int64 word64;
-#else
-typedef unsigned long long word64;
-#endif
+typedef uint8_t byte;
+typedef uint16_t word16;
+typedef uint32_t word32;
+typedef uint64_t word64;
+
 
 void U_STACK_TRACE();
 
