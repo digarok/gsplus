@@ -156,7 +156,7 @@ extern word32 slow_mem_changed[];
   stat = GET_PAGE_INFO_RD(((addr) >> 8) & 0xffff);        \
   wstat = PTR2WORD(stat) & 0xff;                          \
   ptr = stat - wstat + ((addr) & 0xff);                   \
-  if(wstat & (1 << (31 - BANK_IO_BIT)) || iostrobe == 1) {                        \
+  if(wstat & BANK_IO_TMP || iostrobe == 1) {                        \
     fcycles_tmp1 = fcycles;                         \
     dest = get_memory8_io_stub((addr), stat,        \
                                &fcycles_tmp1, fplus_x_m1);     \
@@ -172,7 +172,7 @@ extern word32 slow_mem_changed[];
   stat = GET_PAGE_INFO_RD(((addr) >> 8) & 0xffff);        \
   wstat = PTR2WORD(stat) & 0xff;                          \
   ptr = stat - wstat + ((addr) & 0xff);                   \
-  if((wstat & (1 << (31 - BANK_IO_BIT))) || (((addr) & 0xff) == 0xff)) { \
+  if((wstat & BANK_IO_TMP) || (((addr) & 0xff) == 0xff)) { \
     fcycles_tmp1 = fcycles;                         \
     dest = get_memory16_pieces_stub((addr), stat,   \
                                     &fcycles_tmp1, fplus_ptr, in_bank);     \
@@ -188,7 +188,7 @@ extern word32 slow_mem_changed[];
   stat = GET_PAGE_INFO_RD(((addr) >> 8) & 0xffff);        \
   wstat = PTR2WORD(stat) & 0xff;                          \
   ptr = stat - wstat + ((addr) & 0xff);                   \
-  if((wstat & (1 << (31 - BANK_IO_BIT))) || (((addr) & 0xfe) == 0xfe)) { \
+  if((wstat & BANK_IO_TMP) || (((addr) & 0xfe) == 0xfe)) { \
     fcycles_tmp1 = fcycles;                         \
     dest = get_memory24_pieces_stub((addr), stat,   \
                                     &fcycles_tmp1, fplus_ptr, in_bank);     \
@@ -454,11 +454,11 @@ void set_memory8_io_stub(word32 addr, word32 val, byte *stat, double *fcycs_ptr,
   }
   ptr = stat - wstat + ((addr) & 0xff);                           \
   fcycles = *fcycs_ptr;
-  if(wstat & (1 << (31 - BANK_IO2_BIT))) {
+  if(wstat & BANK_IO2_TMP) {
     FCYCLES_ROUND;
     *fcycs_ptr = fcycles;
     set_memory_io((addr), val, fcycs_ptr);
-  } else if(wstat & (1 << (31 - BANK_SHADOW_BIT))) {
+  } else if(wstat & BANK_SHADOW) {
     FCYCS_PTR_FCYCLES_ROUND_SLOW;
     tmp1 = (addr & 0xffff);
     setmem_tmp1 = g_slow_memory_ptr[tmp1];
@@ -468,7 +468,7 @@ void set_memory8_io_stub(word32 addr, word32 val, byte *stat, double *fcycs_ptr,
       slow_mem_changed[tmp1 >> CHANGE_SHIFT] |=
         (1 << (31-((tmp1 >> SHIFT_PER_CHANGE) & 0x1f)));
     }
-  } else if(wstat & (1 << (31 - BANK_SHADOW2_BIT))) {
+  } else if(wstat & BANK_SHADOW2) {
     FCYCS_PTR_FCYCLES_ROUND_SLOW;
     tmp2 = (addr & 0xffff);
     tmp1 = 0x10000 + tmp2;
@@ -886,7 +886,7 @@ word32 get_remaining_operands(word32 addr, word32 opcode, word32 psr, Fplus *fpl
         FINISH(RET_C70D, 0);                    \
       }                                               \
     }                                                       \
-    if(wstat & (1 << (31 - BANK_IO2_BIT)) || iostrobe == 1) {               \
+    if(wstat & BANK_IO2_TMP || iostrobe == 1) {               \
       FCYCLES_ROUND;                                  \
       fcycles_tmp1 = fcycles;                         \
       opcode = get_memory_io((addr), &fcycles_tmp1);  \
