@@ -372,9 +372,6 @@ word32 get_memory8_io_stub(word32 addr, byte *stat, double *fcycs_ptr,
   byte    *ptr;
   wstat = PTR2WORD(stat) & 0xff;
 
-  if(wstat & BANK_BREAK) {
-    check_breakpoints(addr);
-  }
   fcycles = *fcycs_ptr;
   if(wstat & BANK_IO2_TMP || iostrobe == 1) {
     FCYCLES_ROUND;
@@ -449,10 +446,8 @@ void set_memory8_io_stub(word32 addr, word32 val, byte *stat, double *fcycs_ptr,
   word32 wstat;
 
   wstat = PTR2WORD(stat) & 0xff;
-  if(wstat & (1 << (31 - BANK_BREAK_BIT))) {
-    check_breakpoints(addr);
-  }
-  ptr = stat - wstat + ((addr) & 0xff);                           \
+
+  ptr = stat - wstat + ((addr) & 0xff);
   fcycles = *fcycs_ptr;
   if(wstat & BANK_IO2_TMP) {
     FCYCLES_ROUND;
