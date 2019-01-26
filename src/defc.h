@@ -152,6 +152,7 @@ STRUCT(Fplus) {
 };
 
 STRUCT(Engine_reg) {
+								Fplus *fplus_ptr;
 								double fcycles;
 								word32 kpc;
 								word32 acc;
@@ -164,7 +165,7 @@ STRUCT(Engine_reg) {
 
 								word32 direct;
 								word32 psr;
-								Fplus *fplus_ptr;
+								word32 flags;
 };
 
 STRUCT(Kimage) {
