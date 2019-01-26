@@ -34,7 +34,6 @@ extern void get_cwd(LPTSTR buffer, int size);
 #endif
 
 #ifndef GSPLUS_DEBUGGER
-int g_dbg_step = 0;
 int g_dbg_enable_port = 0;
 
 void debug_server_poll(void) { }
@@ -83,7 +82,6 @@ const char *g_gsplus_default_paths[] = { // probably overkill on the paths
 #define EV_VID_UPD      7
 
 extern int g_stepping;
-extern int g_dbg_step;
 
 
 extern int g_c068_statereg;
@@ -775,7 +773,6 @@ void do_reset() {
   engine.kpc = get_memory16_c(0x00fffc, 0);
 
   g_stepping = 0;
-  g_dbg_step = 0;
 
   if (g_irq_pending)
     halt_printf("*** irq remainings...\n");
@@ -998,7 +995,6 @@ int gsplusmain(int argc, char **argv) {
 
   do_reset();
   g_stepping = 0;
-  g_dbg_step = 0;
 
   // OG Notify emulator has been initialized and ready to accept external events
   g_initialized = 1;
@@ -1587,7 +1583,7 @@ void run_prog()      {
     engine.fcycles = prerun_fcycles;
     fcycles_stop = (g_event_start.next->dcycs - g_last_vbl_dcycs) +
                    0.001;
-    if(g_stepping || g_dbg_step < 0) {
+    if(g_stepping) {
       fcycles_stop = prerun_fcycles;
     }
     g_fcycles_stop = fcycles_stop;
@@ -1649,7 +1645,7 @@ void run_prog()      {
       if(halt_sim != 0 && halt_sim != HALT_EVENT) {
         break;
       }
-      if(g_stepping || g_dbg_step != 0) {
+      if(g_stepping) {
         printf("HIT STEPPING BREAK!\n");
         break;
       }
@@ -1719,7 +1715,7 @@ void run_prog()      {
     if(halt_sim != 0 && halt_sim != HALT_EVENT) {
       break;
     }
-    if(g_stepping || g_dbg_step != 0) {
+    if(g_stepping) {
       break;
     }
   }

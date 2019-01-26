@@ -24,7 +24,6 @@
 # define FCYCS_PTR_FCYCLES_ROUND_SLOW
 #endif
 
-extern int g_dbg_step;
 extern int halt_sim;
 extern int g_code_red;
 extern int g_ignore_halts;
@@ -398,19 +397,6 @@ extern word32 slow_mem_changed[];
   }
 
 
-
-void check_breakpoints(word32 addr)      {
-  int count;
-  int i;
-
-  count = g_num_breakpoints;
-  for(i = 0; i < count; i++) {
-    if((g_breakpts[i] & 0xffffff) == addr) {
-      g_dbg_step = -2;
-      halt2_printf("Hit breakpoint at %06x\n", addr);
-    }
-  }
-}
 
 word32 g_num_kpc_breakpoints = 0;
 word32 g_kpc_breakpoints[20];

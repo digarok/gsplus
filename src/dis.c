@@ -17,7 +17,6 @@ extern byte *g_memory_ptr;
 extern byte *g_slow_memory_ptr;
 extern int halt_sim;
 extern int enter_debug;
-extern int g_dbg_step;  //debug.c
 extern int timeout;                     //debug.c
 extern int g_c068_statereg;
 extern word32 stop_run_at;
