@@ -755,38 +755,32 @@ void fixed_memory_ptrs_shut() {
   g_rom_cards_ptr =  NULL;
 }
 
+#if defined(_MSC_VER)
+  #include <intrin.h>
+#elif defined(__GNUC__)
+
+  #if defined(__i386__) ||  defined(__x86_64__)
+    #include <x86intrin.h>
+  #elif defined(__powerpc__) || defined(__ppc__)
+    #define __rdtsc() __builtin_ppc_mftb()
+  #else
+    #warning __rdtsc unavailable.
+    #define __rdtsc() 0
+  #endif
+#else
+  #warning __rdtsc unavailable.
+  #define __rdtsc() 0
+#endif
 
 word32 get_itimer()        {
 #if defined(_WIN32)
   LARGE_INTEGER count;
   if (QueryPerformanceCounter(&count))
     return count.LowPart;
-  else
-    return 0;
-#elif defined(__i386) && defined(__GNUC__)
-  /* Here's my bad ia32 asm code to do rdtsc */
-  /* Linux source uses: */
-  /* asm volatile("rdtsc" : "=a"(ret) : : "edx"); */
-  /* asm volatile("rdtsc" : "=%eax"(ret) : : "%edx"); */
-
-  /* GCC bug report 2001-03/msg00786.html used: */
-  /*register word64 dtmp; */
-  /*asm volatile ("rdtsc" : "=A" (dtmp)); */
-  /*return (word32)dtmp; */
-
-  register word32 ret;
-
-  asm volatile ("rdtsc;movl %%eax,%0" : "=r" (ret) : : "%eax","%edx");
-
-  return ret;
-#elif defined(__POWERPC__) && defined(__GNUC__)
-  register word32 ret;
-
-  asm volatile ("mftb %0" : "=r" (ret));
-  return ret;
-#else
-  return 0;
 #endif
+
+  return __rdtsc();
+
 }
 
 void set_halt_act(int val)      {
