@@ -218,43 +218,75 @@ extern word32 slow_mem_changed[];
     GET_MEMORY16(save_addr, dest, 1);                       \
   }
 
+/*
+ _ macros do not do any MMU checking
+*/
 
-#define PUSH8(arg)                                              \
-  SET_MEMORY8(stack, arg);                                \
+#if 0
+#define MMU_CHECK(addr, val, bytes, in_page, in_bank)     \
+  if (abort_support && check_abort_breakpoints(addr, bytes, in_page, in_bank)) { \
+    g_abort_value = val;                                  \
+    g_abort_address = addr;                               \
+    g_ret1 = RET_ABORT;                                   \
+    g_ret2 = saved_pc;                                    \
+    kpc = saved_pc;
+    goto abort;                                           \
+  }
+#else
+#define MMU_CHECK(addr, val, bytes, in_page, in_bank)
+#endif
+#define PUSH8(arg)                                        \
+  MMU_CHECK(stack, arg, 1, 0, 0)                          \
+  _PUSH8(arg)                                             \
+
+#define _PUSH8(arg)                                       \
+  _SET_MEMORY8(stack, arg);                               \
   stack--;                                                \
   if(psr & 0x100) {                                       \
-    stack = 0x100 | (stack & 0xff);                 \
+    stack = 0x100 | (stack & 0xff);                       \
   }                                                       \
   stack = stack & 0xffff;
 
-#define PUSH16(arg)                                             \
+#define PUSH16(arg)                                       \
+  MMU_CHECK(stack, arg, 2, 1, 1)                          \
+  _PUSH16(arg)
+
+#define _PUSH16(arg)                                             \
   if((stack & 0xfe) == 0) {                               \
     /* stack will cross page! */                    \
-    PUSH8((arg) >> 8);                              \
-    PUSH8(arg);                                     \
+    _PUSH8((arg) >> 8);                              \
+    _PUSH8(arg);                                     \
   } else {                                                \
     stack -= 2;                                     \
     stack = stack & 0xffff;                         \
-    SET_MEMORY16(stack + 1, arg, 1);                \
+    _SET_MEMORY16(stack + 1, arg, 1);                \
   }
 
-#define PUSH16_UNSAFE(arg)                                      \
+#define PUSH16_UNSAFE(arg)                                \
+  MMU_CHECK((stack - 1) & 0xffff, arg, 2, 0, 1)           \
+  _PUSH16_UNSAFE(arg)
+
+#define _PUSH16_UNSAFE(arg)                               \
   save_addr = (stack - 1) & 0xffff;                       \
   stack -= 2;                                             \
   if(psr & 0x100) {                                       \
-    stack = 0x100 | (stack & 0xff);                 \
+    stack = 0x100 | (stack & 0xff);                       \
   }                                                       \
   stack = stack & 0xffff;                                 \
-  SET_MEMORY16(save_addr, arg, 1);
+  _SET_MEMORY16(save_addr, arg, 1);
 
-#define PUSH24_UNSAFE(arg)                                      \
+#define PUSH24_UNSAFE(arg)                                \
+  MMU_CHECK((stack - 2) & 0xffff, arg, 2, 0, 1)           \
+  _PUSH24_UNSAFE(arg)
+
+#define _PUSH24_UNSAFE(arg)                               \
   save_addr = (stack - 2) & 0xffff;                       \
   stack -= 3;                                             \
   if(psr & 0x100) {                                       \
-    stack = 0x100 | (stack & 0xff);                 \
+    stack = 0x100 | (stack & 0xff);                       \
   }                                                       \
   stack = stack & 0xffff;                                 \
-  SET_MEMORY24(save_addr, arg, 1);
+  _SET_MEMORY24(save_addr, arg, 1);
 
 #define PULL8(dest)                                             \
   stack++;                                                \
@@ -303,7 +335,11 @@ extern word32 slow_mem_changed[];
     }                                               \
   }
 
-#define SET_MEMORY8(addr, val)                                          \
+#define SET_MEMORY8(addr, val)                                    \
+  MMU_CHECK(addr, val, 1, 0, 0)                                   \
+  _SET_MEMORY8(addr, val)
+
+#define _SET_MEMORY8(addr, val)                                   \
   LOG_DATA_MACRO(addr, val, 8);                                   \
   CYCLES_PLUS_1;                                                  \
   stat = GET_PAGE_INFO_WR(((addr) >> 8) & 0xffff);                \
@@ -318,8 +354,12 @@ extern word32 slow_mem_changed[];
     *ptr = val;                                             \
   }
 
+#define SET_MEMORY16(addr, val, in_bank)                          \
+  MMU_CHECK(addr, val, 2, 0, in_bank)                             \
+  _SET_MEMORY16(addr, val, in_bank)
 
-#define SET_MEMORY16(addr, val, in_bank)                                \
+
+#define _SET_MEMORY16(addr, val, in_bank)                         \
   LOG_DATA_MACRO(addr, val, 16);                                  \
   stat = GET_PAGE_INFO_WR(((addr) >> 8) & 0xffff);                \
   wstat = PTR2WORD(stat) & 0xff;                                  \
@@ -335,7 +375,12 @@ extern word32 slow_mem_changed[];
     ptr[1] = (val) >> 8;                                    \
   }
 
-#define SET_MEMORY24(addr, val, in_bank)                                \
+#define SET_MEMORY24(addr, val, in_bank)                          \
+  MMU_CHECK(addr, val, 3, 0, in_bank)                             \
+  _SET_MEMORY24(addr, val, in_bank)
+
+
+#define _SET_MEMORY24(addr, val, in_bank)                         \
   LOG_DATA_MACRO(addr, val, 24);                                  \
   stat = GET_PAGE_INFO_WR(((addr) >> 8) & 0xffff);                \
   wstat = PTR2WORD(stat) & 0xff;                                  \
@@ -352,6 +397,8 @@ extern word32 slow_mem_changed[];
     ptr[2] = (val) >> 16;                                   \
   }
 
+
+
 void check_breakpoints(word32 addr)      {
   int count;
   int i;
@@ -364,6 +411,51 @@ void check_breakpoints(word32 addr)      {
     }
   }
 }
+
+word32 g_num_kpc_breakpoints = 0;
+word32 g_kpc_breakpoints[20];
+int check_kpc_breakpoints(word32 addr) {
+  int i;
+  for (i = 0; i < g_num_kpc_breakpoints; ++i) {
+    if (g_kpc_breakpoints[i] == addr) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+/* 65816 abort just pushes the orignal pc (-1?)  on the stack.
+   MMU hardware could, of course, store the address [and value?]
+
+*/
+word32 g_abort_address;
+word32 g_abort_value;
+
+int check_abort_breakpoints(word32 addr, unsigned bytes, int in_page, int in_bank) {
+  byte *stat;
+  word32 wstat;
+  word32 mask = 0xffffff;
+  int i;
+
+  if (in_bank) mask = 0xffff;
+  if (in_page) mask = 0xff;
+
+  while (bytes--) {
+    stat = GET_PAGE_INFO_WR(((addr) >> 8) & 0xffff);
+    wstat = PTR2WORD(stat) & 0xff;
+    if ((wstat & BANK_BREAK)) {
+      for (i = 0; i < g_num_breakpoints; ++i) {
+        if (addr == g_breakpts[i]) return 1;
+      }
+    }
+
+    addr = ((addr + 1) & mask) | (addr & ~mask);
+  }
+  return 0;
+}
+
+
 
 word32 get_memory8_io_stub(word32 addr, byte *stat, double *fcycs_ptr,
                            double fplus_x_m1) {
@@ -488,12 +580,12 @@ void set_memory16_pieces_stub(word32 addr, word32 val, double *fcycs_ptr,
   word32 addrp1;
   word32 wstat;
   fcycles = *fcycs_ptr;
-  SET_MEMORY8(addr, val);
+  _SET_MEMORY8(addr, val);
   addrp1 = addr + 1;
   if(in_bank) {
     addrp1 = (addr & 0xff0000) + (addrp1 & 0xffff);
   }
-  SET_MEMORY8(addrp1, val >> 8);
+  _SET_MEMORY8(addrp1, val >> 8);
 
   *fcycs_ptr = fcycles;
 }
@@ -511,17 +603,17 @@ void set_memory24_pieces_stub(word32 addr, word32 val, double *fcycs_ptr,
   fcycles = *fcycs_ptr;
   fplus_1 = fplus_ptr->plus_1;
   fplus_x_m1 = fplus_ptr->plus_x_minus_1;
-  SET_MEMORY8(addr, val);
+  _SET_MEMORY8(addr, val);
   addrp1 = addr + 1;
   if(in_bank) {
     addrp1 = (addr & 0xff0000) + (addrp1 & 0xffff);
   }
-  SET_MEMORY8(addrp1, val >> 8);
+  _SET_MEMORY8(addrp1, val >> 8);
   addrp2 = addr + 2;
   if(in_bank) {
     addrp2 = (addr & 0xff0000) + (addrp2 & 0xffff);
   }
-  SET_MEMORY8(addrp2, val >> 16);
+  _SET_MEMORY8(addrp2, val >> 16);
 
   *fcycs_ptr = fcycles;
 }
@@ -586,7 +678,7 @@ void set_memory_c(word32 addr, word32 val, int cycs)      {
   fcycles = g_cur_dcycs - g_last_vbl_dcycs;
   fplus_1 = 0;
   fplus_x_m1 = 0;
-  SET_MEMORY8(addr, val);
+  _SET_MEMORY8(addr, val);
 }
 
 void set_memory16_c(word32 addr, word32 val, int cycs)      {
@@ -601,7 +693,7 @@ void set_memory16_c(word32 addr, word32 val, int cycs)      {
   fplus_1 = 0;
   fplus_2 = 0;
   fplus_x_m1 = 0;
-  SET_MEMORY16(addr, val, 0);
+  _SET_MEMORY16(addr, val, 0);
 }
 
 void set_memory24_c(word32 addr, word32 val, int cycs)      {
@@ -854,18 +946,23 @@ word32 get_remaining_operands(word32 addr, word32 opcode, word32 psr, Fplus *fpl
   return arg;
 }
 
-#define FETCH_OPCODE                                                    \
-  addr = kpc;                                                     \
+#define FLAG_IGNORE_BREAKPOINTS 0x0001
+
+#define FETCH_OPCODE                                              \
+  addr = saved_pc = kpc;                                          \
   CYCLES_PLUS_2;                                                  \
   stat = GET_PAGE_INFO_RD(((addr) >> 8) & 0xffff);                \
   wstat = PTR2WORD(stat) & 0xff;                                  \
   ptr = stat - wstat + ((addr) & 0xff);                           \
   arg_ptr = ptr;                                                  \
   opcode = *ptr;                                                  \
-  if((wstat & (1 << (31-BANK_IO_BIT))) || ((addr & 0xff) > 0xfc)) { \
-    if(wstat & BANK_BREAK) {                                \
-      check_breakpoints(addr);                        \
-    }                                                       \
+  if (wstat & BANK_BREAK) {                                       \
+    wstat &= ~BANK_BREAK;                                         \
+    if (kpc_support && check_kpc_breakpoints(addr)) {             \
+        FINISH(RET_KPC, addr);                                    \
+    }                                                             \
+  }                                                               \
+  if((wstat & BANK_IO_TMP) || ((addr & 0xff) > 0xfc)) { \
     if((addr & 0xfffff0) == 0x00c700) {                     \
       if(addr == 0xc700) {                            \
         FINISH(RET_C700, 0);                    \
@@ -923,6 +1020,15 @@ int enter_engine(Engine_reg *engine_ptr)     {
   register word32 addr;
   word32 addr_latch;
   word32 tmp1, tmp2;
+
+  word32 saved_pc = 0;
+
+  word32 abort_support = g_num_breakpoints ? 1 : 0;
+  word32 kpc_support = g_num_kpc_breakpoints ? 1 : 0;
+
+
+  if (engine_ptr->flags & 0x01) abort_support = 0;
+  if (engine_ptr->flags & 0x01) kpc_support = 0;
 
 
   tmp_pc_ptr = 0;
