@@ -20,13 +20,7 @@
 #include "glog.h"
 
 // DISASSEMBLER STUFF
-enum {
-  ABS = 1, ABSX, ABSY, ABSLONG, ABSIND, ABSXIND, IMPLY, ACCUM, IMMED, JUST8,
-  DLOC, DLOCX, DLOCY, LONG, LONGX, DLOCIND, DLOCINDY, DLOCXIND, DLOCBRAK,
-  DLOCBRAKY, DISP8, DISP8S, DISP8SINDY, DISP16, MVPMVN, REPVAL, SEPVAL
-};
-extern const char * const disas_opcodes[256];
-extern const word32 disas_types[256];
+#include "disasm.h"
 
 // STEPPING/ENGINE STUFF
 extern Engine_reg engine;
@@ -1217,8 +1211,8 @@ int do_dis_json(char *buf, word32 kpc, int accsize, int xsize, int op_provided, 
 
   kpc++;
 
-  dtype = disas_types[opcode];
-  out = disas_opcodes[opcode];
+  dtype = disasm_types[opcode];
+  out = disasm_opcodes[opcode];
   type = dtype & 0xff;
   args = dtype >> 8;
 
@@ -1292,6 +1286,12 @@ int do_dis_json(char *buf, word32 kpc, int accsize, int xsize, int op_provided, 
       }
       sprintf(buf_disasm,"%s   $%06x",out,val);
       break;
+    case ABSLONGX:
+      if(args != 3) {
+        printf("arg # mismatch for opcode %x\n", opcode);
+      }
+      sprintf(buf_disasm,"%s   $%06x,X",out,val);
+      break;
     case ABSIND:
       if(args != 2) {
         printf("arg # mismatch for opcode %x\n", opcode);
@@ -1348,18 +1348,6 @@ int do_dis_json(char *buf, word32 kpc, int accsize, int xsize, int op_provided, 
         printf("arg # mismatch for opcode %x\n", opcode);
       }
       sprintf(buf_disasm,"%s   $%02x,Y",out,val);
-      break;
-    case LONG:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%06x",out,val);
-      break;
-    case LONGX:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%06x,X",out,val);
       break;
     case DLOCIND:
       if(args != 1) {

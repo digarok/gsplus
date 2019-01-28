@@ -9,7 +9,7 @@
 #include "defc.h"
 #include <stdarg.h>
 
-#include "disas.h"
+#include "disasm.h"
 
 #define LINE_SIZE 160
 
@@ -836,8 +836,8 @@ int do_dis(FILE *outfile, word32 kpc, int accsize, int xsize,
 
   kpc++;
 
-  dtype = disas_types[opcode];
-  out = disas_opcodes[opcode];
+  dtype = disasm_types[opcode];
+  out = disasm_opcodes[opcode];
   type = dtype & 0xff;
   args = dtype >> 8;
 
@@ -915,6 +915,13 @@ int do_dis(FILE *outfile, word32 kpc, int accsize, int xsize,
       sprintf(buffer,"%s\t$%06x",out,val);
       show_line(outfile, oldkpc,instr,args+1,buffer);
       break;
+    case ABSLONGX:
+      if(args != 3) {
+        printf("arg # mismatch for opcode %x\n", opcode);
+      }
+      sprintf(buffer,"%s\t$%06x,X",out,val);
+      show_line(outfile, oldkpc,instr,args+1,buffer);
+      break;
     case ABSIND:
       if(args != 2) {
         printf("arg # mismatch for opcode %x\n", opcode);
@@ -979,20 +986,6 @@ int do_dis(FILE *outfile, word32 kpc, int accsize, int xsize,
         printf("arg # mismatch for opcode %x\n", opcode);
       }
       sprintf(buffer,"%s\t$%02x,Y",out,val);
-      show_line(outfile, oldkpc,instr,args+1,buffer);
-      break;
-    case LONG:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buffer,"%s\t$%06x",out,val);
-      show_line(outfile, oldkpc,instr,args+1,buffer);
-      break;
-    case LONGX:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buffer,"%s\t$%06x,X",out,val);
       show_line(outfile, oldkpc,instr,args+1,buffer);
       break;
     case DLOCIND:
