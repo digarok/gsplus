@@ -72,6 +72,11 @@ add_custom_command(
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+add_custom_command(
+	OUTPUT debug_shell.c
+	COMMAND re2c -o ${CMAKE_CURRENT_BINARY_DIR}/debug_shell.c "${CMAKE_CURRENT_SOURCE_DIR}/debug_shell.re2c"
+	MAIN_DEPENDENCY debug_shell.re2c
+)
 
 add_executable(to_pro to_pro.c)
 add_executable(partls partls.c)
@@ -112,10 +117,13 @@ set(MACOSX_BUNDLE_GUI_IDENTIFIER com.dagenbrock.gsplus)
 # https://cmake.org/Wiki/CMake:Bundles_And_Frameworks
 # OS X properties.
 add_executable(GSplus WIN32 MACOSX_BUNDLE
-	adb.c clock.c config.c dis.c engine_c.c scc.c iwm.c 
+	adb.c clock.c config.c engine_c.c scc.c iwm.c 
 	joystick_driver.c moremem.c paddles.c parallel.c printer.cpp sim65816.c
 	smartport.c sound.c sound_driver.c video.c scc_socket_driver.c glog.c
 	imagewriter.cpp scc_imagewriter.c scc_llap.c options.c
+
+	disasm.c
+	debug_shell.c
 
 	$<$<BOOL:${WITH_DEBUGGER}>:debug.c>
 	$<$<BOOL:${WITH_HOST_FST}>:${host_fst_code}>
