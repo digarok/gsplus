@@ -67,6 +67,8 @@ extern int g_audio_enable;            // defined in sound.c
 // Start in fullscreen mode
 extern int g_fullscreen;              // defined in adb.c, because weird driver writing for x
 
+extern int g_dbg_shell;
+
 // Specify the joystick - SDL2
 extern int g_joystick_number;         // defined in joystick_driver.c
 extern int g_joystick_x_axis;         // defined in joystick_driver.c
@@ -383,6 +385,8 @@ int parse_cli_options(int argc, char **argv) {
         g_dbg_enable_port = strtol(argv[i+1], 0, 0);
         glogf("%s Using %d for debug port", parse_log_prefix, g_dbg_enable_port);
         i++;
+    } else if (!strcmp("-g", argv[i])) {
+      g_dbg_shell = 1;
     } else {
       if ((i == (argc - 1)) && (strncmp("-", argv[i], 1) != 0)) {
         final_arg = argv[i];
@@ -392,6 +396,7 @@ int parse_cli_options(int argc, char **argv) {
       }
     }
   }
+  return 0;
 }
 
 void help_exit() {

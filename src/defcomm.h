@@ -94,7 +94,12 @@
 #define RET_C70A	0xb
 #define RET_C70D	0xc
 #define RET_IRQ		0xd
+#define RET_BP		0xe
+#define RET_MP		0xf
 
+#define FLAG_IGNORE_MP	0x01
+#define FLAG_IGNORE_BP	0x02
+#define FLAG_STEP		0x04
 
 #define MODE_BORDER		0
 #define MODE_TEXT		1

@@ -6,6 +6,7 @@
  */
 
 #include "defc.h"
+#include <stddef.h>
 
 #ifdef HAVE_RAWNET
 #include "rawnet/cs8900.h"
@@ -24,8 +25,13 @@ extern unsigned char iostrobe;
 
 extern word32 slow_mem_changed[];
 
-extern int g_num_breakpoints;
-extern word32 g_breakpts[];
+
+extern int g_num_mp_breakpoints;
+extern word32 g_mp_breakpoints[];
+
+extern int g_num_bp_breakpoints;
+extern word32 g_bp_breakpoints[];
+
 
 extern Page_info page_info_rd_wr[];
 
@@ -242,11 +248,40 @@ void moremem_init() {
 
 void fixup_brks()      {
   word32 page;
-  word32 tmp, tmp2;
   Pg_info val;
-  int is_wr_only;
-  int i, num;
+  int i;
 
+  /* need to clear break bit from all pages first? */
+  for (page = 0; page < 0xffff; ++page) {
+    val = GET_PAGE_INFO_RD(page);
+    val = (Pg_info)((ptrdiff_t)val &~ BANK_BREAK);
+    SET_PAGE_INFO_RD(page, val);
+  }
+  for (page = 0; page < 0xffff; ++page) {
+    val = GET_PAGE_INFO_WR(page);
+    val = (Pg_info)((ptrdiff_t)val &~ BANK_BREAK);
+    SET_PAGE_INFO_WR(page, val);
+  }
+
+
+  /* bp are read-only. mp are read/write */
+  for (i = 0; i < g_num_bp_breakpoints; ++i) {
+    page = (g_bp_breakpoints[i] >> 8) & 0xffff;
+    val = GET_PAGE_INFO_RD(page);
+    val = (Pg_info)((ptrdiff_t)val | BANK_BREAK);
+    SET_PAGE_INFO_RD(page, val);
+    /* why IO_TMP? */
+  }
+
+  for (i = 0; i < g_num_mp_breakpoints; ++i) {
+    page = (g_mp_breakpoints[i] >> 8) & 0xffff;
+    val = GET_PAGE_INFO_WR(page);
+    val = (Pg_info)((ptrdiff_t)val | BANK_BREAK);
+    SET_PAGE_INFO_WR(page, val);
+    /* why IO_TMP? */
+  }
+
+#if 0
   num = g_num_breakpoints;
   for(i = 0; i < num; i++) {
     page = (g_breakpts[i] >> 8) & 0xffff;
@@ -262,6 +297,8 @@ void fixup_brks()      {
     tmp2 = tmp | BANK_IO_TMP | BANK_BREAK;
     SET_PAGE_INFO_WR(page, val - tmp + tmp2);
   }
+#endif
+
 }
 
 void fixup_hires_on()      {

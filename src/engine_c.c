@@ -221,15 +221,11 @@ extern word32 slow_mem_changed[];
  _ macros do not do any MMU checking
 */
 
-#if 0
+#if 1
 #define MMU_CHECK(addr, val, bytes, in_page, in_bank)     \
-  if (abort_support && check_abort_breakpoints(addr, bytes, in_page, in_bank)) { \
-    g_abort_value = val;                                  \
-    g_abort_address = addr;                               \
-    g_ret1 = RET_ABORT;                                   \
+  if (abort_support && check_mp_breakpoints(addr, val, bytes, in_page, in_bank)) { \
+    g_ret1 = RET_MP;                                      \
     g_ret2 = saved_pc;                                    \
-    kpc = saved_pc;
-    goto abort;                                           \
     kpc = saved_pc;                                       \
     psr = saved_psr;                                      \
     goto finish;                                          \
@@ -404,12 +400,20 @@ extern word32 slow_mem_changed[];
 
 
 
-word32 g_num_kpc_breakpoints = 0;
-word32 g_kpc_breakpoints[20];
-int check_kpc_breakpoints(word32 addr) {
+extern int g_num_bp_breakpoints;
+extern word32 g_bp_breakpoints[];
+
+extern int g_num_mp_breakpoints;
+extern word32 g_mp_breakpoints[];
+
+extern word32 g_abort_address;
+extern word32 g_abort_value;
+extern word32 g_abort_bytes;
+
+int check_bp_breakpoints(word32 addr) {
   int i;
-  for (i = 0; i < g_num_kpc_breakpoints; ++i) {
-    if (g_kpc_breakpoints[i] == addr) {
+  for (i = 0; i < g_num_bp_breakpoints; ++i) {
+    if (g_bp_breakpoints[i] == addr) {
       return 1;
     }
   }
@@ -421,14 +425,16 @@ int check_kpc_breakpoints(word32 addr) {
    MMU hardware could, of course, store the address [and value?]
 
 */
-word32 g_abort_address;
-word32 g_abort_value;
 
-int check_abort_breakpoints(word32 addr, unsigned bytes, int in_page, int in_bank) {
+
+int check_mp_breakpoints(word32 addr, word32 value, unsigned bytes, int in_page, int in_bank) {
   byte *stat;
   word32 wstat;
   word32 mask = 0xffffff;
   int i;
+
+  unsigned xbytes = bytes;
+  word32 xaddr = addr;
 
   if (in_bank) mask = 0xffff;
   if (in_page) mask = 0xff;
@@ -437,8 +443,14 @@ int check_abort_breakpoints(word32 addr, unsigned bytes, int in_page, int in_ban
     stat = GET_PAGE_INFO_WR(((addr) >> 8) & 0xffff);
     wstat = PTR2WORD(stat) & 0xff;
     if ((wstat & BANK_BREAK)) {
-      for (i = 0; i < g_num_breakpoints; ++i) {
-        if (addr == g_breakpts[i]) return 1;
+      for (i = 0; i < g_num_mp_breakpoints; ++i) {
+        if (addr == g_mp_breakpoints[i]) {
+          g_abort_address = xaddr;
+          g_abort_bytes = xbytes;
+          mask = (1 << (xbytes << 3))-1;
+          g_abort_value = value & mask;
+          return 1;
+        }
       }
     }
 
@@ -951,8 +963,8 @@ word32 get_remaining_operands(word32 addr, word32 opcode, word32 psr, Fplus *fpl
   opcode = *ptr;                                                  \
   if (wstat & BANK_BREAK) {                                       \
     wstat &= ~BANK_BREAK;                                         \
-    if (kpc_support && check_kpc_breakpoints(addr)) {             \
-        FINISH(RET_KPC, addr);                                    \
+    if (kpc_support && check_bp_breakpoints(addr)) {              \
+        FINISH(RET_BP, addr);                                     \
     }                                                             \
   }                                                               \
   if((wstat & BANK_IO_TMP) || ((addr & 0xff) > 0xfc)) { \
@@ -1017,12 +1029,12 @@ int enter_engine(Engine_reg *engine_ptr)     {
   word32 saved_pc = 0;
   word32 saved_psr = 0;
 
-  word32 abort_support = g_num_breakpoints ? 1 : 0;
-  word32 kpc_support = g_num_kpc_breakpoints ? 1 : 0;
+  word32 abort_support = g_num_mp_breakpoints ? 1 : 0;
+  word32 kpc_support = g_num_bp_breakpoints ? 1 : 0;
 
 
-  if (engine_ptr->flags & 0x01) abort_support = 0;
-  if (engine_ptr->flags & 0x01) kpc_support = 0;
+  if (engine_ptr->flags & FLAG_IGNORE_MP) abort_support = 0;
+  if (engine_ptr->flags & FLAG_IGNORE_BP) kpc_support = 0;
 
 
   tmp_pc_ptr = 0;

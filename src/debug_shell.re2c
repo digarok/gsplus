@@ -1,0 +1,696 @@
+
+/*
+ * requires re2c (http://re2c.org)
+ *
+ */
+
+#include <stdio.h>
+#include "defc.h"
+#include <stdarg.h>
+#include <ctype.h>
+#include <string.h>
+
+#include "disasm.h"
+
+
+extern int g_fullscreen;
+extern int g_config_control_panel;
+extern Engine_reg engine;
+
+
+int g_num_breakpoints = 0;
+word32 g_breakpts[MAX_BREAK_POINTS];
+
+int g_num_mp_breakpoints = 0;
+word32 g_mp_breakpoints[MAX_BREAK_POINTS];
+
+int g_num_bp_breakpoints = 0;
+word32 g_bp_breakpoints[MAX_BREAK_POINTS];
+
+int g_dbg_shell = 0;
+int g_stepping = 0;
+
+word32 g_abort_address = 0;
+word32 g_abort_value = 0;
+word32 g_abort_bytes = 0;
+
+
+word32 do_hexdump(word32 address, int lines) {
+	static char hex[] = "0123456789abcdef";
+
+	char buffer1[64];
+	char buffer2[20];
+	int i;
+
+	while (--lines) {
+		char *cp = buffer1;
+		for (i = 0; i < 16; ++i) {
+			uint8_t c = get_memory_c(address + i, 0);
+			*cp++ = hex[c >> 4];
+			*cp++ = hex[c & 0x0f];
+			*cp++ = ' ';
+			if (i == 7) *cp++ = ' ';
+
+			buffer2[i] = (c < 0x80) && isprint(c) ? c : '.';
+		}
+		*cp = 0;
+		buffer2[16] = 0;
+		printf("%02x/%04x: %s  %s\n",
+			address >> 16, address & 0xffff,
+			buffer1, buffer2
+			);
+		address += 16;
+		address &= 0xffffff;
+	}
+
+	return address;
+}
+
+word32 do_list(word32 address, int *psr_ptr, int lines) {
+
+	char buffer[32];
+	int psr = *psr_ptr;
+	unsigned opcode;
+	unsigned dtype;
+	unsigned operand;
+	word32 pc;
+	int i;
+	int args;
+
+	while (lines--) {
+		pc = address;
+
+		opcode = get_memory_c(address++, 0) & 0xff;
+		dtype = disasm_types[opcode];
+		args = dtype >> 8;
+
+		switch (args) {
+			case 4:
+				args = psr & 0x20 ? 1 : 2;
+				break;
+			case 5:
+				args = psr & 0x10 ? 1 : 2;
+				break;
+		}
+		operand = 0;
+		switch(args) {
+			case 1:
+				operand = get_memory_c(address, 0);
+				break;
+			case 2:
+				operand = get_memory16_c(address, 0);
+				break;
+			case 3:
+				operand = get_memory24_c(address, 0);
+				break;
+		}
+		address += args;
+		buffer[0] = 0;
+
+		switch(dtype & 0xff) {
+			case ABS:
+				sprintf(buffer, "$%04x", operand);
+				break;
+			case ABSX:
+				sprintf(buffer, "$%04x,x", operand);
+				break;
+			case ABSY:
+				sprintf(buffer, "$%04x,y", operand);
+				break;
+
+    case ABSIND:
+      sprintf(buffer,"($%04x)",operand );
+      break;
+    case ABSXIND:
+      sprintf(buffer,"($%04x,x)",operand );
+      break;
+    case IMPLY:
+      break;
+    case ACCUM:
+      break;
+    case IMMED:
+      sprintf(buffer,"#$%0*x",args * 2, operand);
+      break;
+    case JUST8:
+      sprintf(buffer,"$%02x",operand);
+      break;
+    case DLOC:
+      sprintf(buffer,"$%02x",operand);
+      break;
+    case DLOCX:
+      sprintf(buffer,"$%02x,x",operand);
+      break;
+    case DLOCY:
+      sprintf(buffer,"$%02x,y",operand);
+      break;
+    case ABSLONG:
+      sprintf(buffer,"$%06x",operand);
+      break;
+    case ABSLONGX:
+      sprintf(buffer,"$%06x,x",operand);
+      break;
+    case DLOCIND:
+      sprintf(buffer,"($%02x)",operand);
+      break;
+    case DLOCINDY:
+      sprintf(buffer,"($%02x),y",operand);
+      break;
+    case DLOCXIND:
+      sprintf(buffer,"($%02x,x)",operand);
+      break;
+    case DLOCBRAK:
+      sprintf(buffer,"[$%02x]",operand);
+      break;
+    case DLOCBRAKY:
+      sprintf(buffer,"[$%02x],y",operand);
+      break;
+    case DISP8:
+      sprintf(buffer,"$%04x",
+              (address+(int8_t)operand) & 0xffff);
+      break;
+    case DISP8S:
+      sprintf(buffer,"$%02x,s",operand);
+      break;
+    case DISP8SINDY:
+      sprintf(buffer,"($%02x,s),y",operand);
+      break;
+    case DISP16:
+      sprintf(buffer,"$%04x",
+              (address+(int16_t)(operand)) & 0xffff);
+      break;
+    case MVPMVN:
+      sprintf(buffer,"$%02x,$%02x",operand & 0xff,operand >> 8);
+      break;
+    case SEPVAL:
+    	psr |= operand;
+      sprintf(buffer,"#$%02x",operand);
+      break;
+    case REPVAL:
+    	psr &= ~operand;
+      sprintf(buffer,"#$%02x",operand);
+      break;
+		}
+
+		printf("%02x/%04x: %s %-10s",
+			pc >> 16, pc & 0xffff,
+			disasm_opcodes[opcode], buffer);
+
+		printf("%02x", opcode);
+		for(i = 0 ; i < args; ++i) {
+			printf(" %02x", operand & 0xff);
+			operand >>= 8;
+		}
+		fputc('\n', stdout);
+	}
+	*psr_ptr = psr;
+	return address;
+}
+
+
+enum {
+	REG_A,
+	REG_B,
+	REG_D,
+	REG_E,
+	REG_K,
+	REG_MX,
+	REG_P,
+	REG_PC,
+	REG_S,
+	REG_X,
+	REG_Y,
+};
+
+static word32 to_hex(const char *iter, const char *end) {
+	word32 rv = 0;
+	while(iter != end) {
+		char c = *iter++;
+		rv <<= 4;
+		if (isdigit(c)) rv |= c - '0';
+		else rv |= (c | 0x20) - 'a' + 10;
+	}
+	return rv;
+}
+
+
+/*!re2c
+	re2c:define:YYCTYPE = char;
+	re2c:yyfill:enable = 0;
+	end = "\x00";
+	x = [A-Fa-f0-9];
+*/
+
+static int do_assign(const char *cp, int reg) {
+
+	word32 addr = 0;
+	int has_bank = 0;
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+
+	/*!re2c
+
+		* { return -1; }
+		x{6} end {
+			addr = to_hex(cp, cp + 6);
+			has_bank = 1;
+			goto next;
+		}
+		x{2} "/" x{4} end {
+			addr = to_hex(cp, cp + 2) << 16;
+			addr |= to_hex(cp + 3, cp + 7);
+			has_bank = 1;
+			goto next;
+		} 
+		x{4} end {
+			addr = to_hex(cp, cp + 4);
+			has_bank = 0;
+			goto next;
+		}
+		"%"[01]{2} end {
+			if (reg != REG_MX) return -1;
+			if (cp[1] == '1') addr |= 0x20;
+			if (cp[2] == '1') addr |= 0x10;
+			goto next;
+		}
+	*/
+
+next:
+
+	if (has_bank && reg != REG_PC) return -1;
+
+	switch(reg) {
+		case REG_A: engine.acc = addr; break;
+		case REG_X: engine.xreg = addr; break;
+		case REG_Y: engine.yreg = addr; break;
+		case REG_D: engine.direct = addr; break;
+		case REG_S: engine.stack = addr; break;
+		case REG_B: engine.dbank = addr & 0xff; break;
+
+		case REG_E:
+			engine.psr &= 0xff;
+			if (addr) engine.psr |= 0x0100;
+			break;
+
+		case REG_K:
+			addr = (addr & 0xff) << 16;
+			engine.kpc = (engine.kpc & 0xffff) | addr;
+			break;
+
+		case REG_PC:
+			if (!has_bank) addr |= (engine.kpc & 0xff0000);
+			engine.kpc = addr;
+			break;
+
+		case REG_P:
+			engine.psr &= ~0xff;
+			engine.psr |= (addr & 0xff);
+			break;
+
+		case REG_MX:
+			/* only 00, 10, 20, 30 are legal values */
+			if ((addr | 0x30) != 0x30) return -1;
+			engine.psr &= ~0x30;
+			engine.psr |= addr;
+			break;
+
+
+	}
+
+	/* fixup registers */
+	if (engine.psr & 0x0100) {
+		engine.psr |= 0x30;
+		engine.stack = (engine.stack & 0xff) | 0x0100;
+	}
+	if (engine.psr & 0x10) {
+		engine.xreg &= 0xff;
+		engine.yreg &= 0xff;
+	}
+	return 0;
+}
+
+
+static int addr_cmp(const void *a, const void *b) {
+	word32 aa = *(const word32 *)a;
+	word32 bb = *(const word32 *)b;
+
+	return (int)aa - (int)bb;
+}
+
+
+
+
+
+void show_bp() {
+	int i;
+	word32 addr;
+	for (i = 0; i < g_num_bp_breakpoints; ++i) {
+		addr = g_bp_breakpoints[i];
+		printf("%02x/%04x\n", addr >> 16, addr & 0xffff);
+	}
+}
+
+void set_bp(word32 addr) {
+	int i;
+
+	for (i = 0; i < g_num_bp_breakpoints; ++i) {
+		if (g_bp_breakpoints[i] == addr) break;
+	}
+
+	if (i < g_num_bp_breakpoints) return; /* already set */
+	if (g_num_bp_breakpoints == MAX_BREAK_POINTS) {
+		printf("Too many breakpoints.\n");
+		return;
+	}
+	g_bp_breakpoints[g_num_bp_breakpoints++] = addr;
+
+
+	qsort(g_bp_breakpoints, g_num_bp_breakpoints, sizeof(word32), addr_cmp);
+	fixup_brks();
+}
+
+void delete_bp(word32 addr) {
+	int i;
+
+	for (i = 0; i < g_num_bp_breakpoints; ++i) {
+		if (g_bp_breakpoints[i] == addr) break;
+	}
+
+
+	if (i == g_num_bp_breakpoints) return; /* not set */
+	g_bp_breakpoints[i] = 0;
+	g_bp_breakpoints[i] = g_bp_breakpoints[--g_num_bp_breakpoints]; 
+
+	qsort(g_bp_breakpoints, g_num_bp_breakpoints, sizeof(word32), addr_cmp);
+	fixup_brks();
+
+}
+static int do_bp_mp_common(const char *cp, word32 default_bank, word32 *breakpoints, int *num_breakpoints) {
+	/* bp
+	 * bp [+-] address
+	 */
+
+	int i = 0;
+	int plus = 1;
+	word32 addr = 0;
+	const char *YYCURSOR = NULL;
+	const char *YYMARKER = NULL;
+
+	while (*cp == ' ') ++cp;
+	switch(*cp) {
+		case '-': plus = 0;
+		case '+':
+			++cp;
+			break;
+	}
+
+	if (*cp == 0) {
+		/* just print them... */
+		for (i = 0; i < *num_breakpoints; ++i) {
+			addr = breakpoints[i];
+			printf("%02x/%04x\n", addr >> 16, addr & 0xffff);
+		}
+		return 0;
+	}
+
+	YYCURSOR = cp;
+	/*!re2c
+
+		* { return -1; }
+		x{6} end {
+			addr = to_hex(cp, cp + 6);
+			goto next;
+		}
+		x{2} "/" x{4} end {
+			addr = to_hex(cp, cp + 2) << 16;
+			addr |= to_hex(cp + 3, cp + 7);
+			goto next;
+		} 
+		x{4} end {
+			addr = to_hex(cp, cp + 4);
+			addr |= default_bank;
+			goto next;
+		}
+	*/
+
+next:
+
+	for (i = 0; i < *num_breakpoints; ++i) {
+		if (breakpoints[i] == addr) break;
+	}
+
+	if (plus) {
+		if (i < *num_breakpoints) return 0; /* already set */
+		if (*num_breakpoints == MAX_BREAK_POINTS) {
+			printf("Too many breakpoints.\n");
+			return 0;
+		}
+		breakpoints[(*num_breakpoints)++] = addr;
+	} else {
+		if (i == *num_breakpoints) return 0; /* not set */
+		breakpoints[i] = 0;
+		breakpoints[i] = breakpoints[--(*num_breakpoints)]; 
+	}
+
+	/* sort */
+	qsort(breakpoints, *num_breakpoints, sizeof(word32), addr_cmp);
+	fixup_brks();
+
+	return 0;
+}
+
+static int do_bp(const char *cp) {
+	return do_bp_mp_common(cp, engine.kpc & 0xff0000,
+		g_bp_breakpoints, &g_num_bp_breakpoints);
+}
+
+static int do_mp(const char *cp) {
+	return do_bp_mp_common(cp, engine.dbank << 16,
+		g_mp_breakpoints, &g_num_mp_breakpoints);
+}
+
+
+static word32 g_prev_address = 0;
+
+/* return -1 on error, 0 on success, 1 if debug shell should exit. */
+static int parse_command(const char *cp) {
+
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+
+	int addr = 0;
+	int has_bank = 0;
+	int has_addr = 0;
+
+	/*!re2c
+
+		_ = (" " | "\x00");
+
+		* { --YYCURSOR; if (cp == YYCURSOR) goto next; return -1; }
+
+		"a=" { return do_assign(YYCURSOR, REG_A); }
+		"x=" { return do_assign(YYCURSOR, REG_X); }
+		"y=" { return do_assign(YYCURSOR, REG_Y); }
+		"d=" { return do_assign(YYCURSOR, REG_D); }
+		"e=" { return do_assign(YYCURSOR, REG_E); }
+		"s=" { return do_assign(YYCURSOR, REG_S); }
+		"k=" { return do_assign(YYCURSOR, REG_K); }
+		"b=" { return do_assign(YYCURSOR, REG_B); }
+		"p=" { return do_assign(YYCURSOR, REG_P); }
+		"pc=" { return do_assign(YYCURSOR, REG_PC); }
+		"mx=" { return do_assign(YYCURSOR, REG_MX); }
+
+		"bp" / _ { return do_bp(YYCURSOR); }
+		"mp" / _ { return do_mp(YYCURSOR); }
+
+		"*" end { show_regs(); return 0; }
+
+		("q" | "quit" | "exit") end { return 'q'; }
+		"reset" end { do_reset(); return 0; }
+
+
+		x{6} {
+			addr = to_hex(cp, cp + 6);
+			has_bank = 1;
+			has_addr = 1;
+			goto next;
+		}
+		x{2} "/" x{4} {
+			addr = to_hex(cp, cp + 2) << 16;
+			addr |= to_hex(cp + 3, cp + 7);
+			has_bank = 1;
+			has_addr = 1;
+			goto next;
+		} 
+		x{1,4} {
+			addr = to_hex(cp, YYCURSOR);
+			has_bank = 0;
+			has_addr = 1;
+			goto next;
+		}
+	*/
+next:
+
+	/*!re2c
+		* { return  -1; }
+		";l" end {
+			int psr = engine.psr;
+			if (!has_addr) {
+				addr = g_prev_address;
+				if (!addr) {
+					addr = engine.kpc;
+					has_bank = 1;
+				}
+			}
+			if (!has_bank) {
+				addr |= (engine.kpc & 0xff0000);
+			}
+			g_prev_address = do_list(addr, &psr, 20);
+			return 0;
+		}
+		";h" end {
+			if (!has_addr) {
+				addr = g_prev_address;
+				has_bank = 1;
+			}
+			if (!has_bank) {
+				addr |= (engine.dbank << 16);
+			}
+			g_prev_address = do_hexdump(addr, 20);
+			return 0;
+		}
+		"g" end {
+			/* GO! */
+			if (has_addr) {
+				if (!has_bank) addr |= (engine.kpc & 0xff0000);
+				engine.kpc = addr;
+			}
+			g_stepping = 0;
+			return 1;
+		}
+		"s" end {
+			/* step */
+			if (has_addr) {
+				if (!has_bank) addr |= (engine.kpc & 0xff0000);
+				engine.kpc = addr;
+			}
+			g_stepping = 1;
+			return 1;
+		}
+
+	*/
+}
+
+char *readline(const char *prompt) {
+	static char buffer[1024];
+	fputs(prompt, stdout);
+	fflush(stdout);
+
+	for(;;) {
+		int ok = read(STDIN_FILENO, buffer, sizeof(buffer)-1);
+		if (ok < 0) {
+			if (ok == EINTR) continue;
+			return NULL;
+		}
+		if (ok == 0) return NULL;
+		while (ok) {
+			char c = buffer[ok-1];
+			if (c == ' ' || c == '\r' || c == '\n') {
+				--ok;
+				continue;
+			}
+			break;
+		}
+		buffer[ok] = 0;
+
+		return buffer;
+	}
+}
+
+int debug_shell(int code) {
+	int c;
+	char *cp;
+
+	int psr = engine.psr;
+
+
+	/* todo -- only clear IF exit pc == entry pc ? */
+	if (code == RET_BP) {
+		engine.flags |= FLAG_IGNORE_BP;
+		printf("Breakpoint hit:\n");
+	}
+	if (code == RET_MP) {
+		engine.flags |= FLAG_IGNORE_MP;
+		printf("Memory breakpoint hit\n");
+		switch (g_abort_bytes) {
+			case 1: g_abort_value &= 0xff; break;
+			case 2: g_abort_value &= 0xffff; break;
+			case 3: g_abort_value &= 0xffffff; break;
+		} 
+		printf("%06x: %0*x\n", g_abort_address, g_abort_bytes * 2, g_abort_value);
+	}
+
+	do_list(engine.kpc, &psr, 1);
+
+	for(;;) {
+		cp = readline("> ");
+		if (!cp) return 0;
+		if (!*cp) continue;
+		c = parse_command(cp);
+		if (c < 0) printf("error.\n");
+		if (c == 'q') return 0;
+		if (c == 1) return 1;
+	}
+}
+
+/* also called by do_step */
+void do_go()      {
+  int ret;
+  int ok;
+
+  /* if -g flag, start with debug shell ... */
+
+
+  g_config_control_panel = 1;
+  if (g_dbg_shell) {
+  	ok = debug_shell(0);
+  	if (!ok) return;
+  }
+
+  g_config_control_panel = 0;
+  clear_halt();
+
+  for(;;) {
+
+    ret = run_prog();
+    if (ret || g_stepping) {
+      g_config_control_panel = 1;
+      ok = debug_shell(ret);
+      if (!ok) return;
+      g_config_control_panel = 0;
+    }
+  }
+}
+
+/* legacy */
+
+
+
+void halt_printf(const char *fmt, ...)      {
+  va_list args;
+
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+
+  set_halt(1);
+}
+
+void halt2_printf(const char *fmt, ...)      {
+  va_list args;
+
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+
+  set_halt(2);
+}
