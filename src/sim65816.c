@@ -319,6 +319,7 @@ void sim65816_initglobals() {
   g_mem_size_total = 256*1024;  /* Total contiguous RAM from 0 */
 }
 
+#if 0
 void show_pc_log() {
   FILE *pcfile;
   Pc_log  *log_pc_ptr;
@@ -412,7 +413,7 @@ void show_pc_log() {
 
   fclose(pcfile);
 }
-
+#endif
 
 #define TOOLBOX_LOG_LEN         64
 
@@ -482,30 +483,6 @@ void show_toolbox_log() {
   }
 }
 
-#if 0
-/* get_memory_c is not used, get_memory_asm is, but this does what the */
-/*  assembly language would do */
-word32 get_memory_c(word32 loc, int diff_cycles)        {
-  byte    *addr;
-  word32 result;
-  int index;
-
-#ifdef CHECK_BREAKPOINTS
-  check_breakpoints_c(loc);
-#endif
-
-  index = loc >> 8;
-  result = page_info[index].rd;
-  if(result & BANK_IO_BIT) {
-    return get_memory_io(loc, diff_cycles);
-  }
-
-  addr = (byte *)((result & 0xffffff00) + (loc & 0xff));
-
-  return *addr;
-}
-#endif
-
 
 word32 get_memory_io(word32 loc, double *cyc_ptr) {
   int tmp;
@@ -554,71 +531,6 @@ word32 get_memory_io(word32 loc, double *cyc_ptr) {
   return 0;
 }
 
-#if 0
-word32 get_memory16_pieces(word32 loc, int diff_cycles)        {
-  return(get_memory_c(loc, diff_cycles) +
-         (get_memory_c(loc+1, diff_cycles) << 8));
-}
-
-word32 get_memory24(word32 loc, int diff_cycles)        {
-  return(get_memory_c(loc, diff_cycles) +
-         (get_memory_c(loc+1, diff_cycles) << 8) +
-         (get_memory_c(loc+2, diff_cycles) << 16));
-}
-#endif
-
-#if 0
-void set_memory(word32 loc, int val, int diff_cycles)      {
-  byte *ptr;
-  word32 new_addr;
-  word32 tmp;
-  word32 or_val;
-  int or_pos;
-  int old_slow_val;
-
-#ifdef CHECK_BREAKPOINTS
-  check_breakpoints_c(loc);
-#endif
-
-  tmp = GET_PAGE_INFO_WR((loc>>8) & 0xffff);
-  if(tmp & BANK_IO) {
-    set_memory_io(loc, val, diff_cycles);
-    return;
-  }
-
-  if((loc & 0xfef000) == 0xe0c000) {
-    printf("set_memory_special: non-io for addr %08x, %02x, %d\n",
-           loc, val, diff_cycles);
-    halt_printf("tmp: %08x\n", tmp);
-  }
-
-  ptr = (byte *)(tmp & (~0xff));
-
-  new_addr = loc & 0xffff;
-  old_slow_val = val;
-
-  if(tmp & BANK_SHADOW) {
-    old_slow_val = g_slow_memory_ptr[new_addr];
-  } else if(tmp & BANK_SHADOW2) {
-    new_addr += 0x10000;
-    old_slow_val = g_slow_memory_ptr[new_addr];
-  }
-
-  if(old_slow_val != val) {
-    g_slow_memory_ptr[new_addr] = val;
-    or_pos = (new_addr >> SHIFT_PER_CHANGE) & 0x1f;
-    or_val = DEP1(1, or_pos, 0);
-    if((new_addr >> CHANGE_SHIFT) >= SLOW_MEM_CH_SIZE) {
-      printf("new_addr: %08x\n", new_addr);
-      exit(12);
-    }
-    slow_mem_changed[(new_addr & 0xffff) >> CHANGE_SHIFT] |= or_val;
-  }
-
-  ptr[loc & 0xff] = val;
-
-}
-#endif
 
 void set_memory_io(word32 loc, int val, double *cyc_ptr) {
   word32 tmp;
@@ -664,25 +576,6 @@ void set_memory_io(word32 loc, int val, double *cyc_ptr) {
 
   return;
 }
-
-
-#if 0
-void check_breakpoints_c(word32 loc)      {
-  int index;
-  int count;
-  int i;
-
-  index = (loc & (MAX_BP_INDEX-1));
-  count = breakpoints[index].count;
-  if(count) {
-    for(i = 0; i < count; i++) {
-      if(loc == breakpoints[index].addrs[i]) {
-        halt_printf("Write hit breakpoint %d!\n", i);
-      }
-    }
-  }
-}
-#endif
 
 
 void show_regs_act(Engine_reg *eptr)      {
@@ -809,6 +702,7 @@ void check_engine_asm_defines() {
   CHECK(eptr, eptr->direct, ENGINE_REG_DIRECT, val1, val2);
   CHECK(eptr, eptr->psr, ENGINE_REG_PSR, val1, val2);
   CHECK(eptr, eptr->kpc, ENGINE_REG_KPC, val1, val2);
+  CHECK(eptr, eptr->flags, ENGINE_FLAGS, val1, val2);
 
   pcptr = &pclog;
   CHECK(pcptr, pcptr->dbank_kpc, LOG_PC_DBANK_KPC, val1, val2);
@@ -1005,8 +899,6 @@ int gsplusmain(int argc, char **argv) {
     do_go_debug();
   } else {
     do_go();
-    /* If we get here, we hit a breakpoint, call debug intfc */
-    do_debug_intfc();
   }
 
   // OG Notify emulator is being closed, and cannot accept events anymore
@@ -1473,7 +1365,7 @@ void setup_zip_speeds()      {
   }
 }
 
-void run_prog()      {
+int run_prog()      {
   Fplus   *fplus_ptr;
   Event   *this_event;
   Event   *db1;
@@ -1583,7 +1475,7 @@ void run_prog()      {
     engine.fcycles = prerun_fcycles;
     fcycles_stop = (g_event_start.next->dcycs - g_last_vbl_dcycs) +
                    0.001;
-    if(g_stepping) {
+    if(g_stepping || engine.flags) {
       fcycles_stop = prerun_fcycles;
     }
     g_fcycles_stop = fcycles_stop;
@@ -1619,6 +1511,7 @@ void run_prog()      {
     if(ret != 0) {
       g_engine_action++;
       handle_action(ret);
+      ret >>= 28;
     }
 
     if(halt_sim == HALT_EVENT) {
@@ -1715,16 +1608,24 @@ void run_prog()      {
     if(halt_sim != 0 && halt_sim != HALT_EVENT) {
       break;
     }
+    if (ret == RET_MP) break;
+    if (ret == RET_BP) break;
+    engine.flags &= ~(FLAG_IGNORE_BP | FLAG_IGNORE_MP);
     if(g_stepping) {
+      ret = 0;
       break;
     }
   }
 
+#if 0
   if(!g_testing) {
     printf("leaving run_prog, halt_sim:%d\n", halt_sim);
   }
+#endif
 
   x_auto_repeat_on(0);
+
+  return ret;
 }
 
 void add_irq(word32 irq_mask)      {
@@ -2328,6 +2229,7 @@ void init_reg()      {
   engine.direct = 0;
   engine.psr = 0x134;
   engine.fplus_ptr = 0;
+  engine.flags = 0;
 
 }
 
@@ -2374,6 +2276,10 @@ void handle_action(word32 ret)      {
       break;
     case RET_STP:
       do_stp();
+      break;
+    case RET_BP:
+    case RET_MP:
+      /* handled elsewhere */
       break;
     default:
       halt_printf("Unknown special action: %08x!\n", ret);

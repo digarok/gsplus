@@ -385,7 +385,7 @@ double remove_event_scc(int type);
 void show_all_events(void);
 void show_pmhz(void);
 void setup_zip_speeds(void);
-void run_prog(void);
+int run_prog(void);
 void add_irq(word32 irq_mask);
 void remove_irq(word32 irq_mask);
 void take_irq(int is_it_brk);
