@@ -230,6 +230,9 @@ extern word32 slow_mem_changed[];
     g_ret2 = saved_pc;                                    \
     kpc = saved_pc;
     goto abort;                                           \
+    kpc = saved_pc;                                       \
+    psr = saved_psr;                                      \
+    goto finish;                                          \
   }
 #else
 #define MMU_CHECK(addr, val, bytes, in_page, in_bank)
@@ -936,6 +939,7 @@ word32 get_remaining_operands(word32 addr, word32 opcode, word32 psr, Fplus *fpl
 
 #define FETCH_OPCODE                                              \
   addr = saved_pc = kpc;                                          \
+  saved_psr = psr;                                                \
   CYCLES_PLUS_2;                                                  \
   stat = GET_PAGE_INFO_RD(((addr) >> 8) & 0xffff);                \
   wstat = PTR2WORD(stat) & 0xff;                                  \
@@ -1008,6 +1012,7 @@ int enter_engine(Engine_reg *engine_ptr)     {
   word32 tmp1, tmp2;
 
   word32 saved_pc = 0;
+  word32 saved_psr = 0;
 
   word32 abort_support = g_num_breakpoints ? 1 : 0;
   word32 kpc_support = g_num_kpc_breakpoints ? 1 : 0;

@@ -1055,14 +1055,14 @@ defs_instr_start_16	.word	0
 #  define TSB_INST(in_bank)			\
 	tmp1 = arg | acc;			\
 	CYCLES_PLUS_1;				\
-	zero = arg & acc;			\
-	SET_MEMORY8(addr_latch, tmp1);
+	SET_MEMORY8(addr_latch, tmp1); \
+	zero = arg & acc;
 # else
 #  define TSB_INST(in_bank)			\
 	tmp1 = arg | acc;			\
 	CYCLES_PLUS_1;				\
-	zero = arg & acc;			\
-	SET_MEMORY16(addr_latch, tmp1, in_bank);
+	SET_MEMORY16(addr_latch, tmp1, in_bank); \
+	zero = arg & acc;
 # endif
 #endif
 
@@ -1107,15 +1107,15 @@ defs_instr_start_16	.word	0
 	psr = (psr & 0x1fe) + ((arg >> 7) & 1);	\
 	tmp1 = (arg << 1) & 0xff;		\
 	CYCLES_PLUS_1;				\
-	SET_NEG_ZERO8(tmp1);			\
-	SET_MEMORY8(addr_latch, tmp1);
+	SET_MEMORY8(addr_latch, tmp1);		\
+	SET_NEG_ZERO8(tmp1);
 # else
 #  define ASL_INST(in_bank)			\
 	psr = (psr & 0x1fe) + ((arg >> 15) & 1);\
 	tmp1 = (arg << 1) & 0xffff;		\
 	CYCLES_PLUS_1;				\
-	SET_NEG_ZERO16(tmp1);			\
-	SET_MEMORY16(addr_latch, tmp1, in_bank);
+	SET_MEMORY16(addr_latch, tmp1, in_bank);\
+	SET_NEG_ZERO16(tmp1);
 # endif
 #endif
 
@@ -1302,14 +1302,14 @@ defs_instr_start_16	.word	0
 	arg = arg & 0xff;			\
 	tmp1 = arg & ~acc;			\
 	CYCLES_PLUS_1;				\
-	zero = arg & acc;			\
-	SET_MEMORY8(addr_latch, tmp1);
+	SET_MEMORY8(addr_latch, tmp1);		\
+	zero = arg & acc;
 # else
 #  define TRB_INST(in_bank)			\
 	tmp1 = arg & ~acc;			\
 	CYCLES_PLUS_1;				\
-	zero = arg & acc;			\
-	SET_MEMORY16(addr_latch, tmp1, in_bank);
+	SET_MEMORY16(addr_latch, tmp1, in_bank);\
+	zero = arg & acc;
 # endif
 #endif
 
