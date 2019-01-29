@@ -250,7 +250,10 @@ extern word32 slow_mem_changed[];
   stack = stack & 0xffff;
 
 #define PUSH16(arg)                                       \
-  MMU_CHECK(stack, arg, 2, 1, 1)                          \
+  tmp2 = stack - 1;                                       \
+  if (psr >> 8) tmp2 = (tmp2 & 0xff) | 0x0100;            \
+  tmp2 &= 0xffff;                                         \
+  MMU_CHECK(tmp2, arg, 2, psr >> 8, 1)                    \
   _PUSH16(arg)
 
 #define _PUSH16(arg)                                             \
