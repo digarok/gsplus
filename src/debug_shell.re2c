@@ -18,9 +18,6 @@ extern int g_config_control_panel;
 extern Engine_reg engine;
 
 
-int g_num_breakpoints = 0;
-word32 g_breakpts[MAX_BREAK_POINTS];
-
 int g_num_mp_breakpoints = 0;
 word32 g_mp_breakpoints[MAX_BREAK_POINTS];
 
@@ -33,6 +30,20 @@ int g_stepping = 0;
 word32 g_abort_address = 0;
 word32 g_abort_value = 0;
 word32 g_abort_bytes = 0;
+
+
+/*
+ * todo 
+ * - tool break support
+ * - gs/os break support
+ * - p8 break support
+ * - nifty list data files
+ * - gsbug template files
+ * - r -> run to next rts/rtl
+ * - n -> step over jsl/jsr [ temporary breakpoints? ]
+ * - ! -> mini assembler
+ * - option to drop into debug shell on BRK command
+ */
 
 
 word32 do_hexdump(word32 address, int lines) {
@@ -339,10 +350,11 @@ static int addr_cmp(const void *a, const void *b) {
 
 
 
-
+#if 0
 void show_bp() {
 	int i;
 	word32 addr;
+	printf("Breakpoints:\n");
 	for (i = 0; i < g_num_bp_breakpoints; ++i) {
 		addr = g_bp_breakpoints[i];
 		printf("%02x/%04x\n", addr >> 16, addr & 0xffff);
@@ -382,8 +394,118 @@ void delete_bp(word32 addr) {
 
 	qsort(g_bp_breakpoints, g_num_bp_breakpoints, sizeof(word32), addr_cmp);
 	fixup_brks();
+}
+#endif
+
+
+void show_bp(int type) {
+	int i;
+	word32 addr;
+	word32 *breakpoints;
+	int num_breakpoints;
+
+	switch(type) {
+		case 'B':
+			breakpoints = g_bp_breakpoints;
+			num_breakpoints = g_num_bp_breakpoints;
+			break;
+		case 'M':
+			breakpoints = g_mp_breakpoints;
+			num_breakpoints = g_num_mp_breakpoints;
+			break;
+		default:
+			fputs("Invalid breakpoint type\n", stderr);
+			return;
+	}
+
+	fputs("Breakpoints:\n", stdout);
+	for (i = 0; i < num_breakpoints; ++i) {
+		addr = breakpoints[i];
+		printf("%02x/%04x\n", addr >> 16, addr & 0xffff);
+	}
+}
+
+void set_bp(int type, word32 addr) {
+	int i;
+
+	word32 *breakpoints;
+	int num_breakpoints;
+
+	switch(type) {
+		case 'B':
+			breakpoints = g_bp_breakpoints;
+			num_breakpoints = g_num_bp_breakpoints;
+			break;
+		case 'M':
+			breakpoints = g_mp_breakpoints;
+			num_breakpoints = g_num_mp_breakpoints;
+			break;
+		default:
+			fputs("Invalid breakpoint type\n", stderr);
+			return;
+	}
+
+	for (i = 0; i < num_breakpoints; ++i) {
+		if (breakpoints[i] == addr) break;
+	}
+
+	if (i < num_breakpoints) return; /* already set */
+	if (num_breakpoints == MAX_BREAK_POINTS) {
+		printf("Too many breakpoints.\n");
+		return;
+	}
+	breakpoints[num_breakpoints++] = addr;
+
+	switch(type) {
+		case 'B': g_num_bp_breakpoints = num_breakpoints; break;
+		case 'M': g_num_mp_breakpoints = num_breakpoints; break;
+	}
+
+	qsort(breakpoints, num_breakpoints, sizeof(word32), addr_cmp);
+	fixup_brks();
+}
+
+void delete_bp(int type, word32 addr) {
+	int i;
+
+	word32 *breakpoints;
+	int num_breakpoints;
+
+	switch(type) {
+		case 'B':
+			breakpoints = g_bp_breakpoints;
+			num_breakpoints = g_num_bp_breakpoints;
+			break;
+		case 'M':
+			breakpoints = g_mp_breakpoints;
+			num_breakpoints = g_num_mp_breakpoints;
+			break;
+		default:
+			fputs("Invalid breakpoint type\n", stderr);
+			return;
+	}
+
+	for (i = 0; i < num_breakpoints; ++i) {
+		if (breakpoints[i] == addr) break;
+	}
+
+	switch(type) {
+		case 'B': g_num_bp_breakpoints = num_breakpoints; break;
+		case 'M': g_num_mp_breakpoints = num_breakpoints; break;
+	}
+
+	if (i == num_breakpoints) return; /* not set */
+	breakpoints[i] = 0;
+	breakpoints[i] = breakpoints[--num_breakpoints]; 
+
+	qsort(breakpoints, num_breakpoints, sizeof(word32), addr_cmp);
+	fixup_brks();
+
 
 }
+
+
+
 static int do_bp_mp_common(const char *cp, word32 default_bank, word32 *breakpoints, int *num_breakpoints) {
 	/* bp
 	 * bp [+-] address
@@ -468,6 +590,29 @@ static int do_mp(const char *cp) {
 		g_mp_breakpoints, &g_num_mp_breakpoints);
 }
 
+static void do_help(void) {
+
+	fputs(
+		"  *                Print registers\n"
+		"  reg=value        Assign register (a,x,y,etc)\n"
+		"  reset            Reset computer\n"
+		"  quit             exit debugger\n"
+		"  s                single step\n"
+		"  g                go\n"
+		"  bp               List PC breakpoints\n"
+		"  mp               List memory breakpoints\n"
+		"\n"
+		"  [address];l      List\n"
+		"  [address];h      Hexdump\n"
+		"  [address];bp     Set PC breakpoint\n"
+		"  [address];bp-    Remove PC breakpoint\n"
+		"  [address];mp     Set memory breakpoint\n"
+		"  [address];mp-    Remove memory breakpoint\n"
+		"\n"
+		"\n"
+		"Address = 12/3456, 123456, or 1234\n",
+		stdout);
+}
 
 static word32 g_prev_address = 0;
 
@@ -476,10 +621,15 @@ static int parse_command(const char *cp) {
 
 	const char *YYCURSOR = cp;
 	const char *YYMARKER = NULL;
+	const char *ptr = NULL;
 
 	int addr = 0;
 	int has_bank = 0;
 	int has_addr = 0;
+
+	/*!stags:re2c format = "const char *@@;\n"; */
+
+	while (*cp == ' ') ++cp;
 
 	/*!re2c
 
@@ -499,13 +649,14 @@ static int parse_command(const char *cp) {
 		"pc=" { return do_assign(YYCURSOR, REG_PC); }
 		"mx=" { return do_assign(YYCURSOR, REG_MX); }
 
-		"bp" / _ { return do_bp(YYCURSOR); }
-		"mp" / _ { return do_mp(YYCURSOR); }
+		"bp" end { show_bp('B'); return 0; }
+		"mp" end { show_bp('M'); return 0; }
 
 		"*" end { show_regs(); return 0; }
 
 		("q" | "quit" | "exit") end { return 'q'; }
 		"reset" end { do_reset(); return 0; }
+		("help" | "?") end { do_help(); return 0; }
 
 
 		x{6} {
@@ -575,6 +726,26 @@ next:
 			}
 			g_stepping = 1;
 			return 1;
+		}
+
+		";bp" @ptr [+-]? end {
+			char plus = *ptr;
+			if (!has_addr && plus == 0) { show_bp('B'); return 0; }
+			if (!has_addr) return -1;
+			if (!has_bank) addr |= (engine.kpc & 0xff0000);
+			if (plus == '-') delete_bp('B', addr);
+			else set_bp('B', addr);
+			return 0;
+		}
+
+		";mp" @ptr [+-]? end {
+			char plus = *ptr;
+			if (!has_addr && plus == 0) { show_bp('M'); return 0; }
+			if (!has_addr) return -1;
+			if (!has_bank) addr |= (engine.kpc & 0xff0000);
+			if (plus == '-') delete_bp('M', addr);
+			else set_bp('M', addr);
+			return 0;
 		}
 
 	*/
