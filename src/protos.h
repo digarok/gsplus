@@ -172,9 +172,9 @@ void do_debug_intfc(void);
 word32 dis_get_memory_ptr(word32 addr);
 void show_one_toolset(FILE *toolfile, int toolnum, word32 addr);
 void show_toolset_tables(word32 a2bank, word32 addr);
-void set_bp(word32 addr);
-void show_bp(void);
-void delete_bp(word32 addr);
+void set_bp(int type, word32 addr);
+void show_bp(int type);
+void delete_bp(int type, word32 addr);
 void do_blank(void);
 void do_go(void);
 void do_go_debug(void);  // socket debug ver
