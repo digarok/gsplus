@@ -88,8 +88,7 @@
 #define RET_MVN		0x5
 #define RET_WAI		0x6
 #define RET_STP		0x7
-#define RET_ADD_DEC_8	0x8
-#define RET_ADD_DEC_16	0x9
+#define RET_HALT	0x8
 #define RET_C700	0xa
 #define RET_C70A	0xb
 #define RET_C70D	0xc

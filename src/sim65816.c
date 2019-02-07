@@ -1514,11 +1514,11 @@ int run_prog()      {
       ret >>= 28;
     }
 
-    if(halt_sim == HALT_EVENT) {
+    if(halt_sim & HALT_EVENT) {
       g_engine_halt_event++;
       /* if we needed to stop to check for interrupts, */
       /*  clear halt */
-      halt_sim = 0;
+      halt_sim &= ~HALT_EVENT;
     }
 
 #if 0
@@ -1535,7 +1535,7 @@ int run_prog()      {
 
     this_event = g_event_start.next;
     while(dcycs >= this_event->dcycs) {
-      if(halt_sim != 0 && halt_sim != HALT_EVENT) {
+      if(halt_sim & ~HALT_EVENT) {
         break;
       }
       if(g_stepping) {
@@ -1605,9 +1605,7 @@ int run_prog()      {
     }
 #endif
 
-    if(halt_sim != 0 && halt_sim != HALT_EVENT) {
-      break;
-    }
+
     if (ret == RET_MP) break;
     if (ret == RET_BP) break;
     engine.flags &= ~(FLAG_IGNORE_BP | FLAG_IGNORE_MP);
@@ -1615,6 +1613,12 @@ int run_prog()      {
       ret = 0;
       break;
     }
+    if(halt_sim & 0x07) {
+      halt_sim &= ~0x07;
+      ret = RET_HALT;
+      break;
+    }
+
   }
 
 #if 0
@@ -2256,14 +2260,6 @@ void handle_action(word32 ret)      {
     case RET_C70D:
       do_c70d(ret);
       break;
-#if 0
-    case RET_ADD_DEC_8:
-      do_add_dec_8(ret);
-      break;
-    case RET_ADD_DEC_16:
-      do_add_dec_16(ret);
-      break;
-#endif
     case RET_IRQ:
       irq_printf("Special fast IRQ response.  irq_pending: %x\n",
                  g_irq_pending);
@@ -2277,6 +2273,7 @@ void handle_action(word32 ret)      {
     case RET_BP:
     case RET_MP:
     case RET_BRK:
+    case RET_HALT:
       /* handled elsewhere */
       break;
     default:

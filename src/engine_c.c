@@ -880,7 +880,8 @@ word32 get_itimer()        {
 }
 
 void set_halt_act(int val)      {
-  if(val == 1 && g_ignore_halts && !g_user_halt_bad) {
+  extern int g_dbg_shell;
+  if(val == 1 && g_ignore_halts && !g_user_halt_bad && !g_dbg_shell) {
     g_code_red++;
   } else {
     halt_sim |= val;

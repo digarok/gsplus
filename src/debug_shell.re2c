@@ -876,6 +876,12 @@ int debug_shell(int code) {
 		} 
 		printf("%06x: %0*x\n", g_abort_address, g_abort_bytes * 2, g_abort_value);
 	}
+	if (code == RET_BRK) {
+		/* hit a BRK op */
+	}
+	if (code == RET_HALT) {
+		/* halt_printf */
+	}
 
 	do_list(engine.kpc, &psr, 1);
 
