@@ -339,6 +339,44 @@ next:
 	return 0;
 }
 
+static word32 do_mem_assign(word32 addr, const char *cp) {
+	/* "string" -> pokes ASCII chars */
+	/* 'string' -> pokes ASCII chars | 0x80 */
+	/* xx -> pokes hex byte */
+
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+
+	for(;;) {
+		const char *start = YYCURSOR;
+		/*!re2c
+			end { return addr; }
+			" " { continue; }
+			* {
+				fputs("Invalid data\n", stderr);
+				return addr;
+			}
+			x{2} {
+				set_memory_c(addr++, to_hex(start, YYCURSOR), 0);
+				continue;
+			}
+			["] [^"\x00]* ["] {
+				for(++start; start < YYCURSOR -1; ++start) {
+					set_memory_c(addr++, *start, 0);				
+				}
+				continue;
+			}
+			['] [^'\x00]* ['] {
+				for(++start; start < YYCURSOR -1; ++start) {
+					set_memory_c(addr++, *start | 0x80, 0);				
+				}
+				continue;
+			}
+
+		*/
+	}
+}
+
 
 static int addr_cmp(const void *a, const void *b) {
 	word32 aa = *(const word32 *)a;
@@ -707,6 +745,16 @@ command:
 	/*!re2c
 		* { return  -1; }
 		";l" end {
+
+		":" {
+			if (!has_addr) {
+				addr = g_prev_address;
+				has_bank = 1;
+			}
+			if (!has_bank) addr |= (g_prev_address & 0xff0000);
+			g_prev_address = do_mem_assign(addr, YYCURSOR);
+			return 0;
+		}
 			int psr = engine.psr;
 			if (!has_addr) {
 				addr = g_prev_address;
