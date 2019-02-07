@@ -44,11 +44,13 @@ void U_STACK_TRACE();
 
 #ifdef GSPLUS_LITTLE_ENDIAN
 // @todo: look at using <byteswap.h> for fastest platform implementations
-# define BIGEND(a)    ((((a) >> 24) & 0xff) +   \
-																							(((a) >> 8) & 0xff00) +   \
-																							(((a) << 8) & 0xff0000) +   \
-																							(((a) << 24) & 0xff000000))
-# define GET_BE_WORD16(a) ((((a) >> 8) & 0xff) + (((a) << 8) & 0xff00))
+# define BIGEND(a)    (\
+	(((a) >> 24) & 0xff) +     \
+	(((a) >> 8) & 0xff00) +    \
+	(((a) & 0xff00) << 8) +    \
+	(((a) & 0xff  ) << 24)     \
+	)
+# define GET_BE_WORD16(a) ((((a) >> 8) & 0xff) + ((((a) & 0xff) << 8)))
 # define GET_BE_WORD32(a) (BIGEND(a))
 #else
 # define BIGEND(a) (a)
