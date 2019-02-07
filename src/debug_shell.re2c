@@ -5,17 +5,23 @@
  */
 
 #include <stdio.h>
-#include "defc.h"
 #include <stdarg.h>
 #include <ctype.h>
 #include <string.h>
 
+#include <unistd.h>
+#include <signal.h>
+
+#include "defc.h"
 #include "disasm.h"
+
+
 
 
 extern int g_fullscreen;
 extern int g_config_control_panel;
 extern Engine_reg engine;
+extern int halt_sim;
 
 
 int g_num_mp_breakpoints = 0;
@@ -884,13 +890,27 @@ int debug_shell(int code) {
 	}
 }
 
+static void do_sig_intr(int sig, siginfo_t *info, void *context) {
+	set_halt(4);
+}
+
 /* also called by do_step */
 void do_go()      {
   int ret;
   int ok;
 
   /* if -g flag, start with debug shell ... */
+  if (isatty(STDIN_FILENO)) {
+  	struct sigaction sa;
+  	memset(&sa, 0, sizeof(sa));
+  	sigemptyset(&sa.sa_mask);
+  	sa.sa_flags = SA_SIGINFO;
+  	sa.sa_sigaction = do_sig_intr;
+  	sigaction(SIGINT, &sa, NULL);
 
+  } else {
+  	g_dbg_shell = 0;  	
+  }
 
   g_config_control_panel = 1;
   if (g_dbg_shell) {
@@ -909,6 +929,7 @@ void do_go()      {
       ok = debug_shell(ret);
       if (!ok) return;
       g_config_control_panel = 0;
+      halt_sim &= ~0x07; /* clear any pending control-Cs, etc. */
     }
   }
 }
