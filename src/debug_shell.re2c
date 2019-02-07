@@ -702,6 +702,42 @@ static int parse_command(const char *cp) {
 		"reset" end { do_reset(); return 0; }
 		("help" | "?") end { do_help(); return 0; }
 
+		"pc" {
+			addr = engine.kpc;
+			has_addr = 1;
+			has_bank = 1;
+			goto indir;
+		}
+		"a" {
+			addr = engine.acc;
+			has_addr = 1;
+			has_bank = 0;
+			goto indir;
+		}
+		"x" {
+			addr = engine.xreg;
+			has_addr = 1;
+			has_bank = 0;
+			goto indir;
+		}
+		"y" {
+			addr = engine.yreg;
+			has_addr = 1;
+			has_bank = 0;
+			goto indir;
+		}
+		"s" {
+			addr = engine.stack;
+			has_addr = 1;
+			has_bank = 1;
+			goto indir;
+		}
+		"d" {
+			addr = engine.dbank;
+			has_addr = 1;
+			has_bank = 1;
+			goto indir;
+		}
 
 		x{6} {
 			addr = to_hex(cp, cp + 6);
