@@ -2239,9 +2239,6 @@ void handle_action(word32 ret)      {
 
   type = EXTRU(ret,3,4);
   switch(type) {
-    case RET_BREAK:
-      do_break(ret & 0xff);
-      break;
     case RET_COP:
       do_cop(ret & 0xff);
       break;
@@ -2279,6 +2276,7 @@ void handle_action(word32 ret)      {
       break;
     case RET_BP:
     case RET_MP:
+    case RET_BRK:
       /* handled elsewhere */
       break;
     default:

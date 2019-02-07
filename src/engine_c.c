@@ -1026,15 +1026,16 @@ int enter_engine(Engine_reg *engine_ptr)     {
   word32 addr_latch;
   word32 tmp1, tmp2;
 
+  word32 flags = 0;
   word32 saved_pc = 0;
   word32 saved_psr = 0;
 
   word32 abort_support = g_num_mp_breakpoints ? 1 : 0;
   word32 kpc_support = g_num_bp_breakpoints ? 1 : 0;
 
-
-  if (engine_ptr->flags & FLAG_IGNORE_MP) abort_support = 0;
-  if (engine_ptr->flags & FLAG_IGNORE_BP) kpc_support = 0;
+  flags = engine_ptr->flags;
+  if (flags & FLAG_IGNORE_MP) abort_support = 0;
+  if (flags & FLAG_IGNORE_BP) kpc_support = 0;
 
 
   tmp_pc_ptr = 0;

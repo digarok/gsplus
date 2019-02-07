@@ -81,7 +81,7 @@
 #define FPLUS_PLUS_3		0x10
 #define FPLUS_PLUS_X_M1		0x18
 
-#define RET_BREAK	0x1
+#define RET_BRK		0x1
 #define RET_COP		0x2
 #define RET_WDM		0x3
 #define RET_MVP		0x4
@@ -100,6 +100,7 @@
 #define FLAG_IGNORE_MP	0x01
 #define FLAG_IGNORE_BP	0x02
 #define FLAG_STEP		0x04
+#define FLAG_WANT_BRK	0x08
 
 #define MODE_BORDER		0
 #define MODE_TEXT		1

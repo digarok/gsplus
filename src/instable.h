@@ -71,16 +71,17 @@ brk_testing_SYM
 	DEC_KPC2;
 	CYCLES_PLUS_2
 	b	dispatch_done
-	depi	RET_BREAK,3,4,ret0
+	depi	RET_BRK,3,4,ret0
 
 #else
 	GET_1BYTE_ARG;
-	if(g_testing) {
+
+	if(flags & FLAG_WANT_BRK) {
 		CYCLES_PLUS_2;
-		FINISH(RET_BREAK, arg);
+		FINISH(RET_BRK, arg);
 	}
-	g_num_brk++;
 	INC_KPC_2;
+	g_num_brk++;
 
 	psr = psr & (~0x82);
 	psr |= (neg << 7);
