@@ -786,7 +786,6 @@ indir:
 command:
 	/*!re2c
 		* { return  -1; }
-		";l" end {
 
 		":" {
 			if (!has_addr) {
@@ -797,6 +796,8 @@ command:
 			g_prev_address = do_mem_assign(addr, YYCURSOR);
 			return 0;
 		}
+
+		";" ? "l" end {
 			int psr = engine.psr;
 			if (!has_addr) {
 				addr = g_prev_address;
