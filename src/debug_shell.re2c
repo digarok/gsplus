@@ -635,7 +635,7 @@ static int parse_command(const char *cp) {
 
 		_ = (" " | "\x00");
 
-		* { --YYCURSOR; if (cp == YYCURSOR) goto next; return -1; }
+		* { --YYCURSOR; if (cp == YYCURSOR) goto command; return -1; }
 
 		"a=" { return do_assign(YYCURSOR, REG_A); }
 		"x=" { return do_assign(YYCURSOR, REG_X); }
@@ -663,24 +663,47 @@ static int parse_command(const char *cp) {
 			addr = to_hex(cp, cp + 6);
 			has_bank = 1;
 			has_addr = 1;
-			goto next;
+			goto indir;
 		}
 		x{2} "/" x{4} {
 			addr = to_hex(cp, cp + 2) << 16;
 			addr |= to_hex(cp + 3, cp + 7);
 			has_bank = 1;
 			has_addr = 1;
-			goto next;
+			goto indir;
 		} 
 		x{1,4} {
 			addr = to_hex(cp, YYCURSOR);
 			has_bank = 0;
 			has_addr = 1;
-			goto next;
+			goto indir;
 		}
 	*/
-next:
+indir:
+	/* only gets here if address specified */
+	for(;;) {
+	/*!re2c
+		"" { break; }
+		"^" {
+			/* 3-byte indirection */
+			if (!has_bank) addr = (g_prev_address & 0xff0000) | addr;
+			addr = get_memory24_c(addr, 0);
+			has_bank = 1;
+			continue; 
+		}
+		"@" {
+			/* 2-byte indirection */
+			/* 3-byte indirection */
+			if (!has_bank) addr = (g_prev_address & 0xff0000) | addr;
+			word32 b = addr & 0xff0000;
+			addr = get_memory16_c(addr, 0) | b;
+			has_bank = 1;
+			continue; 
+		}
+	*/
+	}
 
+command:
 	/*!re2c
 		* { return  -1; }
 		";l" end {
