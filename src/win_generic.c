@@ -302,8 +302,15 @@ LRESULT CALLBACK win_event_handler(HWND hwnd, UINT umsg, WPARAM wParam, LPARAM l
       DragFinish((HDROP)wParam);
       break;
     case WM_KILLFOCUS:
-		  adb_all_keys_up(); // ALT-TAB doesn't send key-up messages
-		  break;
+      nb_win32_key = 0;
+      adb_all_keys_up(); // ALT-TAB doesn't send key-up messages
+      break;
+    case WM_ACTIVATE:
+      if (wParam == WA_INACTIVE) {
+        nb_win32_key = 0;
+        adb_all_keys_up();
+      }
+      break;
   }
   switch(umsg) {
     HANDLE_MSG(hwnd, WM_KEYUP, WIN_EVENT_KEY);
