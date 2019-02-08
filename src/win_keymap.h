@@ -19,7 +19,8 @@ int g_a2_key_to_wsym[][3] = {
 	{ kVK_F13,					VK_F13,	0 },
 	{ kVK_F14,					VK_F14,	0 },
 	{ kVK_F15,					VK_F15,	0 },
-	{ kVK_Reset, 				VK_PAUSE, VK_CANCEL+0x100 },
+	{ kVK_Reset, 				VK_PAUSE, VK_PAUSE+0x100 },
+	{ kVK_Reset, 				VK_CANCEL, VK_CANCEL+0x100 },
 
 	{ kVK_ANSI_Grave,			VK_OEM_3, 0 },		/* '`' */
 	{ kVK_ANSI_1,				'1', 0 },
@@ -57,8 +58,6 @@ int g_a2_key_to_wsym[][3] = {
 	{ kVK_End,					VK_END+0x100, 0 },
 	{ kVK_PageDown,				VK_NEXT+0x100, 0 },
 
-
-
 	// { kVK_CapsLock,			VK_CAPITAL, 0 },  // Handled specially!
 	{ kVK_ANSI_A,				'A', 0 },
 	{ kVK_ANSI_S,				'S', 0 },
@@ -73,8 +72,9 @@ int g_a2_key_to_wsym[][3] = {
 	{ kVK_ANSI_Quote,			VK_OEM_7, 0 },	/* single quote */
 	{ kVK_Return,				VK_RETURN, 0 },
 
-
 	{ kVK_Shift,				VK_SHIFT, 0 },
+	{ kVK_Shift,				VK_LSHIFT, 0 },
+	{ kVK_Shift,				VK_RSHIFT, 0 },
 	{ kVK_ANSI_Z,				'Z', 0 },
 	{ kVK_ANSI_X,				'X', 0 },
 	{ kVK_ANSI_C,				'C', 0 },
@@ -87,19 +87,25 @@ int g_a2_key_to_wsym[][3] = {
 	{ kVK_ANSI_Slash,			VK_OEM_2, 0 },	/* / */
 
 
-	{ kVK_Control,				VK_CONTROL, VK_CONTROL+0x100 },
-	{ kVK_Option,				VK_SNAPSHOT+0x100, VK_MENU+0x100 },/* Opt=prntscrn or alt-r */
+	/* LMENU/RMENU = alt key = command*/
+	/* LWIN / RWIN = windows key = option */
+	/* weird menu key = APPS = option */
 
-// OG ActiveGS map OA-CA to Win & AltKey
-#ifndef ACTIVEGS
-	{ kVK_Command,				VK_SCROLL, VK_MENU },		/* Command=scr_lock or alt-l */
-#else
-	{ kVK_Reset, 				VK_CANCEL, 0 },
-	{ kVK_Option, 				VK_LWIN+0x100, VK_LWIN },
-	{ kVK_Command,				VK_MENU, 0 },		/* Command=alt-l */
-	{ kVK_Command,				VK_LMENU, 0 },		/* Command=alt-l */
+	{ kVK_Control,				VK_CONTROL, VK_CONTROL+0x100 },
+	{ kVK_Control,				VK_LCONTROL, VK_LCONTROL+0x100 },
+	{ kVK_Control,				VK_RCONTROL, VK_RCONTROL+0x100 },
+
+	{ kVK_Option,				VK_SNAPSHOT+0x100, 0 },/* Opt=prntscrn or alt-r */
+	{ kVK_Option,				VK_LWIN, VK_LWIN+0x100 },
+	{ kVK_Option,				VK_RWIN, VK_RWIN+0x100 },
+	{ kVK_Option,				VK_APPS, VK_APPS+0x100 },
+
+	{ kVK_Command,				VK_MENU, VK_MENU+0x100 },
+	{ kVK_Command,				VK_LMENU, VK_LMENU+0x100 },
+	{ kVK_Command,				VK_RMENU, VK_RMENU+0x100 },
+
+#ifdef ACTIVEGS
 	{ kVK_Reset,				VK_SCROLL,0 },		/* RESET */
-	{ kVK_Control,				VK_LCONTROL, 0 },	// CTRL
 #endif
 
 	{ kVK_Space,				' ', 0 },

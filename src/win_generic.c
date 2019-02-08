@@ -228,11 +228,6 @@ void win_event_key(HWND hwnd, UINT raw_vk, BOOL down, int repeat, UINT flags)   
          vk, down, repeat, flags);
 #endif
 
-  /* remap a few keys here.. sigh */
-  if((vk & 0xff) == VK_APPS) {
-    /* remap to command */
-    vk = VK_MENU;
-  }
 
   if((vk & 0xff) == VK_CAPITAL) {
     // Windows gives us up-and-down events of the actual key
@@ -261,6 +256,44 @@ void win_event_key(HWND hwnd, UINT raw_vk, BOOL down, int repeat, UINT flags)   
   }
   printf("VK: %04x unknown\n", vk);
 }
+
+/* low-level hook for keyboard events, to bypass special handling of
+ * windows key, alt-escape, etc
+ */
+LRESULT CALLBACK win_ll_keyboard(int nCode, WPARAM wParam, LPARAM lParam) {
+  KBDLLHOOKSTRUCT *kb = (KBDLLHOOKSTRUCT *)lParam;
+  int down = 0;
+
+  if (nCode < 0 || GetFocus() == NULL) return CallNextHookEx(0, nCode, wParam, lParam);
+
+  if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) down = 1;
+
+  switch (kb->vkCode) {
+    case VK_LWIN:
+    case VK_RWIN:
+    case VK_MENU:
+    case VK_LMENU:
+    case VK_RMENU:
+    case VK_CONTROL:
+    case VK_LCONTROL:
+    case VK_RCONTROL:
+      if (nb_win32_key < MAX_EVENT) {
+
+        win32_keys[nb_win32_key].raw_vk = kb->vkCode;
+        win32_keys[nb_win32_key].down = down;
+        win32_keys[nb_win32_key].repeat = 0;
+        win32_keys[nb_win32_key].flags = kb->flags; /* same? */
+
+        nb_win32_key++;
+      }
+      return 1;
+      break;
+  }
+
+  return CallNextHookEx(0, nCode, wParam, lParam);
+}
+
+
 
 void win_event_quit(HWND hwnd)      {
   quitEmulator();
