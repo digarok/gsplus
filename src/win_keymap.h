@@ -4,7 +4,7 @@
 int g_a2_key_to_wsym[][3] = {
 	{ 0x35,	VK_ESCAPE,	0 },
 	{ 0x7a,	VK_F1,	0 },
-	{ 0x78,	VK_F2,	0 },	// OG Was 7B but F2 is defined has 0x78 in a2_key_to_ascii
+	{ 0x78,	VK_F2,	0 },
 	{ 0x63,	VK_F3,	0 },
 	{ 0x76,	VK_F4,	0 },
 	{ 0x60,	VK_F5,	0 },
@@ -18,7 +18,9 @@ int g_a2_key_to_wsym[][3] = {
 	{ 0x69,	VK_F13,	0 },
 	{ 0x6b,	VK_F14,	0 },
 	{ 0x71,	VK_F15,	0 },
-	{ 0x7f, VK_PAUSE, VK_CANCEL+0x100 },
+
+	{ 0x7f, VK_PAUSE,  VK_PAUSE+0x100 },
+	{ 0x7f, VK_CANCEL, VK_CANCEL+0x100 },
 
 	{ 0x32,	0xc0, 0 },		/* '`' */
 	{ 0x12,	'1', 0 },
@@ -35,10 +37,9 @@ int g_a2_key_to_wsym[][3] = {
 	{ 0x18,	0xbb, 0 },		/* '=' */
 	{ 0x33,	VK_BACK, 0 },		/* backspace */
 	{ 0x72,	VK_INSERT+0x100, 0 },	/* Insert key */
-/*	{ 0x73,	XK_Home, 0 },		alias VK_HOME to be KP_Equal! */
 	{ 0x74,	VK_PRIOR+0x100, 0 },	/* pageup */
 	{ 0x47,	VK_NUMLOCK, VK_NUMLOCK+0x100 },	/* clear */
-	{ 0x51,	VK_HOME+0x100, 0 },		/* KP_equal is HOME key */
+	{ 0x51,	VK_HOME+0x100, 0 },
 	{ 0x4b,	VK_DIVIDE, VK_DIVIDE+0x100 },
 	{ 0x43,	VK_MULTIPLY, VK_MULTIPLY+0x100 },
 
@@ -83,6 +84,8 @@ int g_a2_key_to_wsym[][3] = {
 	{ 0x45,	VK_ADD, 0 },
 
 	{ 0x38,	VK_SHIFT, 0 },
+	{ 0x38,	VK_LSHIFT, 0 },
+	{ 0x38,	VK_RSHIFT, 0 },
 	{ 0x06,	'Z', 0 },
 	{ 0x07,	'X', 0 },
 	{ 0x08,	'C', 0 },
@@ -99,18 +102,24 @@ int g_a2_key_to_wsym[][3] = {
 	{ 0x55,	VK_NUMPAD3, VK_NEXT },
 
 	{ 0x36,	VK_CONTROL, VK_CONTROL+0x100 },
-	{ 0x3a,	VK_SNAPSHOT+0x100, VK_MENU+0x100 },/* Opt=prntscrn or alt-r */
+	{ 0x36,	VK_LCONTROL, VK_LCONTROL+0x100 },
+	{ 0x36,	VK_RCONTROL, VK_RCONTROL+0x100 },
+	{ 0x3a,	VK_SNAPSHOT+0x100, 0 },/* Opt=prntscrn or alt-r */
 
-// OG ActiveGS map OA-CA to Win & AltKey
-#ifndef ACTIVEGS
-	{ 0x37,	VK_SCROLL, VK_MENU },		/* Command=scr_lock or alt-l */
-#else
-	{ 0x7f, VK_CANCEL, 0 },
-	{ 0x3A, VK_LWIN+0x100, VK_LWIN },
-	{ 0x37,	VK_MENU, 0 },		/* Command=alt-l */
-	{ 0x37,	VK_LMENU, 0 },		/* Command=alt-l */
+	/* LMENU/RMENU = alt key = command*/
+	/* LWIN / RWIN = windows key = option */
+	/* weird menu key = APPS = option */
+
+	{ 0x3A,	VK_LWIN, VK_LWIN+0x100 },
+	{ 0x3A,	VK_RWIN, VK_RWIN+0x100 },
+	{ 0x3A,	VK_APPS, VK_APPS+0x100 },
+	{ 0x37,	VK_MENU, VK_MENU+0x100 },
+	{ 0x37,	VK_LMENU, VK_LMENU+0x100 },
+	{ 0x37,	VK_RMENU, VK_RMENU+0x100 },
+
+
+#ifdef ACTIVEGS
 	{ 0x7F,	VK_SCROLL,0 },		/* RESET */
-	{ 0x36,	VK_LCONTROL, 0 },	// CTRL
 #endif
 
 	{ 0x31,	' ', 0 },
@@ -118,7 +127,7 @@ int g_a2_key_to_wsym[][3] = {
 	{ 0x3d,	VK_DOWN+0x100, 0 },
 	{ 0x3c,	VK_RIGHT+0x100, 0 },
 	{ 0x52,	VK_NUMPAD0, VK_INSERT },
-	{ 0x41,	VK_DECIMAL, VK_DECIMAL },
+	{ 0x41,	VK_DECIMAL, VK_DELETE },
 	{ 0x4c,	VK_RETURN+0x100, 0 },
 	{ -1, -1, -1 }
 };
