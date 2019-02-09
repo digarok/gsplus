@@ -1,0 +1,27 @@
+language: c
+
+matrix:
+    include:
+      - os: linux
+        dist: xenial
+      - os: osx
+
+addons:
+  apt:
+    packages:
+    - re2c
+    - libsdl2-dev
+    - libsdl2-image-dev
+
+  homebrew:
+    packages:
+    - re2c
+    - sdl2
+    - sdl2_image
+
+before_script: 
+  - mkdir build
+  - cd build
+  - cmake ..
+
+script: make
