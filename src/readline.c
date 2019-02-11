@@ -100,10 +100,10 @@ char *x_readline(const char *prompt) {
 		readline_init = 1;
 	}
 
-	char *cp = readline(prompt);
+	cp = readline(prompt);
 	if (!cp) return NULL;
 	ok = strlen(cp);
-	if (ok > sizeof(buffer1) - 1) {
+	if (ok > sizeof(buffer) - 1) {
 		free(cp);
 		return "";
 	}
