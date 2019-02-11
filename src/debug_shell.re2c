@@ -611,19 +611,17 @@ void delete_bp(int type, word32 addr) {
 		if (breakpoints[i] == addr) break;
 	}
 
+	if (i == num_breakpoints) return; /* not set */
+	breakpoints[i] = 0;
+	breakpoints[i] = breakpoints[--num_breakpoints]; 
+
 	switch(type) {
 		case 'B': g_num_bp_breakpoints = num_breakpoints; break;
 		case 'M': g_num_mp_breakpoints = num_breakpoints; break;
 	}
 
-	if (i == num_breakpoints) return; /* not set */
-	breakpoints[i] = 0;
-	breakpoints[i] = breakpoints[--num_breakpoints]; 
-
 	qsort(breakpoints, num_breakpoints, sizeof(word32), addr_cmp);
 	fixup_brks();
-
-
 }
 
 
@@ -664,13 +662,11 @@ static int parse_command(const char *cp) {
 
 	const char *YYCURSOR = cp;
 	const char *YYMARKER = NULL;
-	const char *ptr = NULL;
+	//const char *ptr = NULL;
 
 	int addr = 0;
 	int has_bank = 0;
 	int has_addr = 0;
-
-	/*!stags:re2c format = "const char *@@;\n"; */
 
 	while (*cp == ' ') ++cp;
 
@@ -759,6 +755,7 @@ static int parse_command(const char *cp) {
 		}
 	*/
 indir:
+	cp = YYCURSOR;
 	/* only gets here if address specified */
 	for(;;) {
 	/*!re2c
@@ -783,6 +780,7 @@ indir:
 	}
 
 command:
+	cp = YYCURSOR;
 	/*!re2c
 		* { return  -1; }
 
@@ -857,8 +855,8 @@ command:
 			return 1;
 		}
 
-		";bp" @ptr [+-]? end {
-			char plus = *ptr;
+		";bp" [+-]? end {
+			char plus = cp[3];
 			if (!has_addr && plus == 0) { show_bp('B'); return 0; }
 			if (!has_addr) return -1;
 			if (!has_bank) addr |= (engine.kpc & 0xff0000);
@@ -867,8 +865,8 @@ command:
 			return 0;
 		}
 
-		";mp" @ptr [+-]? end {
-			char plus = *ptr;
+		";mp" [+-]? end {
+			char plus = cp[3];
 			if (!has_addr && plus == 0) { show_bp('M'); return 0; }
 			if (!has_addr) return -1;
 			if (!has_bank) addr |= (engine.kpc & 0xff0000);

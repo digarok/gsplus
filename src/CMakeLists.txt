@@ -74,7 +74,7 @@ add_custom_command(
 
 add_custom_command(
 	OUTPUT debug_shell.c
-	COMMAND re2c -T -W -o ${CMAKE_CURRENT_BINARY_DIR}/debug_shell.c "${CMAKE_CURRENT_SOURCE_DIR}/debug_shell.re2c"
+	COMMAND re2c -W -o ${CMAKE_CURRENT_BINARY_DIR}/debug_shell.c "${CMAKE_CURRENT_SOURCE_DIR}/debug_shell.re2c"
 	MAIN_DEPENDENCY debug_shell.re2c
 )
 
