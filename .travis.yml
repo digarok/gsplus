@@ -12,16 +12,17 @@ addons:
     - re2c
     - libsdl2-dev
     - libsdl2-image-dev
-
+    - libfreetype6-dev
   homebrew:
     packages:
     - re2c
     - sdl2
     - sdl2_image
+    - freetype
 
 before_script: 
   - mkdir build
   - cd build
   - cmake ..
 
-script: make
+script: make GSplus
