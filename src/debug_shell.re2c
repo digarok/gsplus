@@ -38,6 +38,10 @@ word32 g_abort_value = 0;
 word32 g_abort_bytes = 0;
 
 
+static word32 g_prev_address = 0;
+static word32 g_prev_stack_address = 0;
+static word32 g_prev_stack_bank = 0;
+
 /*
  * todo 
  * - tool break support
@@ -81,6 +85,129 @@ word32 do_hexdump(word32 address, int lines) {
 	}
 
 	return address;
+}
+
+static int check_stack_rts(word32 address, unsigned bank, char *buffer) {
+	word32 rt;
+	unsigned op;
+
+	rt = get_memory24_c(address, 0);
+	if (rt == 0) return 0;
+
+	rt = (rt & 0xff0000) | ((rt - 3) & 0xffff);
+	op = get_memory_c(rt, 0);
+	if (op == 0x22) {
+		word32 tmp = get_memory24_c(rt + 1, 0); /* crosses bank :/ */
+		/* todo -- check if tmp is known address, include below */
+		/* todo -- if jsl e10000, check for prev. ldx # */
+		sprintf(buffer, "%02x/%04x: JSL %06x",
+			rt >> 16, rt & 0xffff, tmp);
+		return 3;
+	}
+	/* sigh... this might re-check 0000 a lot */
+	rt = get_memory16_c(address, 0);
+	rt = bank | ((rt - 2) & 0xffff);
+
+	op = get_memory_c(rt, 0);
+	if (op == 0x20 || op == 0xfc) {
+		word32 tmp = get_memory16_c(rt + 1, 0);
+		if (op == 0x20) {
+			sprintf(buffer, "%02x/%04x: JSR %04x",
+				rt >> 16, rt & 0xffff, tmp);
+		}
+		if (op == 0xfc) {
+			sprintf(buffer, "%02x/%04x: JSR (%04x,x)",
+				rt >> 16, rt & 0xffff, tmp);	
+		}
+
+		return 2;
+	}
+
+
+	return 0;
+}
+
+word32 do_stack(word32 address, unsigned bank) {
+
+	/* scan through stack.
+	 * if address looks like jsr return address
+	 * or jsl return address, print it.
+	 * otherwise, hexdump it.
+	 *
+	 * jsr absolute = 0x20
+	 * jsr (absolute,x) = 0xfc
+	 * jsl abslong = 0x22
+	 *
+	 *
+	 * TODO - in Niftylist, JSL updates the bank.
+	 * TODO - don't display c000, etc.
+	 */
+
+	static char hex[] = "0123456789abcdef";
+
+	char buffer1[64];
+	char buffer2[64];
+
+	unsigned offset = 0;
+	unsigned line = 0;
+	char *cp = buffer1;
+
+	++address;
+
+	while(line < 20) {
+		unsigned c;
+		int tmp = check_stack_rts(address + offset, bank, buffer2);
+		if (tmp) {
+			/* flush any pending data */
+
+			if (offset) {
+				*cp = 0;
+				printf("%02x/%04x: %s\n",
+					address >> 16, address & 0xffff, buffer1);
+				++line;
+				address += offset;
+				offset = 0;
+				cp = buffer1;
+			}
+
+			for (offset = 0; offset < tmp; ++offset) {
+				c = get_memory_c(address + offset, 0);
+				*cp++ = hex[c >> 4];
+				*cp++ = hex[c & 0x0f];
+				*cp++ = ' ';
+			}
+
+			*cp = 0;
+			printf("%02x/%04x: %-12s%s\n",
+				address >> 16, address & 0xffff, buffer1, buffer2);
+			++line;
+			address += offset;
+			offset = 0;
+			cp = buffer1;
+			continue;
+		}
+
+		c = get_memory_c(address + offset, 0);
+		*cp++ = hex[c >> 4];
+		*cp++ = hex[c & 0x0f];
+		*cp++ = ' ';
+
+		if (offset == 7) *cp++ = ' ';
+		++offset;
+
+		if (offset == 16) {
+			*cp = 0;
+			printf("%02x/%04x: %s\n",
+				address >> 16, address & 0xffff, buffer1);
+			++line;
+			address += offset;
+			offset = 0;
+			cp = buffer1;
+		}
+	}
+
+	return address;
+
 }
 
 word32 do_list(word32 address, int *psr_ptr, int lines) {
@@ -393,55 +520,6 @@ static int addr_cmp(const void *a, const void *b) {
 
 
 
-
-#if 0
-void show_bp() {
-	int i;
-	word32 addr;
-	printf("Breakpoints:\n");
-	for (i = 0; i < g_num_bp_breakpoints; ++i) {
-		addr = g_bp_breakpoints[i];
-		printf("%02x/%04x\n", addr >> 16, addr & 0xffff);
-	}
-}
-
-void set_bp(word32 addr) {
-	int i;
-
-	for (i = 0; i < g_num_bp_breakpoints; ++i) {
-		if (g_bp_breakpoints[i] == addr) break;
-	}
-
-	if (i < g_num_bp_breakpoints) return; /* already set */
-	if (g_num_bp_breakpoints == MAX_BREAK_POINTS) {
-		printf("Too many breakpoints.\n");
-		return;
-	}
-	g_bp_breakpoints[g_num_bp_breakpoints++] = addr;
-
-
-	qsort(g_bp_breakpoints, g_num_bp_breakpoints, sizeof(word32), addr_cmp);
-	fixup_brks();
-}
-
-void delete_bp(word32 addr) {
-	int i;
-
-	for (i = 0; i < g_num_bp_breakpoints; ++i) {
-		if (g_bp_breakpoints[i] == addr) break;
-	}
-
-
-	if (i == g_num_bp_breakpoints) return; /* not set */
-	g_bp_breakpoints[i] = 0;
-	g_bp_breakpoints[i] = g_bp_breakpoints[--g_num_bp_breakpoints]; 
-
-	qsort(g_bp_breakpoints, g_num_bp_breakpoints, sizeof(word32), addr_cmp);
-	fixup_brks();
-}
-#endif
-
-
 void show_bp(int type) {
 	int i;
 	word32 addr;
@@ -549,91 +627,6 @@ void delete_bp(int type, word32 addr) {
 }
 
 
-
-static int do_bp_mp_common(const char *cp, word32 default_bank, word32 *breakpoints, int *num_breakpoints) {
-	/* bp
-	 * bp [+-] address
-	 */
-
-	int i = 0;
-	int plus = 1;
-	word32 addr = 0;
-	const char *YYCURSOR = NULL;
-	const char *YYMARKER = NULL;
-
-	while (*cp == ' ') ++cp;
-	switch(*cp) {
-		case '-': plus = 0;
-		case '+':
-			++cp;
-			break;
-	}
-
-	if (*cp == 0) {
-		/* just print them... */
-		for (i = 0; i < *num_breakpoints; ++i) {
-			addr = breakpoints[i];
-			printf("%02x/%04x\n", addr >> 16, addr & 0xffff);
-		}
-		return 0;
-	}
-
-	YYCURSOR = cp;
-	/*!re2c
-
-		* { return -1; }
-		x{6} end {
-			addr = to_hex(cp, cp + 6);
-			goto next;
-		}
-		x{2} "/" x{4} end {
-			addr = to_hex(cp, cp + 2) << 16;
-			addr |= to_hex(cp + 3, cp + 7);
-			goto next;
-		} 
-		x{4} end {
-			addr = to_hex(cp, cp + 4);
-			addr |= default_bank;
-			goto next;
-		}
-	*/
-
-next:
-
-	for (i = 0; i < *num_breakpoints; ++i) {
-		if (breakpoints[i] == addr) break;
-	}
-
-	if (plus) {
-		if (i < *num_breakpoints) return 0; /* already set */
-		if (*num_breakpoints == MAX_BREAK_POINTS) {
-			printf("Too many breakpoints.\n");
-			return 0;
-		}
-		breakpoints[(*num_breakpoints)++] = addr;
-	} else {
-		if (i == *num_breakpoints) return 0; /* not set */
-		breakpoints[i] = 0;
-		breakpoints[i] = breakpoints[--(*num_breakpoints)]; 
-	}
-
-	/* sort */
-	qsort(breakpoints, *num_breakpoints, sizeof(word32), addr_cmp);
-	fixup_brks();
-
-	return 0;
-}
-
-static int do_bp(const char *cp) {
-	return do_bp_mp_common(cp, engine.kpc & 0xff0000,
-		g_bp_breakpoints, &g_num_bp_breakpoints);
-}
-
-static int do_mp(const char *cp) {
-	return do_bp_mp_common(cp, engine.dbank << 16,
-		g_mp_breakpoints, &g_num_mp_breakpoints);
-}
-
 static void do_help(void) {
 
 	fputs(
@@ -658,10 +651,16 @@ static void do_help(void) {
 		stdout);
 }
 
-static word32 g_prev_address = 0;
+
 
 /* return -1 on error, 0 on success, 1 if debug shell should exit. */
 static int parse_command(const char *cp) {
+
+
+	/* TODO:
+		pc++ EOL -> skip current instruction
+		! -> mini assembler mode.
+	 */
 
 	const char *YYCURSOR = cp;
 	const char *YYMARKER = NULL;
@@ -797,7 +796,7 @@ command:
 			return 0;
 		}
 
-		";" ? "l" end {
+		(";l" | "l") end {
 			int psr = engine.psr;
 			if (!has_addr) {
 				addr = g_prev_address;
@@ -823,6 +822,22 @@ command:
 			g_prev_address = do_hexdump(addr, 20);
 			return 0;
 		}
+
+		";s" end {
+			/* print the stack */
+			word32 bank;
+			if (!has_addr) {
+				addr = g_prev_stack_address;
+				bank = g_prev_stack_bank;
+			}
+			if (has_bank) {
+				bank = addr & 0xff0000;
+				addr &= 0xffff;
+			}
+			g_prev_stack_address = do_stack(addr,bank);
+			return 0;
+		}
+
 		"g" end {
 			/* GO! */
 			if (has_addr) {
@@ -903,6 +918,9 @@ int debug_shell(int code) {
 	}
 
 	do_list(engine.kpc, &psr, 1);
+
+	g_prev_stack_address = engine.stack;
+	g_prev_stack_bank = engine.kpc & 0xff0000;
 
 	for(;;) {
 		cp = x_readline("> ");
