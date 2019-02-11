@@ -915,7 +915,7 @@ int debug_shell(int code) {
 	}
 }
 
-static void do_sig_intr(int sig, siginfo_t *info, void *context) {
+static void do_sig_intr(int sig) {
 	set_halt(4);
 }
 
@@ -929,8 +929,7 @@ void do_go()      {
   	struct sigaction sa;
   	memset(&sa, 0, sizeof(sa));
   	sigemptyset(&sa.sa_mask);
-  	sa.sa_flags = SA_SIGINFO;
-  	sa.sa_sigaction = do_sig_intr;
+  	sa.sa_handler = do_sig_intr;
   	sigaction(SIGINT, &sa, NULL);
 
   } else {
