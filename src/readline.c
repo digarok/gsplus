@@ -1,8 +1,24 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <errno.h>
+
+
+#define HISTORY_SIZE 64
+
+/* remove trailing whitespace and terminators */
+static void cleanup_buffer(char *buffer, int size) {
+
+	while (size > 0) {
+		unsigned c = buffer[size-1];
+		if (c == ' ' || c == '\r' || c == '\n') {
+			--size;
+			continue;
+		}
+		break;
+	}
+	buffer[size] = 0;
+}
 
 #if defined(USE_LIBEDIT)
 
@@ -21,12 +37,12 @@ static char *prompt_fn(EditLine *el) {
 
 char *x_readline(const char *prompt) {
 	static char buffer[1024];
-	int ok = 0;
+	int count = 0;
 	const char *cp;
 
 	if (!el) {
 		hist = history_init();
-		history(hist, &ev, H_SETSIZE, 50);
+		history(hist, &ev, H_SETSIZE, HISTORY_SIZE);
 		history(hist, &ev, H_SETUNIQUE, 1);
 
 		el = el_init("GS+", stdin, stdout, stderr);
@@ -39,22 +55,14 @@ char *x_readline(const char *prompt) {
 	}
 
 	el_prompt = prompt;
-	cp = el_gets(el, &ok);
+	cp = el_gets(el, &count);
 	el_prompt = NULL;
-	if (ok <= 0) return NULL;
-	if (ok > sizeof(buffer) - 1) return "";
+	if (count <= 0) return NULL;
+	if (count > sizeof(buffer) - 1) return "";
 
 
-	memcpy(buffer, cp, ok);
-	while (ok) {
-		unsigned c = buffer[ok-1];
-		if (c == ' ' || c == '\r' || c == '\n') {
-			--ok;
-			continue;
-		}
-		break;
-	}
-	buffer[ok] = 0;
+	memcpy(buffer, cp, count);
+	cleanup_buffer(buffer, count);
 
 	if (*buffer)
 		history(hist, &ev, H_ENTER, buffer);
@@ -88,35 +96,27 @@ char *x_readline(const char *prompt) {
 	static char buffer[1024];
 
 	char *cp;
-	int ok;
+	int count;
 
 	if (!readline_init) {
 		rl_readline_name = "GS+";
 		rl_attempted_completion_function = rl_acf;
 
 		using_history();
-		stifle_history(50);
+		stifle_history(HISTORY_SIZE);
 
 		readline_init = 1;
 	}
 
 	cp = readline(prompt);
 	if (!cp) return NULL;
-	ok = strlen(cp);
-	if (ok > sizeof(buffer) - 1) {
+	count = strlen(cp);
+	if (count > sizeof(buffer) - 1) {
 		free(cp);
 		return "";
 	}
-	memcpy(buffer, cp, ok);
-	while (ok) {
-		unsigned c = buffer[ok-1];
-		if (c == ' ' || c == '\r' || c == '\n') {
-			--ok;
-			continue;
-		}
-		break;
-	}
-	buffer[ok] = 0;
+	memcpy(buffer, cp, count);
+	cleanup_buffer(buffer, count);
 	free(cp);
 
 	/* append to history, but only if unique from prev. entry */
@@ -130,7 +130,45 @@ char *x_readline(const char *prompt) {
 
 void x_readline_end(void) {
 }
+#elif defined(WIN32)
+
+#include <windows.h>
+
+static int readline_init = 0;
+
+char *x_readline(const char *prompt) {
+	static char buffer[1024];
+	DWORD count = 0;
+	BOOL ok;
+	HANDLE h = GetStdHandle(STD_INPUT_HANDLE),
+	if (!readline_init) {
+		CONSOLE_HISTORY_INFO chi;
+		DWORD mode;
+
+		memset(&chi, 0, sizeof(chi));
+		chi.cbSize = sizeof(CONSOLE_HISTORY_INFO);
+		chi.HistoryBufferSize = HISTORY_SIZE;
+		chi.NumberOfHistoryBuffers = 1; /* ???? */
+		chi.dwFlags = HISTORY_NO_DUP_FLAG;
+		SetConsoleHistoryInfo(&chi);
+
+		mode = ENABLE_ECHO_INPUT | ENABLE_EXTENDED_FLAGS | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_QUICK_EDIT_MODE;
+		SetConsoleMode(h, mode);
+
+		readline_init = 1;
+	}
+
+	ok = ReadConsole(h, buffer, sizeof(buffer), &count, NULL);
+	if (!ok) return NULL;
+
+	cleanup_buffer(buffer, count);
+	return buffer;
+}
+
+
 #else
+
+#include <unistd.h>
 
 char *x_readline(const char *prompt) {
 	static char buffer[1024];
@@ -144,15 +182,7 @@ char *x_readline(const char *prompt) {
 			return NULL;
 		}
 		if (ok == 0) return NULL;
-		while (ok) {
-			unsigned c = buffer[ok-1];
-			if (c == ' ' || c == '\r' || c == '\n') {
-				--ok;
-				continue;
-			}
-			break;
-		}
-		buffer[ok] = 0;
+		cleanup_buffer(buffer, ok);
 
 		return buffer;
 	}
