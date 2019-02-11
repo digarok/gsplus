@@ -48,7 +48,7 @@ option(WITH_HOST_FST "Enable host fst support" ON)
 option(TOGGLE_STATUS "Enable F10 Toggle Status support (win32/x11)" OFF)
 option(WITH_RAWNET "Enable Uthernet emulation" OFF)
 option(WITH_ATBRIDGE "Enable AT Bridge" OFF)
-
+set(READLINE "NONE" CACHE STRING "Readline library (NONE, READLINE, LIBEDIT")
 
 set(generated_headers 8inst_c.h 16inst_c.h 8inst_s.h 16inst_s.h size_c.h size_s.h 8size_s.h 16size_s.h)
 add_custom_command(
@@ -142,6 +142,8 @@ SET_SOURCE_FILES_PROPERTIES(
   MACOSX_PACKAGE_LOCATION Resources
  )
 
+
+
 if(APPLE)
 	add_custom_command(TARGET GSplus POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -152,6 +154,16 @@ if(APPLE)
 endif()
 # SET_SOURCE_FILES_PROPERTIES(vmnet_helper PROPERTIES MACOSX_PACKAGE_LOCATION MacOS)
 
+add_library(x_readline readline.c)
+if(READLINE MATCHES "READLINE")
+	target_compile_definitions(x_readline PRIVATE USE_READLINE)
+	target_link_libraries(x_readline PUBLIC history readline)
+elseif(READLINE MATCHES "LIBEDIT")
+	target_compile_definitions(x_readline PRIVATE USE_LIBEDIT)
+	target_link_libraries(x_readline PUBLIC edit)
+endif()
+
+target_link_libraries(GSplus x_readline)
 
 if (WITH_RAWNET)
 	target_link_libraries(GSplus rawnet)

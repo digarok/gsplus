@@ -16,7 +16,7 @@
 #include "disasm.h"
 
 
-
+extern char *x_readline(const char *prompt);
 
 extern int g_fullscreen;
 extern int g_config_control_panel;
@@ -865,31 +865,13 @@ command:
 	*/
 }
 
-char *readline(const char *prompt) {
-	static char buffer[1024];
-	fputs(prompt, stdout);
-	fflush(stdout);
+enum {
+	MODE_NORMAL,
+	MODE_ASSEMBER
+};
 
-	for(;;) {
-		int ok = read(STDIN_FILENO, buffer, sizeof(buffer)-1);
-		if (ok < 0) {
-			if (ok == EINTR) continue;
-			return NULL;
-		}
-		if (ok == 0) return NULL;
-		while (ok) {
-			char c = buffer[ok-1];
-			if (c == ' ' || c == '\r' || c == '\n') {
-				--ok;
-				continue;
-			}
-			break;
-		}
-		buffer[ok] = 0;
+static int g_debugger_mode = MODE_NORMAL;
 
-		return buffer;
-	}
-}
 
 int debug_shell(int code) {
 	int c;
@@ -923,7 +905,7 @@ int debug_shell(int code) {
 	do_list(engine.kpc, &psr, 1);
 
 	for(;;) {
-		cp = readline("> ");
+		cp = x_readline("> ");
 		if (!cp) return 0;
 		if (!*cp) continue;
 		c = parse_command(cp);
