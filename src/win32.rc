@@ -65,8 +65,8 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDC_GSPORT32              ICON    DISCARDABLE     "gsp_icon.ico"
-GSPORT32_ICON             ICON    DISCARDABLE     "gsp_icon.ico"
+IDC_GSPORT32              ICON    DISCARDABLE     "assets/gsp_icon.ico"
+GSPORT32_ICON             ICON    DISCARDABLE     "assets/gsp_icon.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
