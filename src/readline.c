@@ -121,7 +121,7 @@ char *x_readline(const char *prompt) {
 
 	/* append to history, but only if unique from prev. entry */
 	if (*buffer) {
-		HIST_ENTRY *h = history_get(history_length-1);
+		HIST_ENTRY *h = history_get(history_length);
 		if (h == NULL || strcmp(buffer, h->line))
 			add_history(buffer);
 	}
