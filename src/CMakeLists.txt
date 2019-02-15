@@ -78,6 +78,12 @@ add_custom_command(
 	MAIN_DEPENDENCY debug_shell.re2c
 )
 
+add_custom_command(
+	OUTPUT debug_template.c
+	COMMAND re2c -W -o ${CMAKE_CURRENT_BINARY_DIR}/debug_template.c "${CMAKE_CURRENT_SOURCE_DIR}/debug_template.re2c"
+	MAIN_DEPENDENCY debug_template.re2c
+)
+
 add_executable(to_pro to_pro.c)
 add_executable(partls partls.c)
 
@@ -124,6 +130,7 @@ add_executable(GSplus WIN32 MACOSX_BUNDLE
 
 	disasm.c
 	debug_shell.c
+	debug_template.c
 
 	$<$<BOOL:${WITH_DEBUGGER}>:debug.c>
 	$<$<BOOL:${WITH_HOST_FST}>:${host_fst_code}>
@@ -132,6 +139,7 @@ add_executable(GSplus WIN32 MACOSX_BUNDLE
 
 	$<$<BOOL:${WIN32}>:win32.rc>
 	$<$<BOOL:${APPLE}>:assets/gsp_icon.icns>
+	$<$<BOOL:${APPLE}>:assets/GSBug.Templates>
 	$<$<BOOL:${APPLE}>:fix_mac_menu.m>
 )
 
@@ -140,8 +148,13 @@ SET_SOURCE_FILES_PROPERTIES(
   assets/gsp_icon.icns
   PROPERTIES
   MACOSX_PACKAGE_LOCATION Resources
- )
+)
 
+SET_SOURCE_FILES_PROPERTIES(
+  assets/GSBug.Templates
+  PROPERTIES
+  MACOSX_PACKAGE_LOCATION Resources
+)
 
 
 if(APPLE)

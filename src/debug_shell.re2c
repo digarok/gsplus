@@ -42,6 +42,63 @@ static word32 g_prev_address = 0;
 static word32 g_prev_stack_address = 0;
 static word32 g_prev_stack_bank = 0;
 
+
+static int g_templates_loaded = 0;
+extern void debug_load_template(const char *path);
+extern word32 debug_apply_template(word32 address, const char *name);
+
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+static char *get_resource_path(const char *leaf) {
+
+	uint32_t size = 0;
+	char *buffer = 0;
+	int ok;
+	char *cp;
+	int l;
+
+	l = strlen(leaf);
+	ok = _NSGetExecutablePath(NULL, &size);
+	size += l + 1 + sizeof("Resources/");
+	buffer = malloc(size);
+	if (!buffer) return NULL;
+
+	/*
+	 * expect .../GSPlus.app/Contents/MacOS/GSPlus
+	 * drop
+	 */
+	ok = _NSGetExecutablePath(buffer, &size);
+	if (ok < 0) {
+		free(buffer);
+		return NULL;
+	}
+	cp = strrchr(buffer, '/');
+	if (!cp) { free(buffer); return NULL; }
+	*cp = 0;
+	cp = strrchr(buffer, '/');
+	if (!cp) { free(buffer); return NULL; }
+
+	strcpy(cp + 1, "Resources/");
+	strcat(cp, leaf);
+
+	return buffer;	
+}
+#elif defined(WIN32)
+/* todo -- something clever like find the home directory */
+#else
+static char *get_resource_path(const char *leaf) {
+	int l;
+	char *cp;
+	static char path[] = "/usr/local/share/gsplus/";
+	l = strlen(leaf);
+	cp = malloc(l + sizeof(path) + 1);
+	if (!cp) return NULL;
+	strcpy(cp, path);
+	strcat(cp, leaf);
+	return cp;
+}
+#endif
+
 /*
  * todo 
  * - tool break support
@@ -380,7 +437,8 @@ static word32 to_hex(const char *iter, const char *end) {
 /*!re2c
 	re2c:define:YYCTYPE = char;
 	re2c:yyfill:enable = 0;
-	end = "\x00";
+	eol = "\x00";
+	ws = [ \t];
 	x = [A-Fa-f0-9];
 */
 
@@ -394,23 +452,23 @@ static int do_assign(const char *cp, int reg) {
 	/*!re2c
 
 		* { return -1; }
-		x{6} end {
+		x{6} eol {
 			addr = to_hex(cp, cp + 6);
 			has_bank = 1;
 			goto next;
 		}
-		x{2} "/" x{4} end {
+		x{2} "/" x{4} eol {
 			addr = to_hex(cp, cp + 2) << 16;
 			addr |= to_hex(cp + 3, cp + 7);
 			has_bank = 1;
 			goto next;
 		} 
-		x{4} end {
+		x{4} eol {
 			addr = to_hex(cp, cp + 4);
 			has_bank = 0;
 			goto next;
 		}
-		"%"[01]{2} end {
+		"%"[01]{2} eol {
 			if (reg != REG_MX) return -1;
 			if (cp[1] == '1') addr |= 0x20;
 			if (cp[2] == '1') addr |= 0x10;
@@ -483,8 +541,8 @@ static word32 do_mem_assign(word32 addr, const char *cp) {
 	for(;;) {
 		const char *start = YYCURSOR;
 		/*!re2c
-			end { return addr; }
-			" " { continue; }
+			eol { return addr; }
+			ws { continue; }
 			* {
 				fputs("Invalid data\n", stderr);
 				return addr;
@@ -672,67 +730,77 @@ static int parse_command(const char *cp) {
 
 	/*!re2c
 
-		_ = (" " | "\x00");
+		_ = (ws | eol);
 
 		* { --YYCURSOR; if (cp == YYCURSOR) goto command; return -1; }
 
-		"a=" { return do_assign(YYCURSOR, REG_A); }
-		"x=" { return do_assign(YYCURSOR, REG_X); }
-		"y=" { return do_assign(YYCURSOR, REG_Y); }
-		"d=" { return do_assign(YYCURSOR, REG_D); }
-		"e=" { return do_assign(YYCURSOR, REG_E); }
-		"s=" { return do_assign(YYCURSOR, REG_S); }
-		"k=" { return do_assign(YYCURSOR, REG_K); }
-		"b=" { return do_assign(YYCURSOR, REG_B); }
-		"p=" { return do_assign(YYCURSOR, REG_P); }
-		"pc=" { return do_assign(YYCURSOR, REG_PC); }
-		"mx=" { return do_assign(YYCURSOR, REG_MX); }
+		"bp" eol { show_bp('B'); return 0; }
+		"mp" eol { show_bp('M'); return 0; }
 
-		"bp" end { show_bp('B'); return 0; }
-		"mp" end { show_bp('M'); return 0; }
+		"*" eol { show_regs(); return 0; }
 
-		"*" end { show_regs(); return 0; }
+		("q" | "quit" | "exit" | "bye") eol { return 'q'; }
+		"reset" eol { do_reset(); return 0; }
+		("help" | "?") eol { do_help(); return 0; }
 
-		("q" | "quit" | "exit") end { return 'q'; }
-		"reset" end { do_reset(); return 0; }
-		("help" | "?") end { do_help(); return 0; }
+		// register stuff
 
-		"pc" {
+		"%pc++" eol {
+			/* todo */
+			return 0;	
+		}
+
+		"%a=" { return do_assign(YYCURSOR, REG_A); }
+		"%x=" { return do_assign(YYCURSOR, REG_X); }
+		"%y=" { return do_assign(YYCURSOR, REG_Y); }
+		"%d=" { return do_assign(YYCURSOR, REG_D); }
+		"%e=" { return do_assign(YYCURSOR, REG_E); }
+		"5s=" { return do_assign(YYCURSOR, REG_S); }
+		"%k=" { return do_assign(YYCURSOR, REG_K); }
+		"%b=" { return do_assign(YYCURSOR, REG_B); }
+		"%p=" { return do_assign(YYCURSOR, REG_P); }
+		"%pc=" { return do_assign(YYCURSOR, REG_PC); }
+		"%mx=" { return do_assign(YYCURSOR, REG_MX); }
+
+
+		"%pc" {
 			addr = engine.kpc;
 			has_addr = 1;
 			has_bank = 1;
 			goto indir;
 		}
-		"a" {
+		"%a" {
 			addr = engine.acc;
 			has_addr = 1;
 			has_bank = 0;
 			goto indir;
 		}
-		"x" {
+		"%x" {
 			addr = engine.xreg;
 			has_addr = 1;
 			has_bank = 0;
 			goto indir;
 		}
-		"y" {
+		"%y" {
 			addr = engine.yreg;
 			has_addr = 1;
 			has_bank = 0;
 			goto indir;
 		}
-		"s" {
+		"%s" {
 			addr = engine.stack;
 			has_addr = 1;
 			has_bank = 1;
 			goto indir;
 		}
-		"d" {
+		"%d" {
 			addr = engine.dbank;
 			has_addr = 1;
 			has_bank = 1;
 			goto indir;
 		}
+
+
 
 		x{6} {
 			addr = to_hex(cp, cp + 6);
@@ -780,48 +848,33 @@ indir:
 	}
 
 command:
+	if (!has_bank) {
+		addr |= (g_prev_address & 0xff0000);
+	}
+	if (!has_addr) {
+		addr = g_prev_address;
+	}
+
 	cp = YYCURSOR;
 	/*!re2c
 		* { return  -1; }
 
 		":" {
-			if (!has_addr) {
-				addr = g_prev_address;
-				has_bank = 1;
-			}
-			if (!has_bank) addr |= (g_prev_address & 0xff0000);
 			g_prev_address = do_mem_assign(addr, YYCURSOR);
 			return 0;
 		}
 
-		(";l" | "l") end {
+		(";l" | "l") eol {
 			int psr = engine.psr;
-			if (!has_addr) {
-				addr = g_prev_address;
-				if (!addr) {
-					addr = engine.kpc;
-					has_bank = 1;
-				}
-			}
-			if (!has_bank) {
-				addr |= (engine.kpc & 0xff0000);
-			}
 			g_prev_address = do_list(addr, &psr, 20);
 			return 0;
 		}
-		";h" end {
-			if (!has_addr) {
-				addr = g_prev_address;
-				has_bank = 1;
-			}
-			if (!has_bank) {
-				addr |= (engine.dbank << 16);
-			}
+		";h" eol {
 			g_prev_address = do_hexdump(addr, 20);
 			return 0;
 		}
 
-		";s" end {
+		";s" eol {
 			/* print the stack */
 			word32 bank;
 			if (!has_addr) {
@@ -836,42 +889,45 @@ command:
 			return 0;
 		}
 
-		"g" end {
+		"g" eol {
 			/* GO! */
 			if (has_addr) {
-				if (!has_bank) addr |= (engine.kpc & 0xff0000);
 				engine.kpc = addr;
 			}
 			g_stepping = 0;
 			return 1;
 		}
-		"s" end {
+		"s" eol {
 			/* step */
 			if (has_addr) {
-				if (!has_bank) addr |= (engine.kpc & 0xff0000);
 				engine.kpc = addr;
 			}
 			g_stepping = 1;
 			return 1;
 		}
 
-		";bp" [+-]? end {
+		";bp" [+-]? eol {
 			char plus = cp[3];
 			if (!has_addr && plus == 0) { show_bp('B'); return 0; }
 			if (!has_addr) return -1;
-			if (!has_bank) addr |= (engine.kpc & 0xff0000);
 			if (plus == '-') delete_bp('B', addr);
 			else set_bp('B', addr);
 			return 0;
 		}
 
-		";mp" [+-]? end {
+		";mp" [+-]? eol {
 			char plus = cp[3];
 			if (!has_addr && plus == 0) { show_bp('M'); return 0; }
 			if (!has_addr) return -1;
-			if (!has_bank) addr |= (engine.kpc & 0xff0000);
 			if (plus == '-') delete_bp('M', addr);
 			else set_bp('M', addr);
+			return 0;
+		}
+		"\\temp" / (ws|eol) {
+			/* apply a gsbug template to memory */
+			/* address\temp name */
+			while (isspace(*YYCURSOR)) ++YYCURSOR;
+			g_prev_address = debug_apply_template(addr, YYCURSOR);
 			return 0;
 		}
 
@@ -891,6 +947,15 @@ int debug_shell(int code) {
 	char *cp;
 
 	int psr = engine.psr;
+
+	if (!g_templates_loaded) {
+		char *path;
+		g_templates_loaded = 1;
+
+		path = get_resource_path("GSBug.Templates");
+		debug_load_template(path);
+		free(path);
+	}
 
 
 	/* todo -- only clear IF exit pc == entry pc ? */
@@ -932,6 +997,7 @@ int debug_shell(int code) {
 }
 
 static void do_sig_intr(int sig) {
+	/* todo -- raise() if halt already pending */
 	set_halt(4);
 }
 
