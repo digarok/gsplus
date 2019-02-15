@@ -281,7 +281,7 @@ word32 do_list(word32 address, int *psr_ptr, int lines) {
 	while (lines--) {
 		pc = address;
 
-		opcode = get_memory_c(address++, 0) & 0xff;
+		opcode = get_memory_c(address++, 0);
 		dtype = disasm_types[opcode];
 		args = dtype >> 8;
 
@@ -747,7 +747,45 @@ static int parse_command(const char *cp) {
 
 		"%pc++" eol {
 			/* todo */
+			unsigned opcode = get_memory_c(engine.kpc, 0);
+			unsigned dtype = disasm_types[opcode];
+			unsigned args = dtype >> 8;
+			word32 tmp;
+
+			switch (args) {
+				case 4:
+					args = engine.psr & 0x20 ? 1 : 2;
+					break;
+				case 5:
+					args = engine.psr & 0x10 ? 1 : 2;
+					break;
+			}
+			tmp = engine.kpc + 1 + args;
+			tmp &= 0xffff;
+			engine.kpc = (engine.kpc & 0xff0000) | tmp;
 			return 0;	
+		}
+
+		"%s++" eol {
+			unsigned tmp = engine.stack + 1;
+			if (engine.psr & 0x0100) {
+				tmp &= 0xff;
+				tmp |= 0x0100;
+			} else {
+				tmp &= 0xffff;
+			}
+			engine.stack = tmp;
+		}
+
+		"%s--" eol {
+			unsigned tmp = engine.stack + 1;
+			if (engine.psr & 0x0100) {
+				tmp &= 0xff;
+				tmp |= 0x0100;
+			} else {
+				tmp &= 0xffff;
+			}
+			engine.stack = tmp;
 		}
 
 		"%a=" { return do_assign(YYCURSOR, REG_A); }
@@ -984,6 +1022,7 @@ int debug_shell(int code) {
 
 	g_prev_stack_address = engine.stack;
 	g_prev_stack_bank = engine.kpc & 0xff0000;
+	g_prev_address = engine.kpc;
 
 	for(;;) {
 		cp = x_readline("> ");
