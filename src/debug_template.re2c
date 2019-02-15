@@ -93,6 +93,7 @@ static int parse_field(const char *cp, struct field *f) {
 	const char *start;
 	const char *end;
 	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
 
 	int type = 0;
 	int count = 0;
@@ -150,6 +151,7 @@ void debug_load_template(const char *path) {
 	struct field field;
 	unsigned line = 0;
 	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
 
 
 	f = fopen(path, "r");
