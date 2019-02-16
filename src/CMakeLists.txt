@@ -140,6 +140,8 @@ add_executable(GSplus WIN32 MACOSX_BUNDLE
 	$<$<BOOL:${WIN32}>:win32.rc>
 	$<$<BOOL:${APPLE}>:assets/gsp_icon.icns>
 	$<$<BOOL:${APPLE}>:assets/GSBug.Templates>
+	$<$<BOOL:${APPLE}>:assets/Tools.text>
+	$<$<BOOL:${APPLE}>:assets/GSOS.text>
 	$<$<BOOL:${APPLE}>:fix_mac_menu.m>
 )
 
@@ -152,6 +154,8 @@ SET_SOURCE_FILES_PROPERTIES(
 
 SET_SOURCE_FILES_PROPERTIES(
   assets/GSBug.Templates
+  assets/Tools.text
+  assets/GSOS.text
   PROPERTIES
   MACOSX_PACKAGE_LOCATION Resources
 )

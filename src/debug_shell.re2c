@@ -44,8 +44,10 @@ static word32 g_prev_stack_bank = 0;
 
 
 static int g_templates_loaded = 0;
-extern void debug_load_template(const char *path);
+extern void debug_load_templates(const char *path);
 extern word32 debug_apply_template(word32 address, const char *name);
+extern void debug_load_tools(const char *path, unsigned vector);
+extern const char *debug_tool_name(unsigned, unsigned vector);
 
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
@@ -267,42 +269,90 @@ word32 do_stack(word32 address, unsigned bank) {
 
 }
 
-word32 do_list(word32 address, int *psr_ptr, int lines) {
+struct disasm_cookie {
+	unsigned psr;
+	unsigned x;
+};
 
+static int is_jsl_e10000(word32 address) {
+	return get_memory_c(address, 0) == 0x22 &&
+		get_memory24_c(address + 1, 0) == 0xe10000;
+}
+
+static int is_jsl_e10008(word32 address) {
+	return get_memory_c(address, 0) == 0x22 &&
+		get_memory24_c(address + 1, 0) == 0xe10008;
+}
+static int is_jsl_e100a8(word32 address) {
+	return get_memory_c(address, 0) == 0x22 &&
+		get_memory24_c(address + 1, 0) == 0xe100a8;
+}
+
+
+static int is_jsl_e100b0(word32 address) {
+	return get_memory_c(address, 0) == 0x22 &&
+		get_memory24_c(address + 1, 0) == 0xe100b0;
+}
+
+static int is_jsr_bf00(word32 address) {
+	return get_memory_c(address, 0) == 0x20 &&
+		get_memory16_c(address + 1, 0) == 0xbf00;
+}
+
+static int g_disasm_psr;
+
+word32 do_list(word32 address, int lines) {
+
+	unsigned char buffer2[32];
 	char buffer[32];
-	int psr = *psr_ptr;
+
+	const char *opcode_string;
+
 	unsigned opcode;
 	unsigned dtype;
 	unsigned operand;
+
 	word32 pc;
 	int i;
 	int args;
+	int n;
 
 	while (lines--) {
+
+		int bsize = 0;
 		pc = address;
 
 		opcode = get_memory_c(address++, 0);
 		dtype = disasm_types[opcode];
 		args = dtype >> 8;
 
+		buffer2[bsize++] = opcode;
+		opcode_string = disasm_opcodes[opcode];
+
 		switch (args) {
 			case 4:
-				args = psr & 0x20 ? 1 : 2;
+				args = g_disasm_psr & 0x20 ? 1 : 2;
 				break;
 			case 5:
-				args = psr & 0x10 ? 1 : 2;
+				args = g_disasm_psr & 0x10 ? 1 : 2;
 				break;
 		}
 		operand = 0;
 		switch(args) {
 			case 1:
 				operand = get_memory_c(address, 0);
+				buffer2[bsize++] = operand;
 				break;
 			case 2:
 				operand = get_memory16_c(address, 0);
+				buffer2[bsize++] = operand;
+				buffer2[bsize++] = operand >> 8;
 				break;
 			case 3:
 				operand = get_memory24_c(address, 0);
+				buffer2[bsize++] = operand;
+				buffer2[bsize++] = operand >> 8;
+				buffer2[bsize++] = operand >> 16;
 				break;
 		}
 		address += args;
@@ -319,91 +369,141 @@ word32 do_list(word32 address, int *psr_ptr, int lines) {
 				sprintf(buffer, "$%04x,y", operand);
 				break;
 
-    case ABSIND:
-      sprintf(buffer,"($%04x)",operand );
-      break;
-    case ABSXIND:
-      sprintf(buffer,"($%04x,x)",operand );
-      break;
-    case IMPLY:
-      break;
-    case ACCUM:
-      break;
-    case IMMED:
-      sprintf(buffer,"#$%0*x",args * 2, operand);
-      break;
-    case JUST8:
-      sprintf(buffer,"$%02x",operand);
-      break;
-    case DLOC:
-      sprintf(buffer,"$%02x",operand);
-      break;
-    case DLOCX:
-      sprintf(buffer,"$%02x,x",operand);
-      break;
-    case DLOCY:
-      sprintf(buffer,"$%02x,y",operand);
-      break;
-    case ABSLONG:
-      sprintf(buffer,"$%06x",operand);
-      break;
-    case ABSLONGX:
-      sprintf(buffer,"$%06x,x",operand);
-      break;
-    case DLOCIND:
-      sprintf(buffer,"($%02x)",operand);
-      break;
-    case DLOCINDY:
-      sprintf(buffer,"($%02x),y",operand);
-      break;
-    case DLOCXIND:
-      sprintf(buffer,"($%02x,x)",operand);
-      break;
-    case DLOCBRAK:
-      sprintf(buffer,"[$%02x]",operand);
-      break;
-    case DLOCBRAKY:
-      sprintf(buffer,"[$%02x],y",operand);
-      break;
-    case DISP8:
-      sprintf(buffer,"$%04x",
-              (address+(int8_t)operand) & 0xffff);
-      break;
-    case DISP8S:
-      sprintf(buffer,"$%02x,s",operand);
-      break;
-    case DISP8SINDY:
-      sprintf(buffer,"($%02x,s),y",operand);
-      break;
-    case DISP16:
-      sprintf(buffer,"$%04x",
-              (address+(int16_t)(operand)) & 0xffff);
-      break;
-    case MVPMVN:
-      sprintf(buffer,"$%02x,$%02x",operand & 0xff,operand >> 8);
-      break;
-    case SEPVAL:
-    	psr |= operand;
-      sprintf(buffer,"#$%02x",operand);
-      break;
-    case REPVAL:
-    	psr &= ~operand;
-      sprintf(buffer,"#$%02x",operand);
-      break;
+			case ABSIND:
+				sprintf(buffer,"($%04x)",operand );
+				break;
+			case ABSXIND:
+				sprintf(buffer,"($%04x,x)",operand );
+				break;
+			case IMPLY:
+				break;
+			case ACCUM:
+				break;
+			case IMMED:
+				sprintf(buffer,"#$%0*x",args * 2, operand);
+				break;
+			case JUST8:
+				sprintf(buffer,"$%02x",operand);
+				break;
+			case DLOC:
+				sprintf(buffer,"$%02x",operand);
+				break;
+			case DLOCX:
+				sprintf(buffer,"$%02x,x",operand);
+				break;
+			case DLOCY:
+				sprintf(buffer,"$%02x,y",operand);
+				break;
+			case ABSLONG:
+				sprintf(buffer,"$%06x",operand);
+				break;
+			case ABSLONGX:
+				sprintf(buffer,"$%06x,x",operand);
+				break;
+			case DLOCIND:
+				sprintf(buffer,"($%02x)",operand);
+				break;
+			case DLOCINDY:
+				sprintf(buffer,"($%02x),y",operand);
+				break;
+			case DLOCXIND:
+				sprintf(buffer,"($%02x,x)",operand);
+				break;
+			case DLOCBRAK:
+				sprintf(buffer,"[$%02x]",operand);
+				break;
+			case DLOCBRAKY:
+				sprintf(buffer,"[$%02x],y",operand);
+				break;
+			case DISP8:
+				sprintf(buffer,"$%04x",
+				      (address+(int8_t)operand) & 0xffff);
+				break;
+			case DISP8S:
+				sprintf(buffer,"$%02x,s",operand);
+				break;
+			case DISP8SINDY:
+				sprintf(buffer,"($%02x,s),y",operand);
+				break;
+			case DISP16:
+				sprintf(buffer,"$%04x",
+				      (address+(int16_t)(operand)) & 0xffff);
+				break;
+			case MVPMVN:
+				sprintf(buffer,"$%02x,$%02x",operand & 0xff,operand >> 8);
+				break;
+			case SEPVAL:
+			case REPVAL:
+				sprintf(buffer,"#$%02x",operand);
+				break;
 		}
 
-		printf("%02x/%04x: %s %-10s",
-			pc >> 16, pc & 0xffff,
-			disasm_opcodes[opcode], buffer);
+		/* todo -- special case for ldx #xxxx, jsl $e10000 */
+		/* todo -- special case for GS/OS calls */
+		/* todo -- special case for P8 MLI calls */
 
-		printf("%02x", opcode);
-		for(i = 0 ; i < args; ++i) {
-			printf(" %02x", operand & 0xff);
-			operand >>= 8;
+		switch (opcode) {
+			case 0xe2: /* sep */
+				g_disasm_psr|= operand;
+				break;
+			case 0xc2: /* rep */
+				g_disasm_psr &= ~operand;
+				break;
+			case 0xfb: /* xce */
+				g_disasm_psr |= 0x0130;
+				break;
+			case 0xa2: /* ldx # */
+				if (is_jsl_e10000(address)) {
+					/* tool call ... */
+					const char *name = debug_tool_name(operand, 0xe10000);
+					if (name) {
+						opcode_string = name;
+						buffer[0] = 0;
+						for (i = 0; i < 4; ++i) {
+							buffer2[bsize++] = get_memory_c(address++, 0);
+						}
+					}
+				}
+				break;
+			case 0xae: /* ldx ... */
+			case 0xbe:
+			case 0xa6:
+			case 0xb6:
+			case 0xfa: /* plx */
+			case 0xaa: /* tax */
+			case 0xba: /* tsx */
+			case 0xbb: /* tyx */
+			case 0xca: /* dex */
+			case 0xe8: /* inx */
+				break;
+			case 0x22: /* jsl */
+				if (operand == 0xe100a8) {
+					/* inline GS/OS call? */
+					unsigned num = get_memory16_c(address, 0);
+					const char *name = debug_tool_name(num, operand);
+					if (name) {
+						opcode_string = name;
+						unsigned parms = get_memory24_c(address + 2, 0);
+						sprintf(buffer, "$%06x", parms);
+
+						for (i = 0; i < 6; ++i) {
+							buffer2[bsize++] = get_memory_c(address++, 0);
+						}
+					}
+				}
+				break;
+		}
+
+		n = printf("%02x/%04x: %s %s",
+			pc >> 16, pc & 0xffff,
+			opcode_string, buffer);
+		for(; n < 40; ++n) putchar(' ');
+
+		for(i = 0; i < bsize; ++i) {
+			printf(" %02x", buffer2[i]);
 		}
 		fputc('\n', stdout);
 	}
-	*psr_ptr = psr;
 	return address;
 }
 
@@ -729,24 +829,26 @@ void delete_bp(int type, word32 addr) {
 static void do_help(void) {
 
 	fputs(
-		"  *                Print registers\n"
-		"  reg=value        Assign register (a,x,y,etc)\n"
-		"  reset            Reset computer\n"
-		"  quit             exit debugger\n"
-		"  s                single step\n"
-		"  g                go\n"
-		"  bp               List PC breakpoints\n"
-		"  mp               List memory breakpoints\n"
+		"  *                       Print registers\n"
+		"  reg=value               Assign register (a,x,y,etc)\n"
+		"  reset                   Reset computer\n"
+		"  quit                    Exit debugger\n"
+		"  s                       Single step\n"
+		"  g                       Go\n"
+		"  bp                      List PC breakpoints\n"
+		"  mp                      List memory breakpoints\n"
 		"\n"
-		"  [address];l      List\n"
-		"  [address];h      Hexdump\n"
-		"  [address];bp     Set PC breakpoint\n"
-		"  [address];bp-    Remove PC breakpoint\n"
-		"  [address];mp     Set memory breakpoint\n"
-		"  [address];mp-    Remove memory breakpoint\n"
+		"  [address];l             List\n"
+		"  [address];h             Hexdump\n"
+		"  [address];bp            Set PC breakpoint\n"
+		"  [address];bp-           Remove PC breakpoint\n"
+		"  [address];mp            Set memory breakpoint\n"
+		"  [address];mp-           Remove memory breakpoint\n"
+		"  [address]\\temp name    Display template\n"
 		"\n"
 		"\n"
-		"Address = 12/3456, 123456, or 1234\n",
+		"Address = 12/3456, 123456, or 1234\n"
+		"Register = %%a, %%x, %%y, %%pc, etc\n",
 		stdout);
 }
 
@@ -757,8 +859,8 @@ static int parse_command(const char *cp) {
 
 
 	/* TODO:
-		pc++ EOL -> skip current instruction
 		! -> mini assembler mode.
+		require 2 successive ^Ds to exit
 	 */
 
 	const char *YYCURSOR = cp;
@@ -946,8 +1048,7 @@ command:
 		}
 
 		(";l" | "l") eol {
-			int psr = engine.psr;
-			g_prev_address = do_list(addr, &psr, 20);
+			g_prev_address = do_list(addr, 20);
 			return 0;
 		}
 		";h" eol {
@@ -1027,15 +1128,25 @@ int debug_shell(int code) {
 	int c;
 	char *cp;
 
-	int psr = engine.psr;
-
 	if (!g_templates_loaded) {
 		char *path;
 		g_templates_loaded = 1;
 
 		path = get_resource_path("GSBug.Templates");
-		debug_load_template(path);
-		free(path);
+		if (path) {
+			debug_load_templates(path);
+			free(path);
+		}
+		path = get_resource_path("Tools.text");
+		if (path) {
+			debug_load_tools(path, 0xe10000);
+			free(path);
+		}
+		path = get_resource_path("GSOS.text");
+		if (path) {
+			debug_load_tools(path, 0xe100a8);
+			free(path);
+		}
 	}
 
 
@@ -1061,11 +1172,12 @@ int debug_shell(int code) {
 		/* halt_printf */
 	}
 
-	do_list(engine.kpc, &psr, 1);
 
 	g_prev_stack_address = engine.stack;
 	g_prev_stack_bank = engine.kpc & 0xff0000;
 	g_prev_address = engine.kpc;
+	g_disasm_psr = engine.psr;
+	do_list(engine.kpc, 1);
 
 	for(;;) {
 		cp = x_readline("> ");
