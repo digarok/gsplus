@@ -475,6 +475,47 @@ static int do_assign(const char *cp, int reg) {
 			if (cp[2] == '1') addr |= 0x10;
 			goto next;
 		}
+		"%pc" eol {
+			addr = engine.kpc;
+			has_bank = 1;
+			goto next;
+		}
+		"%a" eol {
+			addr = engine.acc;
+			goto next;
+		}
+		"%x" eol {
+			addr = engine.xreg;
+			goto next;
+		}
+		"%y" eol {
+			addr = engine.yreg;
+			goto next;
+		}
+		"%d" eol {
+			addr = engine.direct;
+			goto next;
+		}
+		"%s" eol {
+			addr = engine.stack;
+			goto next;
+		}
+		"%b" eol {
+			addr = engine.dbank;
+			goto next;
+		}
+		"%k" eol {
+			addr = engine.kpc >> 16;
+			goto next;
+		}
+		"%p" eol {
+			addr = engine.psr & 0xff;
+			goto next;
+		}
+		"%e" eol {
+			addr = engine.psr >> 8;
+			goto next;
+		}
 	*/
 
 next:
