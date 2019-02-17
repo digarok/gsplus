@@ -277,7 +277,7 @@ extern word32 slow_mem_changed[];
   _SET_MEMORY16(save_addr, arg, 1);
 
 #define PUSH24_UNSAFE(arg)                                \
-  MMU_CHECK((stack - 2) & 0xffff, arg, 2, 0, 1)           \
+  MMU_CHECK((stack - 2) & 0xffff, arg, 3, 0, 1)           \
   _PUSH24_UNSAFE(arg)
 
 #define _PUSH24_UNSAFE(arg)                               \
