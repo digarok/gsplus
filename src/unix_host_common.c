@@ -126,7 +126,7 @@ void host_set_date_time(word32 ptr, time_t time) {
 
   word16 tmp = 0;
   tmp |= (tm->tm_year % 100) << 9;
-  tmp |= tm->tm_mon << 5;
+  tmp |= (tm->tm_mon + 1) << 5;
   tmp |= tm->tm_mday;
 
   set_memory16_c(ptr, tmp, 0);
@@ -146,7 +146,7 @@ word32 host_convert_date_time(time_t time) {
 
   word16 dd = 0;
   dd |= (tm->tm_year % 100) << 9;
-  dd |= tm->tm_mon << 5;
+  dd |= (tm->tm_mon + 1) << 5;
   dd |= tm->tm_mday;
 
   word16 tt = 0;
@@ -503,10 +503,10 @@ unsigned host_storage_type(const char *path, word16 *error) {
     *error = host_map_errno_path(errno, path);
     return 0;
   }
-  if (S_ISREG(st.st_mode)) {
+  if (S_ISDIR(st.st_mode)) {
     return host_is_root(&st) ? 0x0f : directoryFile;
   }
-  if (S_ISDIR(st.st_mode)) return standardFile;
+  if (S_ISREG(st.st_mode)) return standardFile;
   *error = badStoreType;
   return 0;
 }
