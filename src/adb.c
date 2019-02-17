@@ -10,6 +10,9 @@
 #include "adb.h"
 #include "glog.h"
 
+#include "adb_keycodes.h"
+
+
 int g_fullscreen = 0;
 int g_grabmouse = 0;
 
@@ -1655,34 +1658,48 @@ void adb_physical_key_update(int a2code, int is_up) {
   /* Now check for special keys (function keys, etc) */
   ascii_and_type = a2_key_to_ascii[a2code][1];
   special = 0;
-  if((ascii_and_type & 0xf000) == 0x8000) {
-    /* special function key */
+
+  /* special FKeys? */
+  if (ascii_and_type & 0x1000) {
     special = ascii_and_type & 0xff;
-    switch(special) {
-      case 0x01:           /* F1 - remap to cmd */
-        a2code = 0x37;
+    switch (special) {
+      case kVK_F1:
+        /* F1 - remap to cmd */
+        a2code = kVK_Command;
         special = 0;
         break;
-      case 0x02:           /* F2 - remap to option */
-        a2code = 0x3a;
+      case kVK_F2:
+        /* F2 - remap to option */
+        a2code = kVK_Option;
         special = 0;
         break;
-      case 0x0c:           /* F12 - remap to reset */
-        a2code = 0x7f;
+      case kVK_F12:
+        /* F12 - remap to reset */
+        a2code = kVK_Reset;
         special = 0;
+        break;
+      case kVK_F3:
+      case kVK_F4:
+      case kVK_F5:
+      case kVK_F6:
+      case kVK_F7:
+      case kVK_F8:
+      case kVK_F9:
+      case kVK_F10:
+      case kVK_F11:
         break;
       default:
-        break;
+        special = 0;
     }
   }
 
   /* CUA clipboard paste - for those that remember ctrl-insert/shift-insert */
-  if(is_up == 0 && a2code == 0x72 && SHIFT_DOWN) {
+  if(is_up == 0 && a2code == kVK_Insert && SHIFT_DOWN) {
     clipboard_paste();
   }
 
   /* Only process reset requests here */
-  if(is_up == 0 && a2code == 0x7f && CTRL_DOWN) {
+  if(is_up == 0 && a2code == kVK_Reset && CTRL_DOWN) {
     /* Reset pressed! */
     glogf("Reset pressed since CTRL_DOWN: %d", CTRL_DOWN);
     do_reset();
@@ -1691,10 +1708,10 @@ void adb_physical_key_update(int a2code, int is_up) {
 
   if(special && !is_up) {
     switch(special) {
-      case 0x03:           /* F3 - screenshot */
+      case kVK_F3:           /* F3 - screenshot */
         g_screenshot_requested = 1;
         break;
-      case 0x04:           /* F4 - emulator config panel */
+      case kVK_F4:           /* F4 - emulator config panel */
         if (CMD_DOWN) {
           glog("Alt-F4 Quit!");
           iwm_shut();
@@ -1705,7 +1722,7 @@ void adb_physical_key_update(int a2code, int is_up) {
           cfg_toggle_config_panel();
         }
         break;
-      case 0x05:           /* F5 - emulator clipboard paste */
+      case kVK_F5:           /* F5 - emulator clipboard paste */
         if (SHIFT_DOWN) {
           g_grabmouse = !g_grabmouse;
 #ifdef HAVE_SDL
@@ -1717,18 +1734,18 @@ void adb_physical_key_update(int a2code, int is_up) {
           clipboard_paste();
         }
         break;
-      case 0x06:           /* F6 - emulator speed */
+      case kVK_F6:           /* F6 - emulator speed */
         if(SHIFT_DOWN) {
           halt2_printf("Shift-F6 pressed\n");
         } else {
           adb_increment_speed();
         }
         break;
-      case 0x07:           /* F7 - fast disk emul */
+      case kVK_F7:           /* F7 - fast disk emul */
         g_fast_disk_emul = !g_fast_disk_emul;
         glogf("g_fast_disk_emul is now %d",     g_fast_disk_emul);
         break;
-      case 0x08:           /* F8 - warp pointer */
+      case kVK_F8:           /* F8 - warp pointer */
         g_warp_pointer = !g_warp_pointer;
         if(g_hide_pointer != g_warp_pointer) {
           g_hide_pointer = g_warp_pointer;
@@ -1736,7 +1753,7 @@ void adb_physical_key_update(int a2code, int is_up) {
         }
         glogf("g_warp_pointer is now %d",     g_warp_pointer);
         break;
-      case 0x09:           /* F9 - swap paddles */
+      case kVK_F9:           /* F9 - swap paddles */
         if(SHIFT_DOWN) {
           g_swap_paddles = !g_swap_paddles;
           glogf("Swap paddles is now: %d", g_swap_paddles);
@@ -1745,7 +1762,7 @@ void adb_physical_key_update(int a2code, int is_up) {
           glogf("Invert paddles is now: %d", g_invert_paddles);
         }
         break;
-      case 0x0a:           /* F10 - change a2vid paletter */
+      case kVK_F10:           /* F10 - change a2vid paletter */
         if (SHIFT_DOWN) {
 #ifdef TOGGLE_STATUS
           extern void x_toggle_status_lines();
@@ -1758,7 +1775,7 @@ void adb_physical_key_update(int a2code, int is_up) {
           change_a2vid_palette((g_a2vid_palette + 1) & 0xf);
         }
         break;
-      case 0x0b:           /* F11 - full screen */
+      case kVK_F11:           /* F11 - full screen */
         g_fullscreen = !g_fullscreen;
         x_full_screen(g_fullscreen);
         break;
@@ -1780,10 +1797,10 @@ void adb_physical_key_update(int a2code, int is_up) {
       /*  keypress pass on further, except for cmd/opt */
       if(ascii == 0x30) {
         /* remap '0' to cmd */
-        a2code = 0x37;
+        a2code = kVK_Command;
       } else if(ascii == 0x2e || ascii == 0x2c) {
         /* remap '.' and ',' to option */
-        a2code = 0x3a;
+        a2code = kVK_Option;
       } else {
         /* Just ignore it in this mode */
         return;
