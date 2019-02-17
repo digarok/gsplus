@@ -37,17 +37,20 @@ struct record {
 	char *name;
 	int total_size; /* total size */
 	int field_count; /* # of fields */
-	int field_alloc;
-	struct field *fields;
+	int field_index; /* starting index into the fields array */
 };
 
 static struct record *records = NULL;
 static int record_count = 0;
 static int record_alloc = 0;
 
+static struct field *fields = NULL;
+static int field_count = 0;
+static int field_alloc = 0;
+
 static int record_compare(const void *a, const void *b) {
-	const struct record *aa = (const struct record *)a;
-	const struct record *bb = (const struct record *)b;
+	const struct record *aa = a;
+	const struct record *bb = b;
 	int rv;
 	rv = strcasecmp(aa->name, bb->name);
 	//if (rv == 0) return aa->total_size - bb->total_size;
@@ -56,6 +59,16 @@ static int record_compare(const void *a, const void *b) {
 
 /* 192 records in the standard file... */
 static void add_record(struct record *r) {
+	/* calc size and count */
+	int i;
+
+	r->field_count = field_count - r->field_index;
+	for (i = r->field_index; i < field_count; ++i) {
+		int size = fields[i].type;
+		if (size > 4) size = 4;
+		r->total_size += size * fields[i].count;
+	}
+
 	if (record_count == record_alloc) {
 		size_t size = (record_alloc + 256) * sizeof(struct record);
 		void *tmp = realloc(records, size);
@@ -66,26 +79,17 @@ static void add_record(struct record *r) {
 	records[record_count++] = *r;
 }
 
-static void free_record(struct record *r) {
-	int i;
-	for (i = 0; i < r->field_count; ++i) {
-		free(r->fields[i].name);
-	}
-	free(r->name);
-	free(r->fields);
-}
 
 /* average ~14 fields per record */
-static void add_field(struct record *r, struct field *f) {
-	if (r->field_count == r->field_alloc) {
-		size_t size = (r->field_alloc + 32) * sizeof(struct field);
-		void *tmp = realloc(r->fields, size);
+static void add_field(struct field *f) {
+	if (field_count == field_alloc) {
+		size_t size = (field_alloc + 512) * sizeof(struct field);
+		void *tmp = realloc(fields, size);
 		if (!tmp) return; /* oops */
-		r->fields = tmp;
-		r->field_alloc += 32;
+		fields = tmp;
+		field_alloc += 512;
 	}
-	r->fields[r->field_count++] = *f;
-	r->total_size += f->type * f->count;
+	fields[field_count++] = *f;
 }
 
 
@@ -120,6 +124,9 @@ static int parse_field(const char *cp, struct field *f) {
 	"BYTE" / (ws | eol) { type = 1; goto next; }
 	"WORD" / (ws | eol) { type = 2; goto next; }
 	"LONG" / (ws | eol) { type = 4; goto next; }
+	"CSTRING" / (ws | eol) { type = 5; goto next; }
+	"PSTRING" / (ws | eol) { type = 6; goto next; }
+	"GSSTRING" / (ws | eol) { type = 7; goto next; }
 	"" { type = 0; goto next; }
 	*/
 
@@ -178,11 +185,12 @@ void debug_load_templates(const char *path) {
 
 _field:
 		if (!in_struct) {
-			/* warn and create fake struct */
+			/* warn once */
 			fprintf(stderr, "%s:%d: Missing _START.\n", path, line);
 			memset(&record, 0, sizeof(record));
 			in_struct = -1;
 		}
+		if (in_struct < 0) continue;
 
 		memset(&field, 0, sizeof(field));
 		ok = parse_field(cp, &field);
@@ -191,14 +199,13 @@ _field:
 			/* warn but add */
 			fprintf(stderr, "%s:%d: Bad field line: %s\n", path, line, buffer);
 		}
-		add_field(&record, &field);
+		add_field(&field);
 		continue;
 
 _start:
 		if (in_struct) {
 			/* warn and close it */
 			if (in_struct > 0) add_record(&record);
-			if (in_struct < 0) free_record(&record);	
 		}
 		memset(&record, 0, sizeof(record));
 
@@ -218,6 +225,7 @@ _start:
 		} else {
 			in_struct = 1;
 			record.name = strndup(start, end - start);
+			record.field_index = field_count;
 		}
 
 		while (isspace(*cp)) ++cp;
@@ -236,7 +244,6 @@ _end:
 
 		if (in_struct) {
 			if (in_struct > 0) add_record(&record);
-			if (in_struct < 0) free_record(&record);
 		} else {
 			/* warning */
 			fprintf(stderr, "%s:%d: _END without _START.\n", path, line);
@@ -251,7 +258,6 @@ _end:
 		/* warn & close */
 		fprintf(stderr, "%s:%d: Missing _END.\n", path, line);
 		if (in_struct > 0) add_record(&record);
-		if (in_struct < 0) free_record(&record);
 	}
 	fclose(f);
 
@@ -267,16 +273,18 @@ word32 debug_apply_template(word32 address, const char *name) {
 	/* 1 - lookup template */
 	struct record *r;
 	int i, j;
+	struct field *f;
 
 	r = bsearch(name, records, record_count, sizeof(struct record), record_search);
 	if (r == NULL) {
 		fprintf(stderr, "Invalid template: %s\n", name);
 		return address;
 	}
+	f = fields + r->field_index;
 	if (r->total_size == 0) {
 		/* just print the fields */
 		for (i = 0; i < r->field_count; ++i) {
-			fputs(r->fields[i].name, stdout);
+			fputs(f[i].name, stdout);
 			fputc('\n', stdout);
 		}
 		fputc('\n', stdout);
@@ -284,11 +292,10 @@ word32 debug_apply_template(word32 address, const char *name) {
 	}
 
 	for (i = 0; i < r->field_count; ++i) {
-		struct field *f = &r->fields[i];
 		word32 value;
-		unsigned type = f->type;
-		printf("%-16s", f->name);
-		for (j = 0; j < f->count; ++j) {
+		unsigned type = f[i].type;
+		printf("%-16s", f[i].name);
+		for (j = 0; j < f[i].count; ++j) {
 			switch(type) {
 				case 1:
 					value = get_memory_c(address, 0);
@@ -301,6 +308,9 @@ word32 debug_apply_template(word32 address, const char *name) {
 					printf("%04x ", value);
 					break;
 				case 4:
+				case 5: /* cstring */
+				case 6: /* pstring */
+				case 7: /* gs/os string */
 					value = get_memory16_c(address, 0);
 					address += 4;
 					printf("%08x ", value);
