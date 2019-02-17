@@ -428,34 +428,40 @@ int check_bp_breakpoints(word32 addr) {
 
 
 int check_mp_breakpoints(word32 addr, word32 value, unsigned bytes, int in_page, int in_bank) {
-  byte *stat;
+  byte *stat1;
+  byte *stat2;
   word32 wstat;
   word32 mask = 0xffffff;
   int i;
 
-  unsigned xbytes = bytes;
-  word32 xaddr = addr;
 
-  if (in_bank) mask = 0xffff;
-  if (in_page) mask = 0xff;
+  /* assumptions:
+   * bytes is 1-3, so no possibility of crossing multiple pags
+   * g_mp_breakpoints is in ascending order.
+   */
 
-  while (bytes--) {
-    stat = GET_PAGE_INFO_WR(((addr) >> 8) & 0xffff);
-    wstat = PTR2WORD(stat) & 0xff;
-    if ((wstat & BANK_BREAK)) {
-      for (i = 0; i < g_num_mp_breakpoints; ++i) {
-        if (addr == g_mp_breakpoints[i]) {
-          g_abort_address = xaddr;
-          g_abort_bytes = xbytes;
-          mask = (1 << (xbytes << 3))-1;
+  word32 a1 = addr;
+  word32 a2 = addr + bytes - 1;
+  if (in_page) a1 = (a1 & 0x00ff) | (addr & 0xffff00);
+  if (in_bank) a1 = (a1 & 0xffff) | (addr & 0xff0000);
+
+  stat1 = GET_PAGE_INFO_WR(((a1) >> 8) & 0xffff);
+  stat2 = GET_PAGE_INFO_WR(((a2) >> 8) & 0xffff);
+  wstat = PTR2WORD(stat1) | PTR2WORD(stat2);
+
+  if (wstat & BANK_BREAK) {
+    for (i = 0; i < g_num_mp_breakpoints; ++i) {
+      word32 bp = g_mp_breakpoints[i];
+      if (a1 >= bp && a2 <= bp) {
+          g_abort_address = addr;
+          g_abort_bytes = bytes;
+          mask = (1 << (bytes << 3))-1;
           g_abort_value = value & mask;
-          return 1;
-        }
+          return 1;        
       }
     }
-
-    addr = ((addr + 1) & mask) | (addr & ~mask);
   }
+
   return 0;
 }
 
