@@ -140,7 +140,8 @@ char *x_readline(const char *prompt) {
 	static char buffer[1024];
 	DWORD count = 0;
 	BOOL ok;
-	HANDLE h = GetStdHandle(STD_INPUT_HANDLE),
+	HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+
 	if (!readline_init) {
 		CONSOLE_HISTORY_INFO chi;
 		DWORD mode;
