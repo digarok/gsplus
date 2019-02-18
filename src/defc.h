@@ -6,6 +6,7 @@
  */
 
 #include "defcomm.h"
+#include <stdint.h>
 
 // OG redirect printf to console
 #ifdef ACTIVEGS
@@ -18,14 +19,11 @@ extern "C" int fOutputInfo(FILE*,const char* format,...);
 
 #define STRUCT(a) typedef struct _ ## a a; struct _ ## a
 
-typedef unsigned char byte;
-typedef unsigned short word16;
-typedef unsigned int word32;
-#if _MSC_VER
-typedef unsigned __int64 word64;
-#else
-typedef unsigned long long word64;
-#endif
+typedef uint8_t byte;
+typedef uint16_t word16;
+typedef uint32_t word32;
+typedef uint64_t word64;
+#define PTR2WORD(a) ((uintptr_t)(a))
 
 void U_STACK_TRACE();
 
@@ -228,11 +226,6 @@ STRUCT(Emustate_word32list) {
 								word32 *wptr;
 };
 
-#ifdef __LP64__
-# define PTR2WORD(a) ((unsigned long)(a))
-#else
-# define PTR2WORD(a) ((unsigned int)(a))
-#endif
 
 
 #define ALTZP (g_c068_statereg & 0x80)
