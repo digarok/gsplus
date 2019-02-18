@@ -231,11 +231,9 @@ STRUCT(Emustate_word32list) {
 								word32 *wptr;
 };
 
-#ifdef __LP64__
-# define PTR2WORD(a) ((unsigned long)(a))
-#else
-# define PTR2WORD(a) ((unsigned int)(a))
-#endif
+
+# define PTR2WORD(a) ((uintptr_t)(a))
+
 
 
 #define ALTZP (g_c068_statereg & 0x80)
