@@ -49,6 +49,21 @@ extern word32 debug_apply_template(word32 address, const char *name);
 extern void debug_load_tools(const char *path, unsigned vector);
 extern const char *debug_tool_name(unsigned, unsigned vector);
 
+#ifdef WIN32
+char *strndup(const char *s, size_t maxlen) {
+	char *cp;
+	size_t l = strlen(s);
+
+	if (l > maxlen) l = maxlen;
+	cp = malloc(l + 1);
+	if (cp) {
+		memcpy(cp, s, l);
+		cp[l] = 0;
+	}
+	return cp;
+}
+#endif
+
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
 static char *get_resource_path(const char *leaf) {
