@@ -136,6 +136,10 @@ void x_readline_end(void) {
 
 static int readline_init = 0;
 
+#ifndef HISTORY_NO_DUP_FLAG
+#define HISTORY_NO_DUP_FLAG 0x01
+#endif
+
 char *x_readline(const char *prompt) {
 	static char buffer[1024];
 	DWORD count = 0;
