@@ -87,6 +87,9 @@ static char *get_resource_path(const char *leaf) {
 }
 #elif defined(WIN32)
 /* todo -- something clever like find the home directory */
+static char *get_resource_path(const char *leaf) {
+	return NULL;
+}
 #else
 static char *get_resource_path(const char *leaf) {
 	int l;
@@ -1200,6 +1203,7 @@ void do_go()      {
   int ret;
   int ok;
 
+  #ifndef WIN32
   /* if -g flag, start with debug shell ... */
   if (isatty(STDIN_FILENO)) {
   	struct sigaction sa;
@@ -1211,6 +1215,7 @@ void do_go()      {
   } else {
   	g_dbg_shell = 0;  	
   }
+  #endif
 
   g_config_control_panel = 1;
   if (g_dbg_shell) {
