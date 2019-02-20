@@ -456,7 +456,6 @@ void debug_load_nifty(const char *path) {
 		start = cp;
 		/*!re2c
 			[\r\n\x00] { continue; }
-			";" { continue; }
 			* {
 				fprintf(stderr, "%s:%d: Bad line: %s", path, line, buffer);
 				continue;
@@ -486,7 +485,7 @@ prefix:
 		start = cp;
 		for(;;) {
 			/*!re2c
-			"" / (eol | ws) { break; }
+			"" / eol { break; }
 			"(" | ws {
 				if (vector > 0x100 ) {
 					--cp;
