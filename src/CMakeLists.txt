@@ -14,17 +14,20 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED TRUE)
 
+if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+endif()
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
 	add_compile_options(
-		-O2 -Wall -fomit-frame-pointer
+		-Wall -fomit-frame-pointer
 	)
 endif()
 
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
 	add_compile_options(
-		-O2 -Wall -fomit-frame-pointer
+		-Wall -fomit-frame-pointer
 	)
 endif()
 
