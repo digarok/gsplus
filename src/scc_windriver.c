@@ -7,13 +7,13 @@
 
 /* This file contains the Win32 COM1/COM2 calls */
 
+#ifdef _WIN32
+
 #include "defc.h"
 #include "scc.h"
 
-#ifdef __CYGWIN__
 #include <Windows.h>
 #include <NspAPI.h>
-#endif
 
 #ifdef UNDER_CE
 #define vsnprintf _vsnprintf
@@ -22,7 +22,6 @@
 extern Scc scc_stat[2];
 extern word32 g_c025_val;
 
-#ifdef _WIN32
 int scc_serial_win_init(int port)     {
   COMMTIMEOUTS commtimeouts;
   TCHAR str_buf[8];

@@ -14,17 +14,16 @@
 #ifndef UNDER_CE        //OG
 #include <signal.h>
 #endif
-#ifdef __CYGWIN__
+
+#ifdef _WIN32
 #include <Windows.h>
+#define socklen_t int
 #endif
+
 extern Scc scc_stat[2];
 extern int g_serial_modem[];
 
-#if !(defined _WIN32)
-extern int h_errno;
-#else
-#define socklen_t int
-#endif
+
 int g_wsastartup_called = 0;
 typedef unsigned short USHORT;
 
@@ -108,19 +107,17 @@ void scc_socket_maybe_open_incoming(int port, double dcycs) {
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     printf("sockfd ret: %d\n", sockfd);
     if(sockfd == -1) {
-      printf("socket ret: %d, errno: %d\n", sockfd, errno);
+      perror("socket");
       scc_socket_close(port, 0, dcycs);
       scc_ptr->socket_state = -1;
       return;
     }
-    /* printf("socket ret: %d\n", sockfd); */
 
     on = 1;
     ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
                      (char *)&on, sizeof(on));
     if(ret < 0) {
-      printf("setsockopt REUSEADDR ret: %d, err:%d\n",
-             ret, errno);
+      perror("setsockopt REUSEADDR");
       scc_socket_close(port, 0, dcycs);
       scc_ptr->socket_state = -1;
       return;
@@ -138,7 +135,7 @@ void scc_socket_maybe_open_incoming(int port, double dcycs) {
       break;
     }
     /* else ret to bind was < 0 */
-    printf("bind ret: %d, errno: %d\n", ret, errno);
+    perror("bind");
     inc++;
     scc_socket_close_handle(sockfd);
     printf("Trying next port: %d\n", 6501 + port + inc);
@@ -180,7 +177,7 @@ void scc_socket_open_outgoing(int port, double dcycs) {
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   printf("sockfd ret: %d\n", sockfd);
   if(sockfd == -1) {
-    printf("socket ret: %d, errno: %d\n", sockfd, errno);
+    perror("socket");
     scc_socket_close(port, 1, dcycs);
     return;
   }
@@ -190,8 +187,7 @@ void scc_socket_open_outgoing(int port, double dcycs) {
   ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
                    (char *)&on, sizeof(on));
   if(ret < 0) {
-    printf("setsockopt REUSEADDR ret: %d, err:%d\n",
-           ret, errno);
+    perror("setsockopt REUSEADDR");
     scc_socket_close(port, 1, dcycs);
     return;
   }
@@ -218,9 +214,9 @@ void scc_socket_open_outgoing(int port, double dcycs) {
   hostentptr = gethostbyname((const char*)&scc_ptr->modem_cmd_str[0]);          // OG Added Cast
   if(hostentptr == 0) {
 #if defined(_WIN32)
-    fatal_printf("Lookup host %s failed\n", &scc_ptr->modem_cmd_str[0]);
+    fatal_printf("gethostbyname %s failed\n", &scc_ptr->modem_cmd_str[0]);
 #else
-    fatal_printf("Lookup host %s failed, herrno: %d\n",     &scc_ptr->modem_cmd_str[0], h_errno);
+    fatal_printf("gethostbyname %s failed: %s\n", &scc_ptr->modem_cmd_str[0], hstrerror(h_errno));
 #endif
     scc_socket_close_handle(sockfd);
     scc_socket_close(port, 1, dcycs);
@@ -234,7 +230,7 @@ void scc_socket_open_outgoing(int port, double dcycs) {
 
   ret = connect(sockfd, (struct sockaddr *)&sa_in, sizeof(sa_in));
   if(ret < 0) {
-    printf("connect ret: %d, errno: %d\n", ret, errno);
+    perror("connect");
     scc_socket_close_handle(sockfd);
     scc_socket_close(port, 1, dcycs);
     return;
@@ -276,14 +272,14 @@ void scc_socket_make_nonblock(int port, double dcycs) {
 #else
   flags = fcntl(sockfd, F_GETFL, 0);
   if(flags == -1) {
-    printf("fcntl GETFL ret: %d, errno: %d\n", flags, errno);
+    perror("fcntl GETFL");
     scc_socket_close(port, 1, dcycs);
     scc_ptr->socket_state = -1;
     return;
   }
   ret = fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
   if(ret == -1) {
-    printf("fcntl SETFL ret: %d, errno: %d\n", ret, errno);
+    perror("fcntl SETFL");
     scc_socket_close(port, 1, dcycs);
     scc_ptr->socket_state = -1;
     return;
@@ -374,12 +370,12 @@ void scc_accept_socket(int port, double dcycs) {
     /* For Linux, we need to set O_NONBLOCK on the rdwrfd */
     flags = fcntl(rdwrfd, F_GETFL, 0);
     if(flags == -1) {
-      printf("fcntl GETFL ret: %d, errno: %d\n", flags,errno);
+      perror("fcntl GETFL");
       return;
     }
     ret = fcntl(rdwrfd, F_SETFL, flags | O_NONBLOCK);
     if(ret == -1) {
-      printf("fcntl SETFL ret: %d, errno: %d\n", ret, errno);
+      perror("fcntl SETFL");
       return;
     }
 #endif
