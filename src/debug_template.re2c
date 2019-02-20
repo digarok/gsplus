@@ -108,6 +108,12 @@ static void add_field(struct field *f) {
 	fields[field_count++] = *f;
 }
 
+static char *rtrim(char *cp) {
+	int l = strlen(cp);
+	while (l && isspace(cp[l-1])) --l;
+	cp[l] = 0;
+	return cp;
+}
 
 /* 0 - no field, 1 - ok, -1 - warning */
 static int parse_field(const char *cp, struct field *f) {
@@ -189,7 +195,7 @@ void debug_load_templates(const char *path) {
 
 		const char *cp = fgets(buffer, sizeof(buffer), f);
 		if (!cp) break;
-
+		rtrim(buffer);
 
 		/*!re2c
 		"" { goto _field; }
@@ -340,38 +346,7 @@ word32 debug_apply_template(word32 address, const char *name) {
 	return address;
 }
 
-/* nifty list */
-/*
- * format: 
- * fffx ... header comments
- * xxxx name ; p8 mli calls 
- * *
- * xxxx name ; p16/gsos calls
- * *
- * xxxx name ; tool calls
- * *
- * xxxx name ; user tool calls
- * *
- * xxxx name ; e1 vectors
- * *
- * xxxx name ; e0 vectors
- * *
- * xxxx name ; softswitch/f8 rom
- * *
- * xxxx name ; 01 vectors
- * *
- * xxxx name ; nifty list service calls
- * *
- * xxxx name ; resource types
- * *
- * xxxx name ; error codes
- * *
- * xxxx name ; HC IIgs callbacks 
- * *
- * xxxx name ; request codes
- * *
- *
- */
+
 
 struct tool {
 	char *name;
@@ -415,25 +390,53 @@ static int tool_compare(const void *a, const void *b) {
 	return rv;
 }
 
+/* nifty list */
 /*
-static int tool_search(const void *a, const void *b) {
-	const struct tool *aa = a;
-	const struct tool *bb = b;
+ * format: 
+ * fffx ... header comments
+ * xxxx name ; p8 mli calls 
+ * *
+ * xxxx name ; p16/gsos calls
+ * *
+ * xxxx name ; tool calls
+ * *
+ * xxxx name ; user tool calls
+ * *
+ * xxxx name ; e1 vectors
+ * *
+ * xxxx name ; e0 vectors
+ * *
+ * xxxx name ; softswitch/f8 rom
+ * *
+ * xxxx name ; 01 vectors
+ * *
+ * xxxx name ; nifty list service calls
+ * *
+ * xxxx name ; resource types
+ * *
+ * xxxx name ; error codes
+ * *
+ * xxxx name ; HC IIgs callbacks 
+ * *
+ * xxxx name ; request codes
+ * *
+ *
+ */
 
-	int rv = (int)aa->vector - (int)bb->vector
-	if (rv == 0)
-		rv = (int)aa->number - (int)bb->number;
-	return rv;
-}
-*/
-
-void debug_load_tools(const char *path, unsigned vector) {
+void debug_load_nifty(const char *path) {
 
 	FILE *f;
 	char buffer[1024];
 	unsigned line = 0;
 	const char *YYMARKER = NULL;
 	const char *YYCTXMARKER = NULL;
+
+	int section = 0;
+	unsigned vector = 0;
+	static unsigned vectors[] = {
+		0xbf00, 0xe100a8, 0xe10000, 0xe10008, 0xe1, 0xe0, 0xff, 0x01,
+		0x00, 0x00, 0x00, 0x00, 0x00
+	};
 
 
 	f = fopen(path, "r");
@@ -448,6 +451,7 @@ void debug_load_tools(const char *path, unsigned vector) {
 
 		const char *cp = fgets(buffer, sizeof(buffer), f);
 		if (!cp) break;
+		rtrim(buffer);
 
 		start = cp;
 		/*!re2c
@@ -457,17 +461,39 @@ void debug_load_tools(const char *path, unsigned vector) {
 				fprintf(stderr, "%s:%d: Bad line: %s", path, line, buffer);
 				continue;
 			}
+			"*" {
+				++section;
+				vector = 0;
+				if (section < sizeof(vectors) / sizeof(vectors[0]))
+					vector = vectors[section];
+				continue;
+			}
 			x{4} / ws { goto ok; }
 		*/
 ok:
 		end = cp;
 		tool.number = to_hex(start, end);
-		while (isspace(*cp)) ++cp;
+		if (section == 0 && tool.number >= 0xfff0) continue;
+		if (!vector) continue;
 
+		while (isspace(*cp)) ++cp;
+		/* skip p8/p16/ prefix */
+		/*!re2c
+			"P8:" | "P16:" | "Shell:" | "GS/OS:" { goto prefix; }
+			"" { goto prefix; }
+		*/
+prefix:
 		start = cp;
 		for(;;) {
 			/*!re2c
 			"" / (eol | ws) { break; }
+			"(" | ws {
+				if (vector > 0x100 ) {
+					--cp;
+					break;
+				}
+				continue;
+			}
 			* { continue; }
 			*/
 		}
@@ -475,11 +501,14 @@ ok:
 		if (end > start) {
 			int l = end - start;
 
-			/* add a leading _ */
-			tool.name = malloc(l + 2);
-			tool.name[0] = '_';
-			strncpy(tool.name + 1, start, l);
-			tool.name[l + 2] = 0;
+			if (vector > 0x0100) {
+				/* add a leading _ */
+				tool.name = malloc(l + 2);
+				tool.name[0] = '_';
+				strncpy(tool.name + 1, start, l);
+				tool.name[l + 1] = 0;
+			}
+			else tool.name = strndup(start, l);
 			add_tool(&tool);
 		}
 

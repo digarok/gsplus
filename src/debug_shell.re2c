@@ -46,7 +46,7 @@ static word32 g_prev_stack_bank = 0;
 static int g_templates_loaded = 0;
 extern void debug_load_templates(const char *path);
 extern word32 debug_apply_template(word32 address, const char *name);
-extern void debug_load_tools(const char *path, unsigned vector);
+extern void debug_load_nifty(const char *path);
 extern const char *debug_tool_name(unsigned, unsigned vector);
 
 
@@ -1142,14 +1142,9 @@ int debug_shell(int code) {
 			debug_load_templates(path);
 			free(path);
 		}
-		path = get_resource_path("Tools.text");
+		path = get_resource_path("NList.Data");
 		if (path) {
-			debug_load_tools(path, 0xe10000);
-			free(path);
-		}
-		path = get_resource_path("GSOS.text");
-		if (path) {
-			debug_load_tools(path, 0xe100a8);
+			debug_load_nifty(path);
 			free(path);
 		}
 	}
