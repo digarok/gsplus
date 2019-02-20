@@ -1207,6 +1207,9 @@ int debug_shell(int code) {
 
 static void do_sig_intr(int sig) {
 	/* todo -- raise() if halt already pending */
+	if (halt_sim & 4) {
+		abort();
+	}
 	set_halt(4);
 }
 
