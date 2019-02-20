@@ -10,6 +10,22 @@
 
 #include "defc.h"
 
+
+#ifdef WIN32
+char *strndup(const char *s, size_t maxlen) {
+	char *cp;
+	size_t l = strlen(s);
+
+	if (l > maxlen) l = maxlen;
+	cp = malloc(l + 1);
+	if (cp) {
+		memcpy(cp, s, l);
+		cp[l] = 0;
+	}
+	return cp;
+}
+#endif
+
 /*!re2c
 	re2c:define:YYCTYPE = char;
 	re2c:define:YYCURSOR = cp;
