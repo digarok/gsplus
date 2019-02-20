@@ -11,6 +11,8 @@
 #include "scc.h"
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
+
 #ifndef UNDER_CE        //OG
 #include <signal.h>
 #endif
