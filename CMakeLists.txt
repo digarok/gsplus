@@ -4,7 +4,7 @@ project(gsplus VERSION 0.14)
 
 if(CYGWIN OR MSYS)
 	set(WIN32 1)
-	add_definitions(-DWIN32 -D_WIN32)
+	add_definitions(-DWIN32 -D_WIN32 -D__USE_W32_SOCKETS)
 endif()
 
 # msys/cygwin/mingw32 add dirent.h, etc.
