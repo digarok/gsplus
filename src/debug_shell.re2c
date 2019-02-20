@@ -497,6 +497,21 @@ word32 do_list(word32 address, int lines) {
 					}
 				}
 				break;
+			case 0x20: /* jsr */
+				if (operand == 0xbf00) {
+					unsigned num = get_memory_c(address, 0);
+					const char *name = debug_tool_name(num, operand);
+					if (name) {
+						opcode_string = name;
+						unsigned parms = get_memory16_c(address + 1, 0);
+						sprintf(buffer, "$%04x", parms);
+
+						for (i = 0; i < 3; ++i) {
+							buffer2[bsize++] = get_memory_c(address++, 0);
+						}
+					}
+				}
+				break;
 		}
 
 		n = printf("%02x/%04x: %s %s",
