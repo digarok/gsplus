@@ -312,6 +312,7 @@ word32 do_list(word32 address, int lines) {
 	char buffer[32];
 
 	const char *opcode_string;
+	const char *comment;
 
 	unsigned opcode;
 	unsigned dtype;
@@ -325,6 +326,7 @@ word32 do_list(word32 address, int lines) {
 	while (lines--) {
 
 		int bsize = 0;
+		unsigned bank;
 		pc = address;
 
 		opcode = get_memory_c(address++, 0);
@@ -333,6 +335,7 @@ word32 do_list(word32 address, int lines) {
 
 		buffer2[bsize++] = opcode;
 		opcode_string = disasm_opcodes[opcode];
+		comment = NULL;
 
 		switch (args) {
 			case 4:
@@ -401,9 +404,15 @@ word32 do_list(word32 address, int lines) {
 				break;
 			case ABSLONG:
 				sprintf(buffer,"$%06x",operand);
+				bank = operand >> 16;
+				if (bank == 0xe0 || bank == 0xe1 || bank == 0x01 || bank == 0xff)
+					comment = debug_tool_name(operand & 0xffff, bank);
 				break;
 			case ABSLONGX:
 				sprintf(buffer,"$%06x,x",operand);
+				bank = operand >> 16;
+				if (bank == 0xe0 || bank == 0xe1 || bank == 0x01 || bank == 0xff)
+					comment = debug_tool_name(operand & 0xffff, bank);
 				break;
 			case DLOCIND:
 				sprintf(buffer,"($%02x)",operand);
@@ -443,9 +452,12 @@ word32 do_list(word32 address, int lines) {
 				break;
 		}
 
-		/* todo -- special case for ldx #xxxx, jsl $e10000 */
-		/* todo -- special case for GS/OS calls */
-		/* todo -- special case for P8 MLI calls */
+		if (!comment) {
+			bank = pc >> 16;
+			if (bank == 0xe0 || bank == 0xe1 || bank == 0x01 || bank == 0xff)
+				comment = debug_tool_name(pc & 0xffff, bank);
+		}
+
 
 		switch (opcode) {
 			case 0xe2: /* sep */
@@ -487,6 +499,7 @@ word32 do_list(word32 address, int lines) {
 					unsigned num = get_memory16_c(address, 0);
 					const char *name = debug_tool_name(num, operand);
 					if (name) {
+						comment = NULL;
 						opcode_string = name;
 						unsigned parms = get_memory24_c(address + 2, 0);
 						sprintf(buffer, "$%06x", parms);
@@ -520,7 +533,10 @@ word32 do_list(word32 address, int lines) {
 		for(; n < 40; ++n) putchar(' ');
 
 		for(i = 0; i < bsize; ++i) {
-			printf(" %02x", buffer2[i]);
+			n += printf(" %02x", buffer2[i]);
+		}
+		if (comment) {
+			printf("%*s; %s", 60 - n, "", comment);
 		}
 		fputc('\n', stdout);
 	}
