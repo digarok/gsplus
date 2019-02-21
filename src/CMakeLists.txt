@@ -201,7 +201,7 @@ if (WITH_ATBRIDGE)
 	target_link_libraries(GSplus atbridge)
 endif()
 
-if (DRIVER MATCHES "WIN32")
+if (WIN32)
 	target_link_libraries(GSplus comdlg32 Shlwapi IPHlpApi
 		winmm gdi32 dsound comctl32 ws2_32 shell32
 	)
