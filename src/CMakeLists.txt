@@ -203,7 +203,6 @@ if (DRIVER MATCHES "WIN32")
 	target_link_libraries(GSplus comdlg32 Shlwapi IPHlpApi
 		winmm gdi32 dsound comctl32 ws2_32 shell32
 	)
-	target_compile_definitions(GSplus PRIVATE WIN_SOUND)
 endif()
 
 if (DRIVER MATCHES "SDL")

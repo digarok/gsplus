@@ -21,7 +21,7 @@ long sound_init_device_sdl();
 # include <sys/soundcard.h>
 #endif
 
-#ifndef WIN_SOUND       /* Workaround - gcc in cygwin wasn't defining _WIN32 */
+#ifndef _WIN32
 # include <sys/socket.h>
 # include <netinet/in.h>
 #endif
@@ -77,9 +77,9 @@ void reliable_buf_write(word32 *shm_addr, int pos, int size)      {
 #if defined(HAVE_SDL)
     //ret = sdl_send_audio(ptr, size);
 
-#elif defined(WIN_SOUND)
+#elif defined(_WIN32)
     ret = win32_send_audio(ptr, size);
-#elif defined(MAC) && !defined(HAVE_SDL)
+#elif defined(MAC)
     ret = mac_send_audio(ptr, size);
 #else
     ret = write(g_audio_socket, ptr, size);
@@ -129,10 +129,10 @@ void child_sound_loop(int read_fd, int write_fd, word32 *shm_addr)      {
   child_sound_init_linux();
 #elif HPUX
   child_sound_init_hpdev();
-#elif WIN_SOUND
+#elif defined(_WIN32)
   child_sound_init_win32();
   return;
-#elif defined(MAC) && !defined(HAVE_SDL)
+#elif defined(MAC)
   child_sound_init_mac();
   return;
 #endif
