@@ -26,7 +26,7 @@ extern char g_config_gsplus_screenshot_dir[];
   #include "rawnet/cs8900.h"
 #endif
 
-#if defined (_WIN32) && !defined(WIN_SDL)|| defined(__CYGWIN__) && !defined(WIN_SDL)
+#if defined(_WIN32) && !defined(HAVE_SDL)
   #define WIN32_LEAN_AND_MEAN   /* Tell windows we want less header gunk */
   #define STRICT                        /* Tell Windows we want compile type checks */
   #include <windows.h>          /* Need a definition for LPTSTR in CYGWIN */
@@ -996,7 +996,7 @@ void gsport_expand_path(char *out_ptr, const char *in_ptr, int maxlen)      {
         if(!strncmp("0", name_buf, 128)) {
           /* Replace ${0} with g_argv0_path */
           tmp_ptr = &(g_argv0_path[0]);
-#if defined (_WIN32) && !defined(WIN_SDL)|| defined(__CYGWIN__) && !defined(WIN_SDL)
+#if defined(_WIN32) && !defined(HAVE_SDL)
         } else if(!strncmp("PWD", name_buf, 128)) {
           /* Replace ${PWD} with cwd in Windows */
           get_cwd(out_ptr,128);
