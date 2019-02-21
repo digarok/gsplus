@@ -145,7 +145,7 @@ extern char* g_imagewriter_prop_font;
 extern int g_imagewriter_paper;
 extern int g_imagewriter_banner;
 
-#if defined(_WIN32) && !defined(WIN_SDL) || defined(__CYGWIN__) && !defined(WIN_SDL)
+#if defined(_WIN32) && !defined(HAVE_SDL)
 extern int g_win_show_console_request;
 extern int g_win_status_debug_request;
 #endif
@@ -448,7 +448,7 @@ Cfg_menu g_cfg_imagewriter_menu[] = {
 
 Cfg_menu g_cfg_devel_menu[] = {
   { "Developer Options", g_cfg_devel_menu, 0, 0, CFGTYPE_MENU },
-#if defined(_WIN32) && !defined(WIN_SDL) || defined(__CYGWIN__) && !defined(WIN_SDL)
+#if defined(_WIN32) && !defined(HAVE_SDL)
   { "Status lines,0,Hide,1,Show", KNMP(g_win_status_debug_request), CFGTYPE_INT },
   { "Console,0,Hide,1,Show", KNMP(g_win_show_console_request), CFGTYPE_INT },
 #endif
@@ -1416,7 +1416,7 @@ void insert_disk(int slot, int drive, const char *name, int ejected, int force_s
 
   name_len = strlen(name);
   name_ptr = (char *)malloc(name_len + 1);
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32)
   // On Windows, we need to change backslashes to forward slashes.
   for (i = 0; i < name_len; i++) {
     if (name[i] == '\\') {
@@ -3523,11 +3523,11 @@ void cfg_get_tfe_name()      {
   }
   else
   {
-                #if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32)
     cfg_printf("ERROR: Install/Enable WinPcap for Ethernet Support!!");
-                #else
+#else
     cfg_printf("ERROR: Install/Enable LibPcap for Ethernet Support!!");
-                #endif
+#endif
   }
   return;
 }
