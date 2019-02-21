@@ -101,7 +101,7 @@ elseif(DRIVER MATCHES "X11")
 elseif(DRIVER MATCHES "FB")
 	set(driver_code fbdriver.c)
 elseif(DRIVER MATCHES "WIN32")
-	set(driver_code scc_windriver.c win32snd_driver.c win_console.c win_generic.c)
+	set(driver_code win32snd_driver.c win_console.c win_generic.c)
 elseif(DRIVER MATCHES "HEADLESS")
 	set(driver_code headless_driver.c)
 else()
@@ -140,6 +140,8 @@ add_executable(GSplus WIN32 MACOSX_BUNDLE
 	${driver_code}
 	${generated_headers}
 
+
+	$<$<BOOL:${WIN32}>:scc_windriver.c>
 	$<$<BOOL:${WIN32}>:win32.rc>
 	$<$<BOOL:${APPLE}>:assets/gsp_icon.icns>
 	$<$<BOOL:${APPLE}>:assets/GSBug.Templates>
