@@ -87,10 +87,31 @@ static char *get_resource_path(const char *leaf) {
 
 	return buffer;	
 }
-#elif defined(WIN32)
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 /* todo -- something clever like find the home directory */
 static char *get_resource_path(const char *leaf) {
-	return NULL;
+	DWORD size;
+	char *buffer = 0;
+	char *cp;
+	int l;
+
+	l = strlen(leaf);
+
+	size = GetModuleFileName(NULL, buffer, 0);
+	if (size == 0) return strdup(leaf);
+
+	size += l + 2;
+	buffer = malloc(size);
+	if (!buffer) return NULL;
+
+	size = GetModuleFileName(NULL, buffer, size);
+	if (!size) return strdup(leaf);
+
+	cp = strrchr(buffer, '\\');
+	strcpy(cp + 1, leaf);
+	return buffer;
 }
 #else
 static char *get_resource_path(const char *leaf) {
