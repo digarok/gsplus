@@ -1184,6 +1184,7 @@ static int g_debugger_mode = MODE_NORMAL;
 int debug_shell(int code) {
 	int c;
 	char *cp;
+	int control_d_count = 0;
 
 	if (!g_templates_loaded) {
 		char *path;
