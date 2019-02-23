@@ -130,7 +130,7 @@ char *x_readline(const char *prompt) {
 
 void x_readline_end(void) {
 }
-#elif defined(WIN32)
+#elif defined(_WIN32)
 
 #include <windows.h>
 
