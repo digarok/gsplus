@@ -1233,7 +1233,11 @@ int debug_shell(int code) {
 
 	for(;;) {
 		cp = x_readline("> ");
-		if (!cp) return 0;
+		if (!cp) {
+			if (++control_d_count < 2) continue; 
+			return 0;
+		}
+		control_d_count = 0;
 		if (!*cp) continue;
 		c = parse_command(cp);
 		if (c < 0) printf("error.\n");
