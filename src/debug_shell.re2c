@@ -1259,7 +1259,7 @@ void do_go()      {
   int ret;
   int ok;
 
-  #ifndef WIN32
+  #ifndef _WIN32
   /* if -g flag, start with debug shell ... */
   if (isatty(STDIN_FILENO)) {
   	struct sigaction sa;
