@@ -2,23 +2,36 @@ version: 1.0.{build}
 image:
   - Visual Studio 2017
   - Ubuntu1804
-environment:
-  matrix:
-  - TYPE: mingw32-gdi
-  - TYPE: mingw64-gdi
-  - TYPE: mingw32-sdl
-  - TYPE: msys-gdi  
-  - TYPE: linux-sdl
+configuration:
+- mingw32-sdl
+- mingw32-gdi
+- mingw64-gdi
+- msys-gdi
+- linux-sdl
+
+matrix:
+  exclude:
+    - configuration: linux-sdl
+      image: Visual Studio 2017
+    - configuration: mingw32-sdl
+      image: Ubuntu1804
+    - configuration: mingw32-gdi
+      image: Ubuntu1804
+    - configuration: mingw64-gdi
+      image: Ubuntu1804
+    - configuration: msys-gdi
+      image: Ubuntu1804
+
 for:
   - # mingw64/gdi
     matrix:
       only:
         - image: Visual Studio 2017
-          TYPE: mingw64-gdi
+          configuration: mingw64-gdi
     install:
-      - cmd: MSYSTEM=MINGW64
-      - cmd: MSYSTEM_PREFIX=/mingw64
-      - cmd: PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%
+      - cmd: set MSYSTEM=MINGW64
+      - cmd: set MSYSTEM_PREFIX=/mingw64
+      - cmd: set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%
       - cmd: pacman --noconfirm -Sy
       - cmd: pacman --noconfirm -S re2c mingw-w64-x86_64-cmake
     build_script:
@@ -34,7 +47,7 @@ for:
     matrix:
       only:
         - image: Visual Studio 2017
-          TYPE: mingw32-gdi
+          configuration: mingw32-gdi
     install:
       - cmd: set MSYSTEM=MINGW32
       - cmd: set MSYSTEM_PREFIX=/mingw32
@@ -54,7 +67,7 @@ for:
     matrix:
       only:
         - image: Visual Studio 2017
-          TYPE: mingw32-sdl
+          configuration: mingw32-sdl
     install:
       - cmd: set MSYSTEM=MINGW32
       - cmd: set MSYSTEM_PREFIX=/mingw32
@@ -74,7 +87,7 @@ for:
     matrix:
       only:
         - image: Visual Studio 2017
-          TYPE: msys-gdi
+          configuration: msys-gdi
     install:
       - cmd: set MSYSTEM=MSYS
       - cmd: set MSYSTEM_PREFIX=/usr/
@@ -94,7 +107,7 @@ for:
     matrix:
       only:
         - image: Ubuntu1804
-          TYPE: linux-sdl
+          configuration: linux-sdl
     install:
       - sh: sudo apt-get update
       - sh: sudo apt-get install -y re2c libsdl2-dev libsdl2-image-dev libfreetype6-dev
