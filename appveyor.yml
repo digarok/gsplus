@@ -6,20 +6,19 @@ environment:
     MSYSTEM: MINGW32
     MSYSTEM_PREFIX: /mingw32
     PATH: C:\msys64\mingw32\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
+
   - TYPE: mingw64-gdi
     MSYSTEM: MINGW64
     MSYSTEM_PREFIX: /mingw64
     PATH: C:\msys64\mingw64\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
+
   - TYPE: msys-gdi  
     MSYSTEM: MSYS
     MSYSTEM_PREFIX: /usr/
     PATH: C:\msys64\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
-    CMAKEFLAGS: -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "Unix Makefiles"
-    PACKAGES: re2c
+
   - TYPE: mingw32-sdl
     MSYSTEM_PREFIX: /mingw32
-    CMAKEFLAGS: -DDRIVER=SDL2 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
-    PACKAGES: re2c mingw-w64-i686-cmake mingw-w64-i686-SDL2  mingw-w64-i686-SDL2_image mingw-w64-i686-freetype
     PATH: C:\msys64\mingw32\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
 for:
   - # mingw64/gdi
@@ -56,4 +55,36 @@ for:
       - path: 'build\bin\GSplus.exe'
         name: GSplus-32-gdi
 
+  - # mingw32/sdl
+    matrix:
+      only:
+        - image: Visual Studio 2017
+          TYPE: mingw32-sdl
+    install:
+      - cmd: pacman --noconfirm -Sy
+      - cmd: pacman --noconfirm -S re2c mingw-w64-i686-cmake mingw-w64-i686-SDL2 mingw-w64-i686-SDL2_image mingw-w64-i686-freetype
+    build_script:
+      - cmd: mkdir build
+      - cmd: cd build
+      - cmd: cmake ../ -DDRIVER=SDL2 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
+      - cmd: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build\bin\GSplus.exe'
+        name: GSplus-32-sdl
 
+  - # msys2/gdi
+    matrix:
+      only:
+        - image: Visual Studio 2017
+          TYPE: msys-gdi
+    install:
+      - cmd: pacman --noconfirm -Sy
+      - cmd: pacman --noconfirm -S re2c
+    build_script:
+      - cmd: mkdir build
+      - cmd: cd build
+      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "Unix Makefiles"
+      - cmd: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build\bin\GSplus.exe'
+        name: GSplus-cygwin-32-gdi
