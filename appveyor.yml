@@ -25,11 +25,20 @@ environment:
     CMAKEFLAGS: -DDRIVER=SDL2 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
     PACKAGES: re2c mingw-w64-i686-cmake mingw-w64-i686-SDL2  mingw-w64-i686-SDL2_image mingw-w64-i686-freetype
     PATH: C:\msys64\mingw32\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
-install:
-- cmd: pacman --noconfirm -Sy
-- cmd: pacman --noconfirm -S %PACKAGES%
-build_script:
-- cmd: mkdir build
-- cmd: cd build
-- cmd: cmake ../ %CMAKEFLAGS%
-- cmd: make VERBOSE=1 GSplus
+for:
+  - # mingw32/gdi
+    matrix:
+      only:
+        - TYPE: mingw64-gdi
+        - image: Visual Studio 2017
+    install:
+      - cmd: pacman --noconfirm -Sy
+      - cmd: pacman --noconfirm -S re2c mingw-w64-x86_64-cmake
+    build_script:
+      - cmd: mkdir build
+      - cmd: cd build
+      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
+      - cmd: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build\bin\GSplus.exe'
+        name: GSplus-64-gdi
