@@ -2,34 +2,34 @@ version: 1.0.{build}
 image: Visual Studio 2017
 environment:
   matrix:
-  - MSYSTEM: MINGW32
+  - TYPE: mingw32-gdi
+    MSYSTEM: MINGW32
+    MSYSTEM_PREFIX: /mingw32
     PATH: C:\msys64\mingw32\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
     CMAKEFLAGS: -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
-    MSYSTEM_PREFIX: /mingw32
     PACKAGES: re2c mingw-w64-i686-cmake
-  - MSYSTEM: MINGW64
+  - TYPE: mingw64-gdi
+    MSYSTEM: MINGW64
+    MSYSTEM_PREFIX: /mingw64
     PATH: C:\msys64\mingw64\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
     CMAKEFLAGS: -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
-    MSYSTEM_PREFIX: /mingw64
     PACKAGES: re2c mingw-w64-x86_64-cmake
-  - MSYSTEM: MSYS
+  - TYPE: msys-gdi  
+    MSYSTEM: MSYS
+    MSYSTEM_PREFIX: /usr/
     PATH: C:\msys64\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
     CMAKEFLAGS: -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "Unix Makefiles"
-    MSYSTEM_PREFIX: /usr/
     PACKAGES: re2c
-  - MSYSTEM: MINGW32
+  - TYPE: mingw32-sdl
     MSYSTEM_PREFIX: /mingw32
     CMAKEFLAGS: -DDRIVER=SDL2 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
     PACKAGES: re2c mingw-w64-i686-cmake mingw-w64-i686-SDL2  mingw-w64-i686-SDL2_image mingw-w64-i686-freetype
     PATH: C:\msys64\mingw32\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
 install:
-- cmd: >-
-    REM pacman --noconfirm -Syu
-    pacman --noconfirm -Sy
-    pacman --noconfirm -S %PACKAGES%
+- cmd: pacman --noconfirm -Sy
+- cmd: pacman --noconfirm -S %PACKAGES%
 build_script:
-- cmd: >-
-    mkdir build
-    cd build
-    cmake ../ %CMAKEFLAGS%
-    make VERBOSE=1 GSplus
+- cmd: mkdir build
+- cmd: cd build
+- cmd: cmake ../ %CMAKEFLAGS%
+- cmd: make VERBOSE=1 GSplus
