@@ -6,14 +6,10 @@ environment:
     MSYSTEM: MINGW32
     MSYSTEM_PREFIX: /mingw32
     PATH: C:\msys64\mingw32\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
-    CMAKEFLAGS: -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
-    PACKAGES: re2c mingw-w64-i686-cmake
   - TYPE: mingw64-gdi
     MSYSTEM: MINGW64
     MSYSTEM_PREFIX: /mingw64
     PATH: C:\msys64\mingw64\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
-    CMAKEFLAGS: -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
-    PACKAGES: re2c mingw-w64-x86_64-cmake
   - TYPE: msys-gdi  
     MSYSTEM: MSYS
     MSYSTEM_PREFIX: /usr/
@@ -26,7 +22,7 @@ environment:
     PACKAGES: re2c mingw-w64-i686-cmake mingw-w64-i686-SDL2  mingw-w64-i686-SDL2_image mingw-w64-i686-freetype
     PATH: C:\msys64\mingw32\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
 for:
-  - # mingw32/gdi
+  - # mingw64/gdi
     matrix:
       only:
         - TYPE: mingw64-gdi
@@ -42,3 +38,21 @@ for:
     artifacts:
       - path: 'build\bin\GSplus.exe'
         name: GSplus-64-gdi
+
+  - # mingw32/gdi
+    matrix:
+      only:
+        - TYPE: mingw32-gdi
+        - image: Visual Studio 2017
+    install:
+      - cmd: pacman --noconfirm -Sy
+      - cmd: pacman --noconfirm -S re2c mingw-w64-i686-cmake
+    build_script:
+      - cmd: mkdir build
+      - cmd: cd build
+      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
+      - cmd: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build\bin\GSplus.exe'
+        name: GSplus-32-gdi
+
