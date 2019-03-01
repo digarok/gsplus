@@ -86,7 +86,7 @@ for:
       - cmd: pacman --noconfirm -Sy
       - cmd: pacman --noconfirm -S re2c
     build_script:
-      - cmd: echo $ABCDEF$
+      - cmd: echo %ABCDEF%
       - cmd: mkdir build
       - cmd: cd build
       - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "Unix Makefiles"
@@ -102,7 +102,7 @@ for:
           TYPE: linux-sdl
     install:
       - sh: sudo apt-get update
-      - sh: sudoapt-get install re2c libsdl2-dev libsdl2-image-dev libfreetype6-dev
+      - sh: sudo apt-get install re2c libsdl2-dev libsdl2-image-dev libfreetype6-dev
     build_script:
       - cmd: mkdir build
       - cmd: cd build
