@@ -1,5 +1,6 @@
 version: 1.0.{build}
 image: Visual Studio 2017
+image: Ubuntu1804
 environment:
   matrix:
   - TYPE: mingw32-gdi
@@ -20,6 +21,8 @@ environment:
   - TYPE: mingw32-sdl
     MSYSTEM_PREFIX: /mingw32
     PATH: C:\msys64\mingw32\bin;C:\msys64\usr\bin;C:\Windows\System32;C:\Windows;%PATH%
+
+  - TYPE: linux-sdl
 for:
   - # mingw64/gdi
     matrix:
@@ -78,9 +81,11 @@ for:
         - image: Visual Studio 2017
           TYPE: msys-gdi
     install:
+      - cmd: set ABCDEF=abcdef
       - cmd: pacman --noconfirm -Sy
       - cmd: pacman --noconfirm -S re2c
     build_script:
+      - cmd: echo $ABCDEF$
       - cmd: mkdir build
       - cmd: cd build
       - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "Unix Makefiles"
@@ -88,3 +93,20 @@ for:
     artifacts:
       - path: 'build\bin\GSplus.exe'
         name: GSplus-cygwin-32-gdi
+
+  - # linux/sdl
+    matrix:
+      only:
+        - image: Ubuntu1804
+          TYPE: linux-sdl
+    install:
+      - sh: sudo apt-get update
+      - sh: sudoapt-get install re2c libsdl2-dev libsdl2-image-dev libfreetype6-dev
+    build_script:
+      - cmd: mkdir build
+      - cmd: cd build
+      - cmd: cmake ../ -DDRIVER=SDL2
+      - cmd: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build\bin\GSplus'
+        name: GSplus-linux-sdl
