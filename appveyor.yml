@@ -25,8 +25,8 @@ for:
   - # mingw64/gdi
     matrix:
       only:
-        - TYPE: mingw64-gdi
         - image: Visual Studio 2017
+          TYPE: mingw64-gdi
     install:
       - cmd: pacman --noconfirm -Sy
       - cmd: pacman --noconfirm -S re2c mingw-w64-x86_64-cmake
@@ -42,8 +42,8 @@ for:
   - # mingw32/gdi
     matrix:
       only:
-        - TYPE: mingw32-gdi
         - image: Visual Studio 2017
+          TYPE: mingw32-gdi
     install:
       - cmd: pacman --noconfirm -Sy
       - cmd: pacman --noconfirm -S re2c mingw-w64-i686-cmake
@@ -55,4 +55,5 @@ for:
     artifacts:
       - path: 'build\bin\GSplus.exe'
         name: GSplus-32-gdi
+
 
