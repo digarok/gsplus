@@ -40,6 +40,7 @@
 #define _TFESUPP_H
 
 #include <stdio.h>
+#include <stdint.h>
 
 extern FILE*      g_fh;				// Filehandle for log file
 
