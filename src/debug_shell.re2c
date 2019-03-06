@@ -1186,6 +1186,9 @@ int debug_shell(int code) {
 	char *cp;
 	int control_d_count = 0;
 
+	fflush(stderr);
+	fflush(stdout);
+
 	if (!g_templates_loaded) {
 		char *path;
 		g_templates_loaded = 1;
@@ -1286,6 +1289,8 @@ void do_go()      {
   for(;;) {
 
     ret = run_prog();
+    if (halt_sim & HALT_WANTTOQUIT) return;
+
     if (ret || g_stepping) {
       g_config_control_panel = 1;
       ok = debug_shell(ret);

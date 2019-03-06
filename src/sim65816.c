@@ -1613,9 +1613,12 @@ int run_prog()      {
       ret = 0;
       break;
     }
-    if(halt_sim & 0x07) {
-      halt_sim &= ~0x07;
-      ret = RET_HALT;
+    if (halt_sim & ~HALT_EVENT) {
+      if(halt_sim & 0x07) {
+        /* halt_printf() */
+        halt_sim &= ~0x07;
+        ret = RET_HALT;
+      }
       break;
     }
 
