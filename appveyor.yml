@@ -37,7 +37,7 @@ for:
     build_script:
       - cmd: mkdir build
       - cmd: cd build
-      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
+      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "MSYS Makefiles"
       - cmd: make VERBOSE=1 GSplus
     artifacts:
       - path: 'build\bin\GSplus.exe'
@@ -57,7 +57,7 @@ for:
     build_script:
       - cmd: mkdir build
       - cmd: cd build
-      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
+      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "MSYS Makefiles"
       - cmd: make VERBOSE=1 GSplus
     artifacts:
       - path: 'build\bin\GSplus.exe'
@@ -77,7 +77,7 @@ for:
     build_script:
       - cmd: mkdir build
       - cmd: cd build
-      - cmd: cmake ../ -DDRIVER=SDL2 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
+      - cmd: cmake ../ -DDRIVER=SDL2 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "MSYS Makefiles"
       - cmd: make VERBOSE=1 GSplus
     artifacts:
       - path: 'build\bin\GSplus.exe'
@@ -97,7 +97,7 @@ for:
     build_script:
       - cmd: mkdir build
       - cmd: cd build
-      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "Unix Makefiles"
+      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "Unix Makefiles"
       - cmd: make VERBOSE=1 GSplus
     artifacts:
       - path: 'build\bin\GSplus.exe'

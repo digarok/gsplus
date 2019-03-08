@@ -14,23 +14,34 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED TRUE)
 
+set(__MSVC__ ${MSVC})
+set(__CLANG__ FALSE)
+set(__GCC__ FALSE)
+
+if (${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+	set(__CLANG__ TRUE)
+endif()
+
+if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+	set(__GCC__ TRUE)
+endif()
+
 if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
 
-if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+if(__CLANG__)
 	add_compile_options(
 		-Wall -fomit-frame-pointer
 	)
 endif()
 
 
-if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
+if(__GCC__)
 	add_compile_options(
 		-Wall -fomit-frame-pointer
 	)
 endif()
-
 
 
 TEST_BIG_ENDIAN(IS_BIG_ENDIAN)
@@ -51,6 +62,7 @@ option(WITH_HOST_FST "Enable host fst support" ON)
 option(TOGGLE_STATUS "Enable F10 Toggle Status support (win32/x11)" OFF)
 option(WITH_RAWNET "Enable Uthernet emulation" OFF)
 option(WITH_ATBRIDGE "Enable AT Bridge" OFF)
+option(WITH_STATIC "Enable static link" OFF)
 set(READLINE "AUTO" CACHE STRING "Readline library (AUTO, NONE, READLINE, LIBEDIT)")
 
 set(generated_headers 8inst_c.h 16inst_c.h 8inst_s.h 16inst_s.h size_c.h size_s.h 8size_s.h 16size_s.h)
@@ -86,6 +98,14 @@ add_custom_command(
 	COMMAND re2c -W -o ${CMAKE_CURRENT_BINARY_DIR}/debug_template.c "${CMAKE_CURRENT_SOURCE_DIR}/debug_template.re2c"
 	MAIN_DEPENDENCY debug_template.re2c
 )
+
+if (WITH_STATIC)
+	if(__CLANG__ OR __GCC__)
+		#add_link_options(-static) # 3.13
+		link_libraries(-static)
+	endif()
+endif()
+
 
 add_executable(to_pro to_pro.c)
 add_executable(partls partls.c)
