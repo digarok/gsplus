@@ -30,6 +30,9 @@ word32 g_mp_breakpoints[MAX_BREAK_POINTS];
 int g_num_bp_breakpoints = 0;
 word32 g_bp_breakpoints[MAX_BREAK_POINTS];
 
+int g_num_tmp_bp_breakpoints = 0;
+word32 g_tmp_bp_breakpoints[MAX_BREAK_POINTS];
+
 int g_dbg_shell = 0;
 int g_stepping = 0;
 
