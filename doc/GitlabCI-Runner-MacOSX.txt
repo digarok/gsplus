@@ -1,5 +1,4 @@
 ## SOME NOTES ON SETTING UP GITLAB RUNNER TO BUILD ON LINUX/UBUNTU
-# Based on: https://gitlab.com/gitlab-org/gitlab-ci-multi-runner/blob/master/docs/install/osx.md
 
 ## STEP 1 - Install Gitlab Runner
 sudo curl --output /usr/local/bin/gitlab-ci-multi-runner https://gitlab-ci-multi-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-ci-multi-runner-darwin-amd64
@@ -25,12 +24,9 @@ gitlab-ci-multi-runner register -n \
   --description "MBP" \
   --tag-list "osx"
 
-# maybe also needs 
-gitlab-ci-multi-runner install 
+# maybe also needs
+gitlab-ci-multi-runner install
 # to run correctly
 
 # you can always check with
 gitlab-ci-multi-runner status
-
-
-

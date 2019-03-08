@@ -1,0 +1,2549 @@
+;
+; template: Template Master Index
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+
+_START	Templates
+ADB
+AppleShareFST
+Controls
+Dialogs
+Events
+Fonts
+GSOS
+HighSierraFST
+LineEdit
+Lists
+Locator
+Menus
+MiscTool
+NoteSeq
+NoteSyn
+Print
+ProDOS16
+ProDOSFST
+QDAux
+QuickDraw
+Resources
+SANE
+Sound
+StdFile
+TextEdit
+Windows
+_END
+
+;
+; template: Apple Desktop Bus Tool Set
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	ADB
+ReadConfigRec
+ScaleRec
+SetConfigRec
+SynchRec
+_END
+
+_START	ReadConfigRec
+rcADBAddr	BYTE
+rcLayoutOrLang	BYTE
+rcRepeatDelay	BYTE
+_END
+
+_START	SetConfigRec
+scADBAddr	BYTE
+scLayoutOrLang	BYTE
+scRepeatDelay	BYTE
+_END
+
+_START	SynchRec
+synchMode	BYTE
+synchKybdMouseAddr	BYTE
+synchLayoutOrLang	BYTE
+synchRepeatDelay	BYTE
+_END
+
+_START	ScaleRec
+xDivide	WORD
+yDivide	WORD
+xOffset	WORD
+yOffset	WORD
+xMultiply	WORD
+yMultiply	WORD
+_END
+
+
+;
+; template: Control Manager
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Controls
+BarColors
+BoxColors
+BttnColors
+CheckCtlRec
+CtlRec
+EditLineCtlRec
+EditTextCtlRec
+GrowCtlRec
+IconButtonCtlRec
+LimitBlk
+ListCtlRec
+PictureCtlRec
+PopUpCtlRec
+RadioColors
+RadioCtlRec
+ScrollCtlRec
+SimpleButtonCtlRec
+StatTextCtlRec
+_END
+
+; generic extended control record
+_START	CtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+ctlReserved	BYTE	16
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+; extended control records
+_START	SimpleButtonCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+keyEquiv
+>key1	BYTE
+>key2	BYTE
+>keymodifiers	WORD
+>keyCareBits	WORD
+ctlReserved	BYTE	10
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+_START	CheckCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+keyEquiv
+>key1	BYTE
+>key2	BYTE
+>keymodifiers	WORD
+>keyCareBits	WORD
+ctlReserved	BYTE	10
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+_START	IconButtonCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+keyEquiv
+>key1	BYTE
+>key2	BYTE
+>keymodifiers	WORD
+>keyCareBits	WORD
+ctlReserved	BYTE	10
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+iconRef	LONG
+displayMode	WORD
+_END
+
+_START	EditLineCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+ctlReserved	BYTE	16
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+_START	ListCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+ctlMemDraw	LONG
+ctlMemHeight	WORD
+ctlMemSize	WORD
+ctlListRef	LONG
+ctlListBar	LONG
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+_START	PictureCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+ctlReserved	BYTE	16
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+_START	PopUpCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+menuRef	LONG
+menuEnd	LONG
+popUpRect	WORD	4
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+titleWidth	WORD
+_END
+
+_START	RadioCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+keyEquiv
+>key1	BYTE
+>key2	BYTE
+>keymodifiers	WORD
+>keyCareBits	WORD
+ctlReserved	BYTE	10
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+_START	ScrollCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+thumbRect	WORD	4
+pageRegion	WORD	4
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+_START	GrowCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+ctlReserved	BYTE	16
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+_START	StatTextCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+ctlJust	WORD
+ctlReserved	BYTE	14
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+_END
+
+_START	EditTextCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+textFlags	LONG
+textLength	LONG
+blockList
+>cachedHandle	LONG
+>cachedOffset	LONG
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+viewRect	WORD	4
+totalHeight	LONG
+lineSuper
+>cachedHandle	LONG
+>cachedOffset	LONG
+>cachedIndex	WORD
+>itemsPerBlock	WORD
+styleSuper
+>cachedHandle	LONG
+>cachedOffset	LONG
+>cachedIndex	WORD
+>itemsPerBlock	WORD
+styleList	LONG
+rulerList	LONG
+lineAtEndFlag	WORD
+selectionStart	LONG
+selectionEnd	LONG
+selectionActive	WORD
+selectionState	WORD
+caretTime	LONG
+nullStyleActive	WORD
+nullStyle
+>fontID	LONG
+>foreColor	WORD
+>backColor	WORD
+>userData	LONG
+topTextOffset	LONG
+topTextVPos	WORD
+vertScrollBar	LONG
+vertScrollPos	LONG
+vertScrollMax	LONG
+vertScrollAmount	WORD
+horzScrollBar	LONG
+horzScrollPos	LONG
+horxScrollMax	LONG
+horzScrollAmount	WORD
+growBoxHandle	LONG
+maximumChars	LONG
+maximumLines	LONG
+maxCharsPerLine	WORD
+maximumHeight	WORD
+textDrawMode	WORD
+wordBreakHook	LONG
+wordWrapHook	LONG
+keyFilter	LONG
+theFilterRect	WORD	4
+theBufferVPos	WORD
+theBufferHPos	WORD
+theKeyRecord
+>theChar	WORD
+>theModifiers	WORD
+>theInputHandle	LONG
+>cursorOffset	LONG
+>theOpcode	WORD
+cachedSelcOffset	LONG
+cachedSelcVPos	WORD
+cachedSelcHPos	WORD
+mouseRect	WORD	4
+mouseTime	LONG
+mouseKind	WORD
+lastClick	WORD	2
+savedHPos	WORD
+anchorPoint	LONG
+_END
+
+_START	BarColors
+barOutline	WORD
+barNorArrow	WORD
+barSelArrow	WORD
+barArrowBack	WORD
+barNorThumb	WORD
+barSelThumb	WORD
+barPageRgn	WORD
+barInactive	WORD
+_END
+
+_START	BoxColors
+boxReserved	WORD
+boxNor	WORD
+boxSel	WORD
+boxTitle	WORD
+_END
+
+_START	BttnColors
+bttnOutline	WORD
+bttnNorBack	WORD
+bttnSelBack	WORD
+bttnNorText	WORD
+bttnSelText	WORD
+_END
+
+_START	LimitBlk
+boundRect	WORD	4
+slopRect	WORD	4
+axisParam	WORD
+dragPatt	LONG
+_END
+
+_START	RadioColors
+radReserved	WORD
+radNor	WORD
+radSel	WORD
+radTitle	WORD
+_END
+
+
+;
+; template: Dialog Manager
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Dialogs
+AlertTemplate
+DialogTemplate
+ItemTemplate
+UserCtlItemPB
+_END
+
+_START	AlertTemplate
+atBoundsRect	WORD	4
+atAlertID	WORD
+atStage1	BYTE
+atStage2	BYTE
+atStage3	BYTE
+atStage4	BYTE
+atItemList	LONG
+_END
+
+_START	DialogTemplate
+dtBoundsRect	WORD	4
+dtVisible	WORD
+dtRefCon	LONG
+dtItemList	LONG
+_END
+
+_START	ItemTemplate
+itemID	WORD
+itemRect	WORD	4
+itemType	WORD
+itemDescr	LONG
+itemValue	WORD
+itemFlag	WORD
+itemColor	LONG
+_END
+
+_START	UserCtlItemPB
+defProcParm	LONG
+titleParm	LONG
+param1	WORD
+param2	WORD
+_END
+
+
+;
+; template: Event Manager
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Events
+EventRecord
+_END
+
+_START	EventRecord
+what	WORD
+message	LONG
+when	LONG
+where	WORD	2
+modifiers	WORD
+_END
+
+
+;
+; template: Font Manager
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Fonts
+FontID
+FontStatRec
+_END
+
+_START	FontID
+famNum	WORD
+fontStyle	BYTE
+fontSize	BYTE
+_END
+
+_START	FontStatRec
+resultID
+>famNum	WORD
+>fontStyle	BYTE
+>fontSize	BYTE
+resultStats	WORD
+_END
+
+
+;
+; template: LineEdit Tool Set
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	LineEdit
+LERec
+_END
+
+_START	LERec
+leLineHandle	LONG
+leLength	WORD
+leMaxLength	WORD
+leDestRect	WORD	4
+leViewRect	WORD	4
+lePort	LONG
+leLineHite	WORD
+leBaseHite	WORD
+leSelStart	WORD
+leSelEnd	WORD
+leActFlg	WORD
+leCarAct	WORD
+leCarOn	WORD
+leCarTime	LONG
+leHiliteHook	LONG
+leCaretHook	LONG
+leJust	WORD
+lePWChar	WORD
+_END
+
+
+;
+; template: List Manager
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Lists
+LColorTable
+ListRec
+MemRec
+_END
+
+_START	ListRec
+listRect	WORD	4
+listSize	WORD
+listView	WORD
+listType	WORD
+listStart	WORD
+listCtl	LONG
+listDraw	LONG
+listMemHeight	WORD
+listMemSize	WORD
+listPointer	LONG
+listRefCon	LONG
+listScrollClr	LONG
+_END
+
+; ListCtlRec can be found in the Control Manager templates.
+
+_START	MemRec
+memPtr	LONG
+memFlag	BYTE
+_END
+
+_START	LColorTable
+listFrameClr	WORD
+listNorTextClr	WORD
+listSelTextClr	WORD
+listNorBackClr	WORD
+listSelBackClr	WORD
+_END
+
+
+;
+; template: Menu Manager
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Menus
+Menu
+MenuBarTemplate
+MenuItemTemplate
+MenuTemplate
+_END
+
+_START	Menu
+menuID	WORD
+menuWidth	WORD
+menuHeight	WORD
+menuProc	LONG
+menuFlag	BYTE
+menuRes	BYTE
+firstItem	BYTE
+numOfItems	BYTE
+titleWidth	WORD
+titleName	LONG
+menuCache	LONG
+_END
+
+_START	MenuItemTemplate
+version	WORD
+itemID	WORD
+itemChar	BYTE
+itemAltChar	BYTE
+itemCheck	WORD
+itemFlag	WORD
+itemTitleRef	LONG
+_END
+
+_START	MenuTemplate
+version	WORD
+menuID	WORD
+menuFlag	WORD
+menuTitleRef	LONG
+itemRefArray	LONG
+_END
+
+_START	MenuBarTemplate
+version	WORD
+menuBarFlag	WORD
+menuRefArray	LONG
+_END
+
+
+;
+; template: Miscellaneous Tool Set
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	MiscTool
+ClampRec
+FWRec
+InterruptStateRec
+MouseRec
+QueueHeader
+TimeRec
+_END
+
+_START	QueueHeader
+reserved	LONG
+reserved	WORD
+signature	WORD
+_END
+
+_START	InterruptStateRec
+irq_A	WORD
+irq_X	WORD
+irq_Y	WORD
+irq_S	WORD
+irq_D	WORD
+irq_P	BYTE
+irq_DB	BYTE
+irq_e	BYTE
+irq_K	BYTE
+irq_PC	WORD
+irq_state	BYTE
+irq_shadow	WORD
+irq_mslot	BYTE
+_END
+
+_START	TimeRec
+second	BYTE
+minute	BYTE
+hour	BYTE
+year	BYTE
+day	BYTE
+month	BYTE
+extra	BYTE
+weekday	BYTE
+_END
+
+_START	MouseRec
+mouseMode	BYTE
+mouseStatus	BYTE
+yPos	WORD
+xPos	WORD
+_END
+
+_START	ClampRec
+yMaxClamp	WORD
+yMinClamp	WORD
+xMaxClamp	WORD
+xMinClamp	WORD
+_END
+
+_START	FWRec
+yRegExit	WORD
+xRegExit	WORD
+aRegExit	WORD
+status	WORD
+_END
+
+
+;
+; template: Note Sequencer
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	NoteSeq
+InstTable
+_END
+
+_START	InstTable
+instNumber	WORD
+instArray	LONG
+_END
+
+
+;
+; template: Note Synthesizer
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	NoteSyn
+Envelope
+GCBRecord
+Instrument
+WaveEntry
+_END
+
+_START	Envelope
+breakpoint0	BYTE
+increment0	WORD
+breakpoint1	BYTE
+increment1	WORD
+breakpoint2	BYTE
+increment2	WORD
+breakpoint3	BYTE
+increment3	WORD
+breakpoint4	BYTE
+increment4	WORD
+breakpoint5	BYTE
+increment5	WORD
+breakpoint6	BYTE
+increment6	WORD
+breakpoint7	BYTE
+increment7	WORD
+_END
+
+_START	Instrument
+envelope
+>breakpoint0	BYTE
+>increment0	WORD
+>breakpoint1	BYTE
+>increment1	WORD
+>breakpoint2	BYTE
+>increment2	WORD
+>breakpoint3	BYTE
+>increment3	WORD
+>breakpoint4	BYTE
+>increment4	WORD
+>breakpoint5	BYTE
+>increment5	WORD
+>breakpoint6	BYTE
+>increment6	WORD
+>breakpoint7	BYTE
+>increment7	WORD
+releaseSegment	BYTE
+priorityIncrement	BYTE
+pitchBendRange	BYTE
+vibratoDepth	BYTE
+vibratoSpeed	BYTE
+inSpare	BYTE
+aWaveCount	BYTE
+bWaveCount	BYTE
+aWaveList...
+bWaveList...
+_END
+
+_START	WaveEntry
+topKey	BYTE
+waveAddress	BYTE
+waveSize	BYTE
+DOCMode	BYTE
+relPitch	WORD
+_END
+
+_START	GCBRecord
+synthID	BYTE
+genNum	BYTE
+semiTone	BYTE
+volume	BYTE
+pitchbend	BYTE
+vibratoDepth	BYTE
+reserved	BYTE	10
+_END
+
+
+;
+; template: Print Manager
+; 7/7/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Print
+PrInfoRec
+PrJobRec
+PrRec
+PrStatusRec
+PrStyleRec
+_END
+
+_START	PrRec
+prVersion	WORD
+prInfo
+>iDev	WORD
+>iVRes	WORD
+>iHRes	WORD
+>rPage	WORD	4
+rPaper	WORD	4
+prStl
+>wDev	WORD
+>internA	WORD	3
+>feed	WORD
+>paperType	WORD
+>crWidth	WORD
+>reduction	WORD
+>internB	WORD
+prInfoPT	BYTE	14
+prXInfo	BYTE	24
+prJob
+>iFstPage	WORD
+>iLstPage	WORD
+>iCopies	WORD
+>bJDocLoop	BYTE
+>fFromUser	BYTE
+>pIdleProc	LONG
+>pFileName	LONG
+>iFileVol	WORD
+>bFileVers	BYTE
+>bJobX	BYTE
+printX	BYTE	38
+iReserved	WORD
+_END
+
+_START	PrInfoRec
+iDev	WORD
+iVRes	WORD
+iHRes	WORD
+rPage	WORD	4
+_END
+
+_START	PrStyleRec
+wDev	WORD
+internA	WORD	3
+feed	WORD
+paperType	WORD
+crWidth	WORD
+reduction	WORD
+internB	WORD
+_END
+
+_START	PrJobRec
+iFstPage	WORD
+iLstPage	WORD
+iCopies	WORD
+bJDocLoop	BYTE
+fFromUser	BYTE
+pIdleProc	LONG
+pFileName	LONG
+iFileVol	WORD
+bFileVers	BYTE
+bJobX	BYTE
+_END
+
+_START	PrStatusRec
+iTotPages	WORD
+iCurPage	WORD
+iTotCopies	WORD
+iCurCopy	WORD
+iTotBands	WORD
+iCurBand	WORD
+iPgDirty	WORD
+fImaging	WORD
+hPrint	LONG
+pPrPort	LONG
+hPic	LONG
+_END
+
+
+;
+; template: QuickDraw II
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	QuickDraw
+BufDimRec
+Font
+FontGlobalsRecord
+FontInfoRecord
+GrafPort
+LocInfo
+PaintParam
+PenStateRecord
+ROMFontRecord
+_END
+
+_START	BufDimRec
+buffer_sizing_record
+maxWidth	WORD
+textBufHeight	WORD
+textBufferWords	WORD
+fontWidth	WORD
+_END
+
+_START	Font
+font_record
+offseToMF	WORD
+family	WORD
+style	WORD
+size	WORD
+version	WORD
+fbrExtent	WORD
+highowTLoc	WORD
+_END
+
+_START	FontGlobalsRecord
+fgFontID	WORD
+fgStyle	WORD
+fgSize	WORD
+fgVersion	WORD
+fgWidMax	WORD
+fgFBRExtent	WORD
+_END
+
+_START	FontInfoRecord
+ascent	WORD
+descent	WORD
+widMax	WORD
+leading	WORD
+_END
+
+_START	GrafPort
+portInfo
+>portSCB	WORD
+>ptrToPixImage	LONG
+>width	WORD
+>boundsRect	WORD	4
+portRect	WORD	4
+clipRgn	LONG
+visRgn	LONG
+bkPat	BYTE	32
+pnLoc	WORD	2
+pnSize	WORD	2
+pnMode	WORD
+pnPat	BYTE	32
+pnMask	BYTE	8
+pnVis	WORD
+fontHandle	LONG
+fontID	LONG
+fontFlags	WORD
+txSize	WORD
+txFace	WORD
+txMode	WORD
+spExtra	LONG
+chExtra	LONG
+fgColor	WORD
+bgColor	WORD
+picSave	LONG
+rgnSave	LONG
+polySave	LONG
+grafProcs	LONG
+arcRot	WORD
+userField	LONG
+sysField	LONG
+_END
+
+_START	LocInfo
+portSCB	WORD
+ptrToPixImage	LONG
+width	WORD
+boundsRect	WORD	4
+_END
+
+_START	PaintParam
+PaintPixels_parameter_block
+ptrToSourceLocInfo	LONG
+ptrToDestLocInfo	LONG
+ptrToSourceRect	LONG
+ptrToDestPoint	LONG
+mode	WORD
+maskHandle	LONG
+_END
+
+_START	PenStateRecord
+psPenLoc	WORD	2
+psPnSize	WORD	2
+psPnMode	WORD
+psPnPat	BYTE	32
+psPnMask	BYTE	8
+_END
+
+_START	ROMFontRecord
+rfFamNum	WORD
+rfFamStyle	WORD
+rfSize	WORD
+rfFontHandle	LONG
+rfNamePtr	LONG
+rfFBRExtent	WORD
+_END
+
+;
+; template: QuickDraw II Auxiliary
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	QDAux
+IconRecord
+_END
+
+_START	IconRecord
+iconType	WORD
+iconSize	WORD
+iconHeight	WORD
+iconWidth	WORD
+image/mask
+_END
+
+
+;
+; template: SANE
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	SANE
+HaltDPage
+_END
+
+_START	HaltDPage
+returnAddrs	BYTE	6
+callerDpage	WORD
+callerDB	WORD
+opword	WORD
+cAddress	LONG
+bAddress	LONG
+aAddress	LONG
+haltVector	LONG
+environment	WORD
+pendingExceptions	WORD
+pendingXlo	BYTE
+pendingXhiYlo	BYTE
+pendingYhi	BYTE
+_END
+
+
+;
+; template: Resource Manager
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Resources
+FreeBlockRec
+MapRec
+ResHeaderRec
+ResRefRec
+_END
+
+_START	ResHeaderRec
+rFileVersion	LONG
+rFileToMap	LONG
+rFileMapSize	LONG
+rFileMemo	BYTE	128
+_END
+
+_START	MapRec
+mapNext	LONG
+mapFlag	WORD
+mapOffset	LONG
+mapSize	LONG
+mapToIndex	WORD
+mapFileNum	WORD
+mapID	WORD
+mapIndexSize	LONG
+mapIndexUsed	LONG
+mapFreeListSize	WORD
+mapFreeListUsed	WORD
+mapFreeList/Index
+_END
+
+_START	FreeBlockRec
+blkOffset	LONG
+blkSize	LONG
+_END
+
+_START	ResRefRec
+resType	WORD
+resID	LONG
+resOffset	LONG
+resAttr	WORD
+resSize	LONG
+resHandle	LONG
+_END
+
+
+;
+; template: Sound Tool Set
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Sound
+DOCRegParamBlock
+SoundParamBlock
+_END
+
+_START	SoundParamBlock
+waveStart	LONG
+waveSize	WORD
+freqOffset	WORD
+docBuffer	WORD
+bufferSize	WORD
+nextWavePtr	LONG
+volSetting	WORD
+_END
+
+_START	DOCRegParamBlock
+oscGenTYpe	WORD
+freqLow1	BYTE
+freqHigh1	BYTE
+vol1	BYTE
+tablePtr1	BYTE
+control1	BYTE
+tableSize1	BYTE
+freqLow2	BYTE
+freqHigh2	BYTE
+vol2	BYTE
+tablePtr2	BYTE
+control2	BYTE
+tableSize2	BYTE
+_END
+
+
+;
+; template: Standard File Operations Tool Set
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	StdFile
+ReplyRecord
+ReplyRecord2
+_END
+
+_START	ReplyRecord
+good	WORD
+fileType	WORD
+auxFileType	WORD
+fileName	BYTE	16
+fullPathname	BYTE	129
+_END
+
+_START	ReplyRecord2
+good	WORD
+type	WORD
+auxType	LONG
+nameRefDesc	WORD
+nameRef	LONG
+pathRefDesc	WORD
+pathRef	LONG
+_END
+
+
+;
+; template: Text Edit
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	TextEdit
+KeyRecord
+StyleItem
+SuperBlock
+SuperHandle
+SuperItem
+TabItem
+TEColorTable
+TEFormat
+TEParamBlock
+TERecord
+TERuler
+TEStyle
+TextBlock
+TextList
+_END
+
+_START	TEColorTable
+contentColor	WORD
+outlineColor	WORD
+vertColorDescriptor	WORD
+vertColorRef	LONG
+horzColorDescriptor	WORD
+horzColorRef	LONG
+growColorDescriptor	WORD
+growColorRef	LONG
+_END
+
+_START	TEFormat
+version	WORD
+rulerListLength	LONG
+theRulerList
+styleListLength
+theStyleList
+numberOfStyles
+theStyles
+_END
+
+_START	TEParamBlock
+pCount	WORD
+ID	LONG
+rect	WORD	4
+procRef	LONG
+flags	WORD
+moreFlags	WORD
+refCon	LONG
+textFlags	LONG
+indentRect	WORD	4
+vertBar	LONG
+vertAmount	WORD
+horzBar	LONG
+horzAmount	WORD
+styleRef	LONG
+textDescriptor	WORD
+textRef	LONG
+textLength	LONG
+maxChars	LONG
+maxLines	LONG
+maxCharsPerLine	WORD
+maxHeight	WORD
+colorRef	LONG
+drawMode	WORD
+filterProc	LONG
+_END
+
+_START	TERecord
+; same as EditTextCtlRec
+ctlNext	LONG
+ctlOwner	LONG
+ctlRect	WORD	4
+ctlFlag	BYTE
+ctlHilite	BYTE
+ctlValue	WORD
+ctlProc	LONG
+ctlAction	LONG
+ctlData	LONG
+ctlRefCon	LONG
+ctlColor	LONG
+textFlags	LONG
+textLength	LONG
+blockList
+>cachedHandle	LONG
+>cachedOffset	LONG
+ctlID	LONG
+ctlMoreFlags	WORD
+ctlVersion	WORD
+viewRect	WORD	4
+totalHeight	LONG
+lineSuper
+>cachedHandle	LONG
+>cachedOffset	LONG
+>cachedIndex	WORD
+>itemsPerBlock	WORD
+styleSuper
+>cachedHandle	LONG
+>cachedOffset	LONG
+>cachedIndex	WORD
+>itemsPerBlock	WORD
+styleList	LONG
+rulerList	LONG
+lineAtEndFlag	WORD
+selectionStart	LONG
+selectionEnd	LONG
+selectionActive	WORD
+selectionState	WORD
+caretTime	LONG
+nullStyleActive	WORD
+nullStyle
+>fontID	LONG
+>foreColor	WORD
+>backColor	WORD
+>userData	LONG
+topTextOffset	LONG
+topTextVPos	WORD
+vertScrollBar	LONG
+vertScrollPos	LONG
+vertScrollMax	LONG
+vertScrollAmount	WORD
+horzScrollBar	LONG
+horzScrollPos	LONG
+horxScrollMax	LONG
+horzScrollAmount	WORD
+growBoxHandle	LONG
+maximumChars	LONG
+maximumLines	LONG
+maxCharsPerLine	WORD
+maximumHeight	WORD
+textDrawMode	WORD
+wordBreakHook	LONG
+wordWrapHook	LONG
+keyFilter	LONG
+theFilterRect	WORD	4
+theBufferVPos	WORD
+theBufferHPos	WORD
+theKeyRecord
+>theChar	WORD
+>theModifiers	WORD
+>theInputHandle	LONG
+>cursorOffset	LONG
+>theOpcode	WORD
+cachedSelcOffset	LONG
+cachedSelcVPos	WORD
+cachedSelcHPos	WORD
+mouseRect	WORD	4
+mouseTime	LONG
+mouseKind	WORD
+lastClick	WORD	2
+savedHPos	WORD
+anchorPoint	LONG
+_END
+
+_START	TERuler
+leftMargin	WORD
+leftIndent	WORD
+rightMargin	WORD
+just	WORD
+extraLS	WORD
+flags	WORD
+userData	LONG
+tabType	WORD
+theTabs
+tabTerminator
+_END
+
+_START	TEStyle
+fontID	LONG
+foreColor	WORD
+backColor	WORD
+userData	LONG
+_END
+
+_START	KeyRecord
+theChar	WORD
+theModifiers	WORD
+theInputHandle	LONG
+cursorOffset	LONG
+theOpCode	WORD
+_END
+
+_START	StyleItem
+length	LONG
+offset	LONG
+_END
+
+_START	SuperBlock
+nextHandle	LONG
+prevHandle	LONG
+textLength	LONG
+reserved	LONG
+theItems
+_END
+
+_START	SuperHandle
+cachedHandle	LONG
+cachedOffset	LONG
+cachedIndex	WORD
+itemsPerBlock	WORD
+_END
+
+_START	SuperItem
+length	LONG
+data	LONG
+_END
+
+_START	TabItem
+tabKind	WORD
+tabData	WORD
+_END
+
+_START	TextBlock
+nextHandle	LONG
+prevHandle	LONG
+textLength	LONG
+flags	WORD
+reserved	WORD
+theText
+_END
+
+_START	TextList
+cachedHandle	LONG
+cachedOffset	LONG
+_END
+
+
+;
+; template: Tool Locator
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Locator
+StartStopRec
+ToolSpec
+ToolTable
+_END
+
+_START	ToolTable
+numTools	WORD
+toolArray
+>toolNumber1	WORD
+>minVersion1	WORD
+>toolNumber2	WORD
+>minVersion2	WORD
+>toolNumber3	WORD
+>minVersion3	WORD
+>toolNumber4	WORD
+>minVersion4	WORD
+>toolNumber5	WORD
+>minVersion5	WORD
+>toolNumber6	WORD
+>minVersion6	WORD
+>toolNumber7	WORD
+>minVersion7	WORD
+>toolNumber8	WORD
+>minVersion8	WORD
+>toolNumber9	WORD
+>minVersion9	WORD
+>toolNumber10	WORD
+>minVersion10	WORD
+>toolNumber11	WORD
+>minVersion11	WORD
+>toolNumber12	WORD
+>minVersion12	WORD
+>toolNumber13	WORD
+>minVersion13	WORD
+>toolNumber14	WORD
+>minVersion14	WORD
+>toolNumber15	WORD
+>minVersion15	WORD
+>toolNumber16	WORD
+>minVersion16	WORD
+>toolNumber17	WORD
+>minVersion17	WORD
+>toolNumber18	WORD
+>minVersion18	WORD
+>toolNumber19	WORD
+>minVersion19	WORD
+>toolNumber20	WORD
+>minVersion20	WORD
+>toolNumber21	WORD
+>minVersion21	WORD
+>toolNumber22	WORD
+>minVersion22	WORD
+>toolNumber23	WORD
+>minVersion23	WORD
+>toolNumber24	WORD
+>minVersion24	WORD
+>toolNumber25	WORD
+>minVersion25	WORD
+>toolNumber26	WORD
+>minVersion26	WORD
+>toolNumber27	WORD
+>minVersion27	WORD
+>toolNumber28	WORD
+>minVersion28	WORD
+>toolNumber29	WORD
+>minVersion29	WORD
+>toolNumber30	WORD
+>minVersion30	WORD
+>toolNumber31	WORD
+>minVersion31	WORD
+>toolNumber32	WORD
+>minVersion32	WORD
+>toolNumber33	WORD
+>minVersion33	WORD
+>toolNumber34	WORD
+>minVersion34	WORD
+>toolNumber35	WORD
+>minVersion35	WORD
+>toolNumber36	WORD
+>minVersion36	WORD
+>toolNumber37	WORD
+>minVersion37	WORD
+>toolNumber38	WORD
+>minVersion38	WORD
+>toolNumber39	WORD
+>minVersion39	WORD
+>toolNumber40	WORD
+>minVersion40	WORD
+_END
+
+_START	StartStopRec
+flags	WORD
+videoMode	WORD
+resFileID	WORD
+dPageHandle	LONG
+numTools	WORD
+toolArray
+>toolNumber1	WORD
+>minVersion1	WORD
+>toolNumber2	WORD
+>minVersion2	WORD
+>toolNumber3	WORD
+>minVersion3	WORD
+>toolNumber4	WORD
+>minVersion4	WORD
+>toolNumber5	WORD
+>minVersion5	WORD
+>toolNumber6	WORD
+>minVersion6	WORD
+>toolNumber7	WORD
+>minVersion7	WORD
+>toolNumber8	WORD
+>minVersion8	WORD
+>toolNumber9	WORD
+>minVersion9	WORD
+>toolNumber10	WORD
+>minVersion10	WORD
+>toolNumber11	WORD
+>minVersion11	WORD
+>toolNumber12	WORD
+>minVersion12	WORD
+>toolNumber13	WORD
+>minVersion13	WORD
+>toolNumber14	WORD
+>minVersion14	WORD
+>toolNumber15	WORD
+>minVersion15	WORD
+>toolNumber16	WORD
+>minVersion16	WORD
+>toolNumber17	WORD
+>minVersion17	WORD
+>toolNumber18	WORD
+>minVersion18	WORD
+>toolNumber19	WORD
+>minVersion19	WORD
+>toolNumber20	WORD
+>minVersion20	WORD
+>toolNumber21	WORD
+>minVersion21	WORD
+>toolNumber22	WORD
+>minVersion22	WORD
+>toolNumber23	WORD
+>minVersion23	WORD
+>toolNumber24	WORD
+>minVersion24	WORD
+>toolNumber25	WORD
+>minVersion25	WORD
+>toolNumber26	WORD
+>minVersion26	WORD
+>toolNumber27	WORD
+>minVersion27	WORD
+>toolNumber28	WORD
+>minVersion28	WORD
+>toolNumber29	WORD
+>minVersion29	WORD
+>toolNumber30	WORD
+>minVersion30	WORD
+>toolNumber31	WORD
+>minVersion31	WORD
+>toolNumber32	WORD
+>minVersion32	WORD
+>toolNumber33	WORD
+>minVersion33	WORD
+>toolNumber34	WORD
+>minVersion34	WORD
+>toolNumber35	WORD
+>minVersion35	WORD
+>toolNumber36	WORD
+>minVersion36	WORD
+>toolNumber37	WORD
+>minVersion37	WORD
+>toolNumber38	WORD
+>minVersion38	WORD
+>toolNumber39	WORD
+>minVersion39	WORD
+>toolNumber40	WORD
+>minVersion40	WORD
+_END
+
+_START	ToolSpec
+toolNumber	WORD
+minVersion	WORD
+_END
+
+
+;
+; template: Window Manager
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	Windows
+Paramlist
+WindColor
+WindRec
+WmTaskRec
+_END
+
+_START	WindRec
+wNext	LONG
+port
+>portInfo
+>>portSCB	WORD
+>>ptrToPixImage	LONG
+>>width	WORD
+>>boundsRect	WORD	4
+>portRect	WORD	4
+>clipRgn	LONG
+>visRgn	LONG
+>bkPat	BYTE	32
+>pnLoc	WORD	2
+>pnSize	WORD	2
+>pnMode	WORD
+>pnPat	BYTE	32
+>pnMask	BYTE	8
+>pnVis	WORD
+>fontHandle	LONG
+>fontID	LONG
+>fontFlags	WORD
+>txSize	WORD
+>txFace	WORD
+>txMode	WORD
+>spExtra	LONG
+>chExtra	LONG
+>fgColor	WORD
+>bgColor	WORD
+>picSave	LONG
+>rgnSave	LONG
+>polySave	LONG
+>grafProcs	LONG
+>arcRot	WORD
+>userField	LONG
+>sysField	LONG
+wDefProc	LONG
+wRefCon	LONG
+wContDraw	LONG
+wReserved	LONG
+wStrucRgn	LONG
+wContRgn	LONG
+wUpdateRgn	LONG
+wControls	LONG
+wFrameCtrls	LONG
+wFrame	WORD
+wCustom
+_END
+
+_START	WindColor
+frameColor	WORD
+titleColor	WORD
+tBarColor	WORD
+growColor	WORD
+infoColor	WORD
+_END
+
+_START	Paramlist
+paramLength	WORD
+wFrameBits	WORD
+wTitle	LONG
+wRefCon	LONG
+wZoom	WORD	4
+wColor	LONG
+wYOrigin	WORD
+wXOrigin	WORD
+wDataH	WORD
+wDataW	WORD
+wMaxH	WORD
+wMaxW	WORD
+wScrollVer	WORD
+wScrollHor	WORD
+wPageVer	WORD
+wPageHor	WORD
+wInfoRefCon	LONG
+wInfoHeight	WORD
+wFrameDefProc	LONG
+wInfoDefProc	LONG
+wContDefProc	LONG
+wPosition	WORD	4
+wPlane	LONG
+wStorage	LONG
+_END
+
+_START	WmTaskRec
+wmWhat	WORD
+wmMessage	LONG
+wmWhen	LONG
+wmWhere	LONG
+wmModifiers	WORD
+wmTaskData	LONG
+wmTaskMask	LONG
+wmLastClickTick	LONG
+wmClickCount	WORD
+wmTaskData2	LONG
+wmTaskData3	LONG
+wmTaskData4	LONG
+wmLastClickPt	WORD	2
+_END
+
+
+;
+; template: GS/OS
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	GSOS
+ChangePathRecGS
+CreateRecGS
+DAccessRecGS
+DevNumRecGS
+DInfoRecGS
+DIORecGS
+DirEntryRecGS
+DRenameRecGS
+EOFRecGS
+ExpandPathRecGS
+FileInfoRecGS
+FormatRecGS
+FSTInfoRecGS
+GetNameRecGS
+InterruptRecGS
+IORecGS
+LevelRecGS
+NameRecGS
+NewLineRecGS
+NotifyProcRecGS
+OpenRecGS
+OSShutdownRecGS
+PositionRecGS
+PrefixRecGS
+QuitRecGS
+RefInfoRecGS
+RefNumRecGS
+SessionStatusRecGS
+SetPositionRecGS
+StdRefNumRecGS
+SysPrefsRecGS
+VersionRecGS
+VolumeRecGS
+_END
+
+_START	ChangePathRecGS
+pCount	WORD
+pathname	LONG
+newPathname	LONG
+_END
+
+_START	CreateRecGS
+pCount	WORD
+pathname	LONG
+access	WORD
+fileType	WORD
+auxType	LONG
+storageType	WORD
+eof	LONG
+resourceEOF	LONG
+_END
+
+_START	DAccessRecGS
+pCount	WORD
+devNum	WORD
+code	WORD
+list	LONG
+requestCount	LONG
+transferCount	LONG
+_END
+
+_START	DevNumRecGS
+pCount	WORD
+devName	LONG
+devNum	WORD
+_END
+
+_START	DInfoRecGS
+pCount	WORD
+devNum	WORD
+devName	LONG
+characteristics	WORD
+totalBlocks	LONG
+slotNum	WORD
+unitNum	WORD
+version	WORD
+deviceID	WORD
+headLink	WORD
+forwardLink	WORD
+extenededDIBPtr	LONG
+_END
+
+_START	DIORecGS
+pCount	WORD
+devNum	WORD
+buffer	LONG
+requestCount	LONG
+startingBlock	LONG
+blockSize	WORD
+transferCount	LONG
+_END
+
+_START	DirEntryRecGS
+pCount	WORD
+refNum	WORD
+flags	WORD
+base	WORD
+displacement	WORD
+name	LONG
+entryNum	WORD
+fileType	WORD
+eof	LONG
+blockCount	LONG
+createDateTime
+>seconds	BYTE
+>minutes	BYTE
+>hour	BYTE
+>year	BYTE
+>day	BYTE
+>month	BYTE
+>null	BYTE
+>weekday	BYTE
+modDateTime
+>seconds	BYTE
+>minutes	BYTE
+>hour	BYTE
+>year	BYTE
+>day	BYTE
+>month	BYTE
+>null	BYTE
+>weekday	BYTE
+access	WORD
+auxType	LONG
+fileSysID	WORD
+optionList	LONG
+resourceEOF	LONG
+resourceBlocks	LONG
+_END
+
+_START	DRenameRecGS
+pCount	WORD
+devNum	WORD
+strPtr	LONG
+_END
+
+_START	ExpandPathRecGS
+pCount	WORD
+inputPath	LONG
+outputPath	LONG
+flags	WORD
+_END
+
+_START	FileInfoRecGS
+pCount	WORD
+pathname	LONG
+fileType	WORD
+auxType	LONG
+storageType	WORD
+createDateTime
+modDateTime
+>seconds	BYTE
+>minutes	BYTE
+>hour	BYTE
+>year	BYTE
+>day	BYTE
+>month	BYTE
+>null	BYTE
+>weekday	BYTE
+optionList	LONG
+>seconds	BYTE
+>minutes	BYTE
+>hour	BYTE
+>year	BYTE
+>day	BYTE
+>month	BYTE
+>null	BYTE
+>weekday	BYTE
+eof	LONG
+blocksUsed	LONG
+resourceEOF	LONG
+resourceBlocks	LONG
+_END
+
+_START	FormatRecGS
+pCount	WORD
+devName	LONG
+volName	LONG
+fileSysID	WORD
+reqFileSysID	WORD
+_END
+
+_START	FSTInfoRecGS
+pCount	WORD
+fstNum	WORD
+fileSysID	WORD
+fstName	LONG
+version	WORD
+attributes	WORD
+blockSize	WORD
+maxVolSize	LONG
+maxFileSize	LONG
+_END
+
+_START	InterruptRecGS
+pCount	WORD
+intNum	WORD
+vrn	WORD
+intCode	LONG
+_END
+
+_START	IORecGS
+pCount	WORD
+refNum	WORD
+dataBuffer	LONG
+requestCount	LONG
+transferCount	LONG
+cachePriority	WORD
+_END
+
+_START	LevelRecGS
+pCount	WORD
+level	WORD
+_END
+
+_START	NameRecGS
+pCount	WORD
+pathname	LONG
+_END
+
+_START	NotifyProcRecGS
+pCount	WORD
+procPointer	LONG
+_END
+
+_START	GetNameRecGS
+pCount	WORD
+pathname	LONG
+_END
+
+_START	NewLineRecGS
+pCount	WORD
+refNum	WORD
+enableMask	WORD
+numChars	WORD
+newlineTable	LONG
+_END
+
+_START	OpenRecGS
+pCount	WORD
+refNum	WORD
+pathname	LONG
+requestAccess	WORD
+access	WORD
+fileType	WORD
+auxType	LONG
+storageType	WORD
+createDateTime
+>seconds	BYTE
+>minutes	BYTE
+>hour	BYTE
+>year	BYTE
+>day	BYTE
+>month	BYTE
+>null	BYTE
+>weekday	BYTE
+modDateTime
+>seconds	BYTE
+>minutes	BYTE
+>hour	BYTE
+>year	BYTE
+>day	BYTE
+>month	BYTE
+>null	BYTE
+>weekday	BYTE
+optionList	LONG
+eof	LONG
+blocksUsed	LONG
+resourceEOF	LONG
+resourceBlocks	LONG
+_END
+
+_START	OSShutdownRecGS
+pCount	WORD
+shutdownFlag	WORD
+_END
+
+_START	PositionRecGS
+pCount	WORD
+reNum	WORD
+position	LONG
+_END
+
+_START	EOFRecGS
+pCount	WORD
+reNum	WORD
+eof	LONG
+_END
+
+_START	PrefixRecGS
+pCount	WORD
+prefixNum	WORD
+prefixPtr	LONG
+_END
+
+_START	QuitRecGS
+pCount	WORD
+pathname	LONG
+flags	WORD
+_END
+
+_START	RefNumRecGS
+pCount	WORD
+pathname	LONG
+refNum	WORD
+access	WORD
+resNum	WORD
+caseSense	WORD
+displacement	WORD
+_END
+
+_START	StdRefNumRecGS
+pCount	WORD
+prefixNum	WORD
+refNum	WORD
+_END
+
+_START	SessionStatusRecGS
+pCount	WORD
+status	WORD
+_END
+
+_START	SetPositionRecGS
+pCount	WORD
+refNum	WORD
+base	WORD
+displacement	LONG
+_END
+
+_START	SysPrefsRecGS
+pCount	WORD
+preferences	WORD
+_END
+
+_START	VersionRecGS
+pCount	WORD
+version	WORD
+_END
+
+_START	VolumeRecGS
+pCount	WORD
+devName	LONG
+volName	LONG
+totalBlocks	LONG
+freeBlocks	LONG
+fileSysID	WORD
+blockSize	WORD
+_END
+
+_START	RefInfoRecGS
+pCount	WORD
+refNum	WORD
+access	WORD
+pathname	LONG
+_END
+
+
+;
+; template: AppleShare FST
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	AppleShareFST
+ASOptionListRec
+BufferControlRec
+ByteRangeLockRec
+CopyFileRec
+DesktopRec
+GetCommentRec
+GetPrivilegesRec
+GetServerNameRec
+GetUserPathRec
+SetCommentRec
+SetPrivilegesRec
+SpecialOpenForkRec
+UserInfoRec
+_END
+
+_START	BufferControlRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+refNum	WORD
+flags	WORD
+_END
+
+_START	SpecialOpenForkRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+pathname	LONG
+accessMode	WORD
+forkNum	WORD
+_END
+
+_START	ByteRangeLockRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+refNum	WORD
+lockFlag	WORD
+fileOffset	LONG
+rangeLength	LONG
+rangeStart	LONG
+_END
+
+_START	GetPrivilegesRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+pathname	LONG
+accessRights
+>reserved	BYTE
+>world	BYTE
+>group	BYTE
+>owner	BYTE
+ownerName	LONG
+groupName	LONG
+_END
+
+_START	SetPrivilegesRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+pathname	LONG
+accessRights
+>userSummary	BYTE
+>world	BYTE
+>group	BYTE
+>owner	BYTE
+ownerName	LONG
+groupName	LONG
+_END
+
+_START	UserInfoRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+deviceNum	WORD
+userName	LONG
+primaryGroupName	LONG
+_END
+
+_START	CopyFileRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+sourcePathname	LONG
+destPathname	LONG
+_END
+
+_START	GetUserPathRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+prefix	LONG
+_END
+
+_START	DesktopRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+desktopRefNum	WORD
+pathname	LONG
+_END
+
+_START	GetCommentRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+desktopRefNum	WORD
+pathname	LONG
+comment	LONG
+_END
+
+_START	SetCommentRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+desktopRefNum	WORD
+pathname	LONG
+comment	LONG
+_END
+
+_START	GetServerNameRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+pathname	LONG
+serverName	LONG
+zoneName	LONG
+_END
+
+_START	ASOptionListRec
+bufferSize	WORD
+dataSize	WORD
+theFileSysID	WORD
+finderInfo	BYTE	32
+parentDirID	LONG
+accessRights	LONG
+_END
+
+
+;
+; template: ProDOS FST
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	ProDOSFST
+CharCaseRec
+TimeStampRec
+_END
+
+_START	TimeStampRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+timeOption	WORD
+_END
+
+_START	CharCaseRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+caseOption	WORD
+_END
+
+
+;
+; template: High Sierra FST
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	HighSierraFST
+GetMapSizeRec
+GetMapTableRec
+MapEnableRec
+SetMapTableRec
+_END
+
+_START	MapEnableRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+enable	WORD
+_END
+
+_START	GetMapSizeRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+mapSize	WORD
+_END
+
+_START	GetMapTableRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+bufferPtr	LONG
+_END
+
+_START	SetMapTableRec
+pCount	WORD
+fstNum	WORD
+commandNum	WORD
+mapPtr	LONG
+_END
+
+
+;
+; template: ProDOS 16
+; 2/28/90  by J. Luther
+; Copyright (c) Apple Computer, Inc. 1990
+; All Rights reserved
+;
+
+_START	ProDOS16
+BlockRec
+DevNumRec
+DInfoRec
+DirEntryRec
+EOFRec
+EraseDiskRec
+ExpandPathRec
+FileIORec
+FileRec
+FormatRec
+InterruptRec
+MarkRec
+NewLineRec
+OpenRec
+PathnameRec
+PrefixRec
+QuitRec
+VolumeRec
+_END
+
+_START	BlockRec
+blockDevNum	WORD
+blockDataBuffer	LONG
+blockNum	LONG
+_END
+
+_START	DevNumRec
+devName	LONG
+devNum	WORD
+_END
+
+_START	DInfoRec
+devNum	WORD
+devName	LONG
+_END
+
+_START	DirEntryRec
+refNum	WORD
+reserved	WORD
+base	WORD
+displacement	WORD
+nameBuffer	LONG
+entryNum	WORD
+fileType	WORD
+endOfFile	LONG
+blockCount	LONG
+createTime
+>seconds	BYTE
+>minutes	BYTE
+>hour	BYTE
+>year	BYTE
+>day	BYTE
+>month	BYTE
+>null	BYTE
+>weekday	BYTE
+modTime
+>seconds	BYTE
+>minutes	BYTE
+>hour	BYTE
+>year	BYTE
+>day	BYTE
+>month	BYTE
+>null	BYTE
+>weekday	BYTE
+access	WORD
+auxType	LONG
+fileSysID	WORD
+_END
+
+_START	EOFRec
+eofRefNum	WORD
+eofPosition	WORD
+_END
+
+_START	FileIORec
+fileRefNum	WORD
+dataBuffer	LONG
+requestCount	LONG
+transferCount	LONG
+_END
+
+_START	FileRec
+pathName	LONG
+fAccess	WORD
+fileType	WORD
+auxType	LONG
+storageType	WORD
+createDate	WORD
+createTime	WORD
+modDate	WORD
+modTime	WORD
+blocksUsed	LONG
+_END
+
+_START	FormatRec
+devName	LONG
+volName	LONG
+fileSysID	WORD
+_END
+
+_START	EraseDiskRec
+devName	LONG
+volName	LONG
+fileSysID	WORD
+_END
+
+_START	InterruptRec
+intNum	WORD
+intCode	LONG
+_END
+
+_START	MarkRec
+markRefNum	WORD
+position	LONG
+_END
+
+_START	NewLineRec
+newLRefNum	WORD
+enableMask	WORD
+newLineChar	WORD
+_END
+
+_START	OpenRec
+openRefNum	WORD
+openPathname	LONG
+ioBuffer	LONG
+_END
+
+_START	PathnameRec
+pathname	LONG
+newPathname	LONG
+_END
+
+_START	PrefixRec
+prefixNum	WORD
+prefix	LONG
+_END
+
+_START	QuitRec
+quitPathname	LONG
+flags	WORD
+_END
+
+_START	VolumeRec
+deviceName	LONG
+volName	LONG
+totalBlocks	LONG
+freeBlocks	LONG
+fileSysID	WORD
+_END
+
+_START	ExpandPathRec
+inputPath	LONG
+outputPath	LONG
+flags	WORD
+_END
+

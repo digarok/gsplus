@@ -1,24 +1,8 @@
 /*
- GSPLUS - Advanced Apple IIGS Emulator Environment
- Copyright (C) 2016 - Dagen Brock
- 
- Copyright (C) 2010 by GSport contributors
-
- Based on the KEGS emulator written by and Copyright (C) 2003 Kent Dickey
-
- This program is free software; you can redistribute it and/or modify it 
- under the terms of the GNU General Public License as published by the 
- Free Software Foundation; either version 2 of the License, or (at your 
- option) any later version.
-
- This program is distributed in the hope that it will be useful, but 
- WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
- for more details.
-
- You should have received a copy of the GNU General Public License along 
- with this program; if not, write to the Free Software Foundation, Inc., 
- 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  GSPLUS - Advanced Apple IIGS Emulator Environment
+  Based on the KEGS emulator written by Kent Dickey
+  See COPYRIGHT.txt for Copyright information
+	See LICENSE.txt for license (GPL v2)
 */
 
 #ifdef ASM
@@ -1071,14 +1055,14 @@ defs_instr_start_16	.word	0
 #  define TSB_INST(in_bank)			\
 	tmp1 = arg | acc;			\
 	CYCLES_PLUS_1;				\
-	zero = arg & acc;			\
-	SET_MEMORY8(addr_latch, tmp1);
+	SET_MEMORY8(addr_latch, tmp1); \
+	zero = arg & acc;
 # else
 #  define TSB_INST(in_bank)			\
 	tmp1 = arg | acc;			\
 	CYCLES_PLUS_1;				\
-	zero = arg & acc;			\
-	SET_MEMORY16(addr_latch, tmp1, in_bank);
+	SET_MEMORY16(addr_latch, tmp1, in_bank); \
+	zero = arg & acc;
 # endif
 #endif
 
@@ -1123,15 +1107,15 @@ defs_instr_start_16	.word	0
 	psr = (psr & 0x1fe) + ((arg >> 7) & 1);	\
 	tmp1 = (arg << 1) & 0xff;		\
 	CYCLES_PLUS_1;				\
-	SET_NEG_ZERO8(tmp1);			\
-	SET_MEMORY8(addr_latch, tmp1);
+	SET_MEMORY8(addr_latch, tmp1);		\
+	SET_NEG_ZERO8(tmp1);
 # else
 #  define ASL_INST(in_bank)			\
 	psr = (psr & 0x1fe) + ((arg >> 15) & 1);\
 	tmp1 = (arg << 1) & 0xffff;		\
 	CYCLES_PLUS_1;				\
-	SET_NEG_ZERO16(tmp1);			\
-	SET_MEMORY16(addr_latch, tmp1, in_bank);
+	SET_MEMORY16(addr_latch, tmp1, in_bank);\
+	SET_NEG_ZERO16(tmp1);
 # endif
 #endif
 
@@ -1318,14 +1302,14 @@ defs_instr_start_16	.word	0
 	arg = arg & 0xff;			\
 	tmp1 = arg & ~acc;			\
 	CYCLES_PLUS_1;				\
-	zero = arg & acc;			\
-	SET_MEMORY8(addr_latch, tmp1);
+	SET_MEMORY8(addr_latch, tmp1);		\
+	zero = arg & acc;
 # else
 #  define TRB_INST(in_bank)			\
 	tmp1 = arg & ~acc;			\
 	CYCLES_PLUS_1;				\
-	zero = arg & acc;			\
-	SET_MEMORY16(addr_latch, tmp1, in_bank);
+	SET_MEMORY16(addr_latch, tmp1, in_bank);\
+	zero = arg & acc;
 # endif
 #endif
 

@@ -1,30 +1,25 @@
 # Mac OSX - SDL2 version
 #
-# might need to install cli tools if you haven't already.
+# This should build a `gsplus` executable and copy it to the project root dir.
+# You can run it, though as always you need to supply an Apple IIgs ROM file.
+# Have fun, and please note any errors on the issues page of the project.
+
+
+# Prerequisite: You must install Xcode on your system from the App Store
+
+# Also, install Xcode cli tools.
 xcode-select --install
 
-# Install 'brew' if you don't already have it installed. 
-# then install dependencies
+# Install 'brew'.
+/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+
+# Use brew to install dependencies.
 brew install sdl2
+brew install sdl2_image
 brew install freetype
 
-# build
+# Build.
 git clone git@github.com:digarok/gsplus.git
 cd gsplus/src
 ln -s vars_osx_sdl2 vars
 make clean ; make
-
-#Note that installing freetype via brew will install the library, but I think
-# maybe you have to install the source and build it to link it in properly. 
-
-# You could use /usr/local/src instead of /tmp
-cd /tmp 
-curl --remote-name --location http://sourceforge.net/projects/freetype/files/freetype2/2.6.2/freetype-2.6.2.tar.gz
-tar -xzvf freetype-2.6.2.tar.gz
-cd freetype-2.6.2
-./configure --prefix=/usr/local/freetype-2.6.2
-make
-make install
-ln -s freetype-2.6.2 /usr/local/freetype
-
-

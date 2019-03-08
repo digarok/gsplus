@@ -4,10 +4,12 @@
 OBJECTS1 = adb.o clock.o config.o debug.o dis.o engine_c.o scc.o iwm.o \
 	joystick_driver.o moremem.o paddles.o parallel.o printer.o sim65816.o \
 	smartport.o sound.o sound_driver.o video.o scc_socket_driver.o glog.o \
-	imagewriter.o scc_imagewriter.o scc_llap.o
+	imagewriter.o scc_imagewriter.o scc_llap.o options.o
 ATOBJ = atbridge/aarp.o atbridge/atbridge.o atbridge/elap.o atbridge/llap.o atbridge/port.o
 PCAPOBJ = atbridge/pcap_delay.o
 TFEOBJ = tfe/tfe.o tfe/tfearch.o tfe/tfesupp.o
+FSTOBJ = unix_host_common.o host_common.o host_fst.o host_mli.o
+RAWNETOBJ = rawnet/cs8900.o rawnet/rawnet.o rawnet/rawnetsupp.o
 
 include vars
 
@@ -32,7 +34,7 @@ specials: 8inst_s 16inst_s 8size 16size 8inst_c 16inst_c size_c size_s
 specials_clean:
 	rm -f 8inst_s 16inst_s 8size 16size 8inst_c 16inst_c size_c size_s
 
-# Linux/OSX SDL builds
+# Linux/OSX/RPi SDL builds
 gsplus: $(OBJECTS) compile_time.o
 	$(LD) $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)
 	echo $(OBJECTS)
@@ -68,16 +70,8 @@ gsplus32.exe: $(OBJECTS) compile_time.o
 # Mingw32 / Cygwin builds:  The SDL version (builds, but non-functioning)
 gsplus.exe: $(OBJECTS) compile_time.o
 	#g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
-	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)  -lSDLmain -mwindows
-	#mkdir -p ../GSplus.app/lib
-	#cp -f gsplus.exe ../GSplus.app/GSplus.exe
-	#cp -f ../config.template ../GSplus.app/config.txt
-	#cp -f ../lib/*.ttf ../GSplus.app/lib
-	#cp -f ../lib/arch/win32/*.dll ../GSplus.app
-	#cp -f ../lib/NoBoot.po ../GSplus.app
-	#cp -f GSplus.bat ../GSplus.app/GSplus.bat
-	#cp -f parallel.rom ../GSplus.app
-	#cp -f ../COPYING.txt ../GSplus.app
+	#g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS)  -mwindows
+	g++ $(CCOPTS) $(LDOPTS) $(OBJECTS) compile_time.o $(LDFLAGS) -o $(NAME)$(SUFFIX) $(EXTRA_LIBS) -lwinmm -lgdi32 -ldsound -lcomctl32 -lws2_32 -lshell32
 	cp gsplus.exe ..
 
 # NOT CURRENTLY SUPPORTED

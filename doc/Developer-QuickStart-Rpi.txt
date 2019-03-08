@@ -1,0 +1,17 @@
+# When building on Raspberry Pi, you need to get the hardware
+# accelerated graphics driver enabled with SDL2.  
+# We borrow the SDL2 build from RetroPie which takes care of this for us.
+
+git clone https://github.com/RetroPie/RetroPie-Setup
+cd RetroPie-Setup
+sudo ./retropie_packages.sh sdl2
+
+
+# Then build GSplus like any other *nix system
+sudo apt-get update -y
+sudo apt-get install -y libpcap0.8-dev libsdl2-image-dev
+git clone https://github.com/digarok/gsplus.git
+cd gsplus/src
+ln -s vars_rpilinux_sdl2 vars
+make
+
