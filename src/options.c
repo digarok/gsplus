@@ -395,7 +395,6 @@ void parse_cli_options(int argc, char **argv) {
       }
     }
   }
-  return 0;
 }
 
 void help_exit() {
