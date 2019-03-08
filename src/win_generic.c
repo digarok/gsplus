@@ -382,13 +382,12 @@ void show_xcolor_array()      {
 
 // OG Add function to clear all get_images loaded (dev dependent)
 void x_release_kimage(Kimage *kimage_ptr) {
-  if ((int)kimage_ptr->dev_handle != -1)
+  if (kimage_ptr->dev_handle)
   {
     DeleteObject(kimage_ptr->dev_handle);
-    kimage_ptr->dev_handle = (void*)-1;
+    kimage_ptr->dev_handle = NULL;
   }
-  else
-  if (kimage_ptr->data_ptr)
+  else if (kimage_ptr->data_ptr)
   {
     free(kimage_ptr->data_ptr);
     kimage_ptr->data_ptr = NULL;
@@ -442,7 +441,7 @@ void x_get_kimage(Kimage *kimage_ptr)      {
 
     kimage_ptr->data_ptr = ptr;
 
-    kimage_ptr->dev_handle = (void *)-1;
+    kimage_ptr->dev_handle = NULL;
 
   }
   printf("kim: %p, dev:%p data: %p, size: %08x\n", kimage_ptr,
