@@ -115,6 +115,11 @@ static char *rtrim(char *cp) {
 	return cp;
 }
 
+static char *ltrim(char *cp) {
+	while (isspace(*cp)) ++cp;
+	return cp;
+}
+
 /* 0 - no field, 1 - ok, -1 - warning */
 static int parse_field(const char *cp, struct field *f) {
 	const char *start;
