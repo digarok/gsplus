@@ -274,7 +274,7 @@ void push_api_msg(int size, char *msg_str) {
 
 void api_push_memack() {
   int size = snprintf(tmp_buffer_4k, sizeof(tmp_buffer_4k),"{\"type\":\"memack\"}");
-  char *msg = (char*)malloc(sizeof(char) * size);
+  char *msg = (char*)malloc(sizeof(char) * size + 1);
   strcpy(msg,tmp_buffer_4k);
   push_api_msg(size, msg);
 }
@@ -351,7 +351,7 @@ void api_push_stack() {
   int size = snprintf(tmp_buffer_4k, sizeof(tmp_buffer_4k),"{\"type\":\"stack\",\"data\":{\"loc\":\"%06X\",\"S\":\"%04X\",\"bytes\":[%s]}}",
                       stack_loc,stack,str_ptr);
 
-  char *msg = (char*)malloc(sizeof(char) * size);
+  char *msg = (char*)malloc(sizeof(char) * size + 1);
   strcpy(msg,tmp_buffer_4k);
   push_api_msg(size, msg);
 }
@@ -359,7 +359,7 @@ void api_push_stack() {
 
 void api_push_disassembly_start() {
   int size = snprintf(tmp_buffer_4k, sizeof(tmp_buffer_4k),"{\"type\":\"dis0\"}");
-  char *msg = (char*)malloc(sizeof(char) * size);
+  char *msg = (char*)malloc(sizeof(char) * size + 1);
   strcpy(msg,tmp_buffer_4k);
   push_api_msg(size, msg);
 }
