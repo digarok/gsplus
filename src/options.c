@@ -122,10 +122,9 @@ int parse_int(const char *str1, int min, int max)
   tmp = strtol(str1, 0, 0);
   if (tmp > max) { tmp = max; }
   if (tmp < min) { tmp = min; }
-  printf ( "TMP %d\n", tmp);
   return tmp;
 }
-int parse_cli_options(int argc, char **argv) {
+void parse_cli_options(int argc, char **argv) {
   int	i;
   int tmp1;
   int	skip_amt;

@@ -790,7 +790,6 @@ void banner() {
 
 int gsplusmain(int argc, char **argv) {
   int diff;
-  int tmp1;
   char    *final_arg = 0;
 
 
@@ -800,7 +799,7 @@ int gsplusmain(int argc, char **argv) {
   // OG Restoring globals
   sim65816_initglobals();
   moremem_init();
-  tmp1 = parse_cli_options(argc, argv);
+  parse_cli_options(argc, argv);
 
 
 
