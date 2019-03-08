@@ -16,6 +16,7 @@ void win_event_key(HWND hwnd, UINT raw_vk, BOOL down, int repeat, UINT flags);
 void win_event_quit(HWND hwnd);
 void win_event_redraw(void);
 LRESULT CALLBACK win_event_handler(HWND hwnd, UINT umsg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK win_ll_keyboard(int nCode, WPARAM wParam, LPARAM lParam);
 void inspect_file(LPTSTR lpstrFile);
 int main(int argc, char **argv);
 void check_input_events(void);
