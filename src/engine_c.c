@@ -400,8 +400,8 @@ extern word32 slow_mem_changed[];
 extern int g_num_bp_breakpoints;
 extern word32 g_bp_breakpoints[];
 
-extern int g_num_tmp_bp_breakpoints;
-extern word32 g_tmp_bp_breakpoints[];
+extern int g_num_tp_breakpoints;
+extern word32 g_tp_breakpoints[];
 
 extern int g_num_mp_breakpoints;
 extern word32 g_mp_breakpoints[];
@@ -412,13 +412,15 @@ extern word32 g_abort_bytes;
 
 int check_bp_breakpoints(word32 addr) {
   int i;
+
   for (i = 0; i < g_num_bp_breakpoints; ++i) {
     if (g_bp_breakpoints[i] == addr) {
       return 1;
     }
   }
-  for (i = 0; i < g_num_tmp_bp_breakpoints; ++i) {
-    if (g_tmp_bp_breakpoints[i] == addr) {
+  /* temp breakpoints */
+  for (i = 0; i < g_num_tp_breakpoints; ++i) {
+    if (g_tp_breakpoints[i] == addr) {
       return 1;
     }
   }
@@ -1043,7 +1045,7 @@ int enter_engine(Engine_reg *engine_ptr)     {
   word32 saved_psr = 0;
 
   word32 abort_support = g_num_mp_breakpoints ? 1 : 0;
-  word32 kpc_support = g_num_bp_breakpoints + g_num_tmp_bp_breakpoints ? 1 : 0;
+  word32 kpc_support = g_num_bp_breakpoints  + g_num_tp_breakpoints ? 1 : 0;
 
   flags = engine_ptr->flags;
   if (flags & FLAG_IGNORE_MP) abort_support = 0;
