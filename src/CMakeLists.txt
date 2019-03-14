@@ -57,7 +57,7 @@ pkg_check_modules(FREETYPE2 freetype2)
 # run ccmake, cmake -LH, or cmake -D...
 #
 set(DRIVER "SDL" CACHE STRING "Driver (SDL, X11, WIN32, FB, or HEADLESS")
-option(WITH_DEBUGGER "Enable the debugger" ON)
+option(WITH_DEBUGGER "Enable the debugger" OFF)
 option(WITH_HOST_FST "Enable host fst support" ON)
 option(TOGGLE_STATUS "Enable F10 Toggle Status support (win32/x11)" OFF)
 option(WITH_RAWNET "Enable Uthernet emulation" OFF)

@@ -8,10 +8,13 @@ configuration:
 - mingw64-gdi
 - msys-gdi
 - linux-sdl
+- linux-headless
 
 matrix:
   exclude:
     - configuration: linux-sdl
+      image: Visual Studio 2017
+    - configuration: linux-headless
       image: Visual Studio 2017
     - configuration: mingw32-sdl
       image: Ubuntu1804
@@ -119,3 +122,20 @@ for:
     artifacts:
       - path: 'build/bin/GSplus'
         name: GSplus-linux-sdl
+
+  - # linux/headless
+    matrix:
+      only:
+        - image: Ubuntu1804
+          configuration: linux-headless
+    install:
+      - sh: sudo apt-get update
+      - sh: sudo apt-get install -y re2c
+    build_script:
+      - sh: mkdir build
+      - sh: cd build
+      - sh: cmake ../ -DDRIVER=HEADLESS
+      - sh: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build/bin/GSplus'
+        name: GSplus-linux-headless
