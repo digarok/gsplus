@@ -32,6 +32,9 @@ extern word32 g_mp_breakpoints[];
 extern int g_num_bp_breakpoints;
 extern word32 g_bp_breakpoints[];
 
+extern int g_num_tp_breakpoints;
+extern word32 g_tp_breakpoints[];
+
 
 extern Page_info page_info_rd_wr[];
 
@@ -267,6 +270,14 @@ void fixup_brks()      {
   /* bp are read-only. mp are read/write */
   for (i = 0; i < g_num_bp_breakpoints; ++i) {
     page = (g_bp_breakpoints[i] >> 8) & 0xffff;
+    val = GET_PAGE_INFO_RD(page);
+    val = (Pg_info)((ptrdiff_t)val | BANK_BREAK);
+    SET_PAGE_INFO_RD(page, val);
+    /* why IO_TMP? */
+  }
+
+  for (i = 0; i < g_num_tp_breakpoints; ++i) {
+    page = (g_tp_breakpoints[i] >> 8) & 0xffff;
     val = GET_PAGE_INFO_RD(page);
     val = (Pg_info)((ptrdiff_t)val | BANK_BREAK);
     SET_PAGE_INFO_RD(page, val);
