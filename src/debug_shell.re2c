@@ -1437,7 +1437,10 @@ int debug_shell(int code) {
 	for(;;) {
 		cp = x_readline("> ");
 		if (!cp) {
-			if (++control_d_count < 2) continue; 
+			if (++control_d_count < 2) {
+				fputs("\n", stdout);
+				continue;
+			} 
 			return 0;
 		}
 		control_d_count = 0;
