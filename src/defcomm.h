@@ -100,6 +100,10 @@
 #define FLAG_IGNORE_BP	0x02
 #define FLAG_STEP		0x04
 #define FLAG_WANT_BRK	0x08
+#define FLAG_WANT_COP	0x10
+#define FLAG_WANT_RET	0x20
+#define FLAG_WANT_JSL	0x40
+#define FLAG_IGNORE_BRK	0x80 /* and cop */
 
 #define MODE_BORDER		0
 #define MODE_TEXT		1

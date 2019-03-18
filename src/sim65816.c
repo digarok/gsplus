@@ -1607,7 +1607,9 @@ int run_prog()      {
 
     if (ret == RET_MP) break;
     if (ret == RET_BP) break;
-    engine.flags &= ~(FLAG_IGNORE_BP | FLAG_IGNORE_MP);
+    if (ret == RET_BRK) break;
+    if (ret == RET_COP) break;
+    engine.flags &= ~(FLAG_IGNORE_BP | FLAG_IGNORE_MP | FLAG_IGNORE_BRK);
     if(g_stepping) {
       ret = 0;
       break;

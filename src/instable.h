@@ -76,9 +76,11 @@ brk_testing_SYM
 #else
 	GET_1BYTE_ARG;
 
-	if(flags & FLAG_WANT_BRK) {
-		CYCLES_PLUS_2;
-		FINISH(RET_BRK, arg);
+	if (flags & FLAG_WANT_BRK) {
+		if (~flags & FLAG_IGNORE_BRK) {
+			CYCLES_PLUS_2;
+			FINISH(RET_BRK, arg);
+		}
 	}
 	INC_KPC_2;
 	g_num_brk++;
@@ -167,8 +169,16 @@ cop_native_SYM
 
 
 #else
-	g_num_cop++;
+	GET_1BYTE_ARG;
+
+	if (flags & FLAG_WANT_COP) {
+		if (~flags & FLAG_IGNORE_BRK) {
+			CYCLES_PLUS_2;
+			FINISH(RET_COP, arg);
+		}
+	}
 	INC_KPC_2;
+	g_num_cop++;
 
 	psr = psr & (~0x82);
 	psr |= (neg << 7);

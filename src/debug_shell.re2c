@@ -885,6 +885,36 @@ next:
 	return 0;
 }
 
+static int do_brk_cop(const char *cp, int which) {
+	/* brk=1 / brk=0 */
+
+	const char *YYCURSOR = cp;
+	int value = 0;
+
+	/*!re2c
+		[01] eol {
+			value = *cp - '0';
+			goto next;
+		}
+		* { return -1; }
+	*/
+next:
+
+	switch(which) {
+		case 0x00:
+			engine.flags &= ~FLAG_WANT_BRK;
+			if (value) engine.flags |= FLAG_WANT_BRK;
+			printf("brk intercept %s\n\n", value ? "on" : "off");
+			break;
+		case 0x02:
+			engine.flags &= ~FLAG_WANT_COP;
+			if (value) engine.flags |= FLAG_WANT_COP;
+			printf("cop intercept %s\n\n", value ? "on" : "off");
+			break;
+	}
+	return 0;
+}
+
 static word32 do_mem_assign(word32 addr, const char *cp) {
 	/* "string" -> pokes ASCII chars */
 	/* 'string' -> pokes ASCII chars | 0x80 */
@@ -1122,6 +1152,8 @@ static int parse_command(const char *cp) {
 		("q" | "quit" | "exit" | "bye") eol { return 'q'; }
 		"reset" eol { do_reset(); return 0; }
 		("help" | "?") eol { do_help(); return 0; }
+		"brk=" { return do_brk_cop(YYCURSOR, 0x00); }
+		"cop=" { return do_brk_cop(YYCURSOR, 0x02); }
 
 		// register stuff
 
@@ -1420,7 +1452,9 @@ int debug_shell(int code) {
 		} 
 		printf("%06x: %0*x\n", g_abort_address, g_abort_bytes * 2, g_abort_value);
 	}
-	if (code == RET_BRK) {
+	if (code == RET_BRK || code == RET_COP) {
+		/* todo -- should do this at end, verify pc/memory unchanged */
+		engine.flags |= FLAG_IGNORE_BRK;
 		/* hit a BRK op */
 	}
 	if (code == RET_HALT) {
