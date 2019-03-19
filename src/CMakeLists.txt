@@ -53,6 +53,19 @@ endif()
 pkg_check_modules(SDL2 sdl2)
 pkg_check_modules(FREETYPE2 freetype2)
 
+
+find_program(PERL perl)
+find_program(RE2C re2c)
+
+if (RE2C-NOTFOUND)
+	message(FATAL_ERROR "unable to find re2c")
+endif()
+
+if (PERL-NOTFOUND)
+	message(FATAL_ERROR "unable to find perl")
+endif()
+
+
 #
 # run ccmake, cmake -LH, or cmake -D...
 #
