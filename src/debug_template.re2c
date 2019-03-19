@@ -338,7 +338,7 @@ word32 debug_apply_template(word32 address, const char *name) {
 				case 5: /* cstring */
 				case 6: /* pstring */
 				case 7: /* gs/os string */
-					value = get_memory16_c(address, 0);
+					value = get_memory24_c(address, 0);
 					address += 4;
 					printf("%08x ", value);
 					break;

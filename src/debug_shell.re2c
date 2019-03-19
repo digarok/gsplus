@@ -1244,7 +1244,7 @@ static int parse_command(const char *cp) {
 			goto indir;
 		}
 		"%d" {
-			addr = engine.dbank;
+			addr = engine.direct;
 			has_addr = 1;
 			has_bank = 1;
 			goto indir;
@@ -1471,10 +1471,9 @@ int debug_shell(int code) {
 	for(;;) {
 		cp = x_readline("> ");
 		if (!cp) {
-			if (++control_d_count < 2) {
-				fputs("\n", stdout);
+			fputs("\n", stdout);
+			if (++control_d_count < 2)
 				continue;
-			} 
 			return 0;
 		}
 		control_d_count = 0;
