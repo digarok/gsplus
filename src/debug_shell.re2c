@@ -1458,7 +1458,8 @@ int debug_shell(int code) {
 		/* hit a BRK op */
 	}
 	if (code == RET_HALT) {
-		/* halt_printf */
+		/* halt_printf or ^C */
+		fputs("\n", stdout);
 	}
 
 
