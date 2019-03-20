@@ -725,6 +725,10 @@ int next_pc(void) {
 				pc += 6;
 			return pc;
 			break;
+		case 0x00: /* brk arg */
+		case 0x02: /* cop arg */
+			return pc + 2;
+			break;
 	}
 
 	return -1;
