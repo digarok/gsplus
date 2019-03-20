@@ -899,6 +899,45 @@ next:
 	return 0;
 }
 
+static int do_setting(const char *cp, int value) {
+
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+	unsigned psr_bits = 0;
+
+	/*!re2c
+		* {
+			fputs("invalid setting\n", stderr); 
+			return -1;
+		}
+		"brk" eol {
+			engine.flags &= ~FLAG_WANT_BRK;
+			if (value) engine.flags |= FLAG_WANT_BRK;
+			printf("brk intercept %s\n", value ? "on" : "off");
+			return 0;
+		}
+		"cop" eol {
+			engine.flags &= ~FLAG_WANT_COP;
+			if (value) engine.flags |= FLAG_WANT_COP;
+			printf("cop intercept %s\n", value ? "on" : "off");
+			return 0;			
+		}
+
+		"e" eol { psr_bits = 0x0100; goto set_psr; }
+		"m" eol { psr_bits = 0x0020; goto set_psr; }
+		"x" eol { psr_bits = 0x0010; goto set_psr; }
+	*/
+
+set_psr:
+	if (value) g_disasm_psr |= psr_bits;
+	else g_disasm_psr &= ~psr_bits;
+	if (g_disasm_psr & 0x0100) g_disasm_psr = 0x0130;
+	printf("disasm psr %03x\n", g_disasm_psr);
+	return 0;
+}
+
+#if 0
 static int do_brk_cop(const char *cp, int which) {
 	/* brk=1 / brk=0 */
 
@@ -928,6 +967,8 @@ next:
 	}
 	return 0;
 }
+#endif
+
 
 static word32 do_mem_assign(word32 addr, const char *cp) {
 	/* "string" -> pokes ASCII chars */
@@ -1166,8 +1207,9 @@ static int parse_command(const char *cp) {
 		("q" | "quit" | "exit" | "bye") eol { return 'q'; }
 		"reset" eol { do_reset(); return 0; }
 		("help" | "?") eol { do_help(); return 0; }
-		"brk=" { return do_brk_cop(YYCURSOR, 0x00); }
-		"cop=" { return do_brk_cop(YYCURSOR, 0x02); }
+
+		"0>" { return do_setting(YYCURSOR, 0); }
+		"1>" { return do_setting(YYCURSOR, 1); }
 
 		// register stuff
 
