@@ -130,6 +130,20 @@ static char *get_resource_path(const char *leaf) {
 }
 #endif
 
+void clear_line(void) {
+	/* carriage return, clear_eol */
+	/* cr, ce */
+	fputs("\r\x1b[K", stdout);
+}
+
+void clear_prev_line(void) {
+	/* carriage return, cursor_up, clear_eol */
+	/* cr, up, ce */
+	fputs("\r\x1b[A\x1b[K", stdout);
+
+}
+
+
 /*
  * todo 
  * - tool break support
@@ -1352,6 +1366,8 @@ command:
 				engine.kpc = addr;
 			}
 			g_stepping = 1;
+
+			clear_prev_line();
 			return 1;
 		}
 
@@ -1369,6 +1385,7 @@ command:
 				set_bp('T', tmp);
 			}
 
+			clear_prev_line();
 			return 1;
 		}
 
