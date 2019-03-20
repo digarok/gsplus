@@ -149,12 +149,8 @@ void clear_prev_line(void) {
  * - tool break support
  * - gs/os break support
  * - p8 break support
- * - nifty list data files
- * - gsbug template files
  * - r -> run to next rts/rtl
- * - n -> step over jsl/jsr [ temporary breakpoints? ]
  * - ! -> mini assembler
- * - option to drop into debug shell on BRK command
  */
 
 
