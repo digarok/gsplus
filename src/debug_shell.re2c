@@ -1525,7 +1525,7 @@ int debug_shell(int code) {
 	do_list(engine.kpc, 1);
 
 	for(;;) {
-		cp = x_readline("> ");
+		cp = x_readline("] ");
 		if (!cp) {
 			fputs("\n", stdout);
 			if (++control_d_count < 2)
