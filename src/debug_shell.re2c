@@ -1471,6 +1471,7 @@ int debug_shell(int code) {
 	int c;
 	char *cp;
 	int control_d_count = 0;
+	word32 kpc = engine.kpc;
 
 	fflush(stderr);
 	fflush(stdout);
@@ -1492,17 +1493,14 @@ int debug_shell(int code) {
 	}
 
 
-	/* todo -- only clear IF exit pc == entry pc ? */
 	if (code == RET_BP) {
 
 		/* check for temp. breakpoint */
 		if (!delete_bp('T', engine.kpc)) {
-			engine.flags |= FLAG_IGNORE_BP;
 			printf("Breakpoint hit:\n");
 		}
 	}
 	if (code == RET_MP) {
-		engine.flags |= FLAG_IGNORE_MP;
 		printf("Memory breakpoint hit\n");
 		switch (g_abort_bytes) {
 			case 1: g_abort_value &= 0xff; break;
@@ -1512,8 +1510,6 @@ int debug_shell(int code) {
 		printf("%06x: %0*x\n", g_abort_address, g_abort_bytes * 2, g_abort_value);
 	}
 	if (code == RET_BRK || code == RET_COP) {
-		/* todo -- should do this at end, verify pc/memory unchanged */
-		engine.flags |= FLAG_IGNORE_BRK;
 		/* hit a BRK op */
 	}
 	if (code == RET_HALT) {
@@ -1541,8 +1537,25 @@ int debug_shell(int code) {
 		c = parse_command(cp);
 		if (c < 0) printf("error.\n");
 		if (c == 'q') return 0;
-		if (c == 1) return 1;
+		if (c == 1) break;
 	}
+
+	if (engine.kpc == kpc) {
+		switch(code) {
+			case RET_BRK:
+			case RET_COP:
+				engine.flags |= FLAG_IGNORE_BRK;
+				break;
+			case RET_MP:
+				engine.flags |= FLAG_IGNORE_MP;
+				break;
+			case RET_BP:
+				engine.flags |= FLAG_IGNORE_BP;
+				break;
+		}	
+	}
+
+	return 1;
 }
 
 static void do_sig_intr(int sig) {
