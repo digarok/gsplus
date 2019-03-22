@@ -296,6 +296,49 @@ static int record_search(const void *a, const void *b) {
 	return strcasecmp(a, r->name);
 }
 
+static void print_string(int type, word32 address) {
+
+	unsigned c;
+	unsigned length;
+	unsigned more = 0;
+	if (!address) return;
+	fputc('"', stdout);
+
+
+	switch(type) {
+		case 5:
+			length = 32;
+			break;
+		case 6:
+			length = get_memory_c(address, 0);
+			++address;
+			break;
+		case 7:
+			length = get_memory16_c(address, 0);
+			address += 2;
+			break;
+	}
+	if (length > 32) {
+		length = 32;
+		more = 1;
+	}
+
+	for (unsigned i = 0; i < length; ++i) {
+		c = get_memory_c(address++, 0);
+		if (type == 5 && c == 0) break;
+
+		if ((~c & 0x80) && isprint(c)) {
+			fputc(c, stdout);
+		} else fprintf(stdout, "\\x%02x", c);
+	}
+
+	if (type == 5 && c != 0) more = 1;
+	if (more) fputs("...", stdout);
+
+	fputc('"', stdout);
+	fputc(' ', stdout);
+
+}
 word32 debug_apply_template(word32 address, const char *name) {
 	/* 1 - lookup template */
 	struct record *r;
@@ -341,6 +384,9 @@ word32 debug_apply_template(word32 address, const char *name) {
 					value = get_memory24_c(address, 0);
 					address += 4;
 					printf("%08x ", value);
+					if (type > 4) {
+						print_string(type, value);
+					}
 					break;
 			}
 			address &= 0xffffff;
