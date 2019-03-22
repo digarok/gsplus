@@ -478,7 +478,7 @@ word32 do_list(word32 address, int lines) {
 				      (address+(int16_t)(operand)) & 0xffff);
 				break;
 			case MVPMVN:
-				sprintf(buffer,"$%02x,$%02x",operand & 0xff,operand >> 8);
+				sprintf(buffer,"$%02x,$%02x",operand >> 8, operand & 0xff);
 				break;
 			case SEPVAL:
 			case REPVAL:
