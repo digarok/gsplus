@@ -449,8 +449,16 @@ int check_mp_breakpoints(word32 addr, word32 value, unsigned bytes, int in_page,
 
   word32 a1 = addr;
   word32 a2 = addr + bytes - 1;
-  if (in_page) a2 = (a2 & 0x00ff) | (addr & 0xffff00);
-  if (in_bank) a2 = (a2 & 0xffff) | (addr & 0xff0000);
+
+  if (in_page) {
+    mask = 0x00ff;
+  } else if (in_bank) {
+    mask = 0xffff;
+  } else {
+    mask = 0xffffff;
+  }
+
+  a2 = (a2 & mask) | (addr & ~mask);
 
   stat1 = GET_PAGE_INFO_WR(((a1) >> 8) & 0xffff);
   stat2 = GET_PAGE_INFO_WR(((a2) >> 8) & 0xffff);
@@ -460,11 +468,17 @@ int check_mp_breakpoints(word32 addr, word32 value, unsigned bytes, int in_page,
     for (i = 0; i < g_num_mp_breakpoints; ++i) {
       word32 bp = g_mp_breakpoints[i];
       if (bp >= a1 && bp <= a2) {
+        abort_it:
           g_abort_address = addr;
           g_abort_bytes = bytes;
           mask = (1 << (bytes << 3))-1;
           g_abort_value = value & mask;
           return 1;        
+      }
+      if (a2 < a1) {
+        /* special logic for page/bank-wrapping... */
+        if (bp >= a1 && bp <= (a1 | mask)) goto abort_it;
+        if (bp >= (a1 & ~mask) && bp <= a2) goto abort_it;
       }
     }
   }
