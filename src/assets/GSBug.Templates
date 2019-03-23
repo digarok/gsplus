@@ -1837,6 +1837,7 @@ RefInfoRecGS
 RefNumRecGS
 SessionStatusRecGS
 SetPositionRecGS
+SetPrefixRecGS
 StdRefNumRecGS
 SysPrefsRecGS
 VersionRecGS
@@ -1845,13 +1846,13 @@ _END
 
 _START	ChangePathRecGS
 pCount	WORD
-pathname	LONG
-newPathname	LONG
+pathname	GSSTRING
+newPathname	GSSTRING
 _END
 
 _START	CreateRecGS
 pCount	WORD
-pathname	LONG
+pathname	GSSTRING
 access	WORD
 fileType	WORD
 auxType	LONG
@@ -1871,7 +1872,7 @@ _END
 
 _START	DevNumRecGS
 pCount	WORD
-devName	LONG
+devName	GSSTRING
 devNum	WORD
 _END
 
@@ -1940,19 +1941,19 @@ _END
 _START	DRenameRecGS
 pCount	WORD
 devNum	WORD
-strPtr	LONG
+strPtr	GSSTRING
 _END
 
 _START	ExpandPathRecGS
 pCount	WORD
-inputPath	LONG
+inputPath	GSSTRING
 outputPath	LONG
 flags	WORD
 _END
 
 _START	FileInfoRecGS
 pCount	WORD
-pathname	LONG
+pathname	GSSTRING
 fileType	WORD
 auxType	LONG
 storageType	WORD
@@ -1983,8 +1984,8 @@ _END
 
 _START	FormatRecGS
 pCount	WORD
-devName	LONG
-volName	LONG
+devName	GSSTRING
+volName	GSSTRING
 fileSysID	WORD
 reqFileSysID	WORD
 _END
@@ -2024,7 +2025,7 @@ _END
 
 _START	NameRecGS
 pCount	WORD
-pathname	LONG
+pathname	GSSTRING
 _END
 
 _START	NotifyProcRecGS
@@ -2048,7 +2049,7 @@ _END
 _START	OpenRecGS
 pCount	WORD
 refNum	WORD
-pathname	LONG
+pathname	GSSTRING
 requestAccess	WORD
 access	WORD
 fileType	WORD
@@ -2102,15 +2103,21 @@ prefixNum	WORD
 prefixPtr	LONG
 _END
 
+_START	SetPrefixRecGS
+pCount	WORD
+prefixNum	WORD
+prefixPtr	GSSTRING
+_END
+
 _START	QuitRecGS
 pCount	WORD
-pathname	LONG
+pathname	GSSTRING
 flags	WORD
 _END
 
 _START	RefNumRecGS
 pCount	WORD
-pathname	LONG
+pathname	GSSTRING
 refNum	WORD
 access	WORD
 resNum	WORD
@@ -2148,7 +2155,7 @@ _END
 
 _START	VolumeRecGS
 pCount	WORD
-devName	LONG
+devName	GSSTRING
 volName	LONG
 totalBlocks	LONG
 freeBlocks	LONG
