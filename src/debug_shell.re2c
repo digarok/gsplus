@@ -154,7 +154,10 @@ void clear_prev_line(void) {
  */
 
 
-static void do_who(word32 target) {
+
+static void do_handle(word32 value, int action) {
+	/* action = I)nfo, W)who, H)handle */
+
 	enum {
 		MemList	= 0xe11600,
 		PurgeList = 0xe11604,
@@ -170,30 +173,70 @@ static void do_who(word32 target) {
 		offset_next = 16 
 	};
 
+	unsigned mask = 0;
+	unsigned count = 0;
+
 	/* return information on who owns an address. */
 	/* Nifty list can get info from the GS/OS... we can't */
 
-	word32 handle;
-	handle = get_memory24_c(MemList, 0);
-	while (handle) {
-		word32 address = get_memory32_c(handle + offset_address, 0);
-		word32 size = get_memory24_c(handle + offset_size, 0);
+	fputs("handle addr   size   flgs ownr\n", stdout);
+	fputs("------ ------ ------ ---- ----\n", stdout);
 
-		/* size not 32-bit clean.  may be $ffxxxxxx */
 
-		if (address <= target && address + size > target) {
-
-			fputs("handle addr   size   flgs ownr\n", stdout);
-			fputs("------ ------ ------ ---- ----\n", stdout);
-			fprintf(stdout, "%06x %06x %06x %04x %04x\n",
-				handle, address, size,
-				get_memory16_c(handle + offset_attr, 0),
-				get_memory16_c(handle + offset_owner, 0)
-				);
-			return;
-		}
-		handle = get_memory24_c(handle + offset_next, 0);
+	if (action == 'i') {
+		value &= 0xffff;
+		mask = 0x0000;
+		if (value & 0xf000) mask |= 0xf000;
+		if (value & 0x0f00) mask |= 0x0f00;
+		if (value & 0x00f0) mask |= 0x00f0;
+		if (value & 0x000f) mask |= 0x000f;
 	}
+
+	for (unsigned i = 0; i < 2; ++i) {
+
+		word32 handle;
+		handle = get_memory24_c(i == 0 ? MemList : PurgeList, 0);
+
+		for(; handle ; handle = get_memory24_c(handle + offset_next, 0)) {
+
+			word32 address = get_memory32_c(handle + offset_address, 0);
+			word32 size = get_memory24_c(handle + offset_size, 0);
+			unsigned owner = get_memory16_c(handle + offset_owner, 0);
+			unsigned attr = get_memory16_c(handle + offset_attr, 0);
+
+			/* size not 32-bit clean.  may be $ffxxxxxx */
+
+			if (action == 'w') {
+				if (value < address || value >= address + size) continue;
+			}
+
+			if (action == 'i') {
+				if ((owner & mask) != value) continue;
+			}
+
+			if (action == 'h') {
+				if (value != handle) continue;
+			}
+
+			fprintf(stdout, "%06x %06x %06x %04x %04x\n",
+				handle, address, size, attr, owner
+			);
+			++count;
+			if (action == 'w' || action == 'h') break;
+		}
+
+		if (action == 'w') break;
+		if (action == 'h' && handle) break;
+	}
+
+
+	if (action == 'w' && !count) {
+		fputs("not allocated\n", stderr);
+	}
+	if (action == 'h' && !count) {
+		fputs("not handle\n", stderr);
+	}
+
 }
 
 
@@ -1499,11 +1542,24 @@ command:
 			return 0;
 		}
 
-		"w" eol {
+		"h" eol {
 			g_prev_address = addr;
-			do_who(addr);
+			do_handle(addr, 'h');
 			return 0;
 		}
+
+		"i" eol {
+			g_prev_address = addr;
+			do_handle(addr, 'i');
+			return 0;
+		}
+
+		"w" eol {
+			g_prev_address = addr;
+			do_handle(addr, 'w');
+			return 0;
+		}
+
 
 	*/
 }
