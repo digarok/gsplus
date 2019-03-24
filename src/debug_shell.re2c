@@ -154,6 +154,49 @@ void clear_prev_line(void) {
  */
 
 
+static void do_who(word32 target) {
+	enum {
+		MemList	= 0xe11600,
+		PurgeList = 0xe11604,
+		FreeList = 0xe11608
+	};
+
+	enum {
+		offset_address = 0,
+		offset_attr = 4,
+		offset_owner = 6, 
+		offset_size = 8,
+		offset_prev = 12,
+		offset_next = 16 
+	};
+
+	/* return information on who owns an address. */
+	/* Nifty list can get info from the GS/OS... we can't */
+
+	word32 handle;
+	handle = get_memory24_c(MemList, 0);
+	while (handle) {
+		word32 address = get_memory32_c(handle + offset_address, 0);
+		word32 size = get_memory24_c(handle + offset_size, 0);
+
+		/* size not 32-bit clean.  may be $ffxxxxxx */
+
+		if (address <= target && address + size > target) {
+
+			fputs("handle addr   size   flgs ownr\n", stdout);
+			fputs("------ ------ ------ ---- ----\n", stdout);
+			fprintf(stdout, "%06x %06x %06x %04x %04x\n",
+				handle, address, size,
+				get_memory16_c(handle + offset_attr, 0),
+				get_memory16_c(handle + offset_owner, 0)
+				);
+			return;
+		}
+		handle = get_memory24_c(handle + offset_next, 0);
+	}
+}
+
+
 word32 do_hexdump(word32 address, int lines) {
 	static char hex[] = "0123456789abcdef";
 
@@ -1453,6 +1496,12 @@ command:
 			/* address\temp name */
 			while (isspace(*YYCURSOR)) ++YYCURSOR;
 			g_prev_address = debug_apply_template(addr, YYCURSOR);
+			return 0;
+		}
+
+		"w" eol {
+			g_prev_address = addr;
+			do_who(addr);
 			return 0;
 		}
 
