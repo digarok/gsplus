@@ -978,7 +978,6 @@ word32 get_remaining_operands(word32 addr, word32 opcode, word32 psr, Fplus *fpl
   return arg;
 }
 
-#define FLAG_IGNORE_BREAKPOINTS 0x0001
 
 #define FETCH_OPCODE                                              \
   addr = saved_pc = kpc;                                          \

@@ -1266,7 +1266,6 @@ static int parse_command(const char *cp) {
 
 	/* TODO:
 		! -> mini assembler mode.
-		require 2 successive ^Ds to exit
 	 */
 
 	const char *YYCURSOR = cp;
