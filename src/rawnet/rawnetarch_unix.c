@@ -65,6 +65,12 @@
 #include "rawnetarch.h"
 #include "rawnetsupp.h"
 
+#if defined(__linux__)
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#endif
+
 /*
  *  FIXME:  rename all remaining tfe_ stuff to rawnet_
  */
