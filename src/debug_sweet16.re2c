@@ -1,0 +1,54 @@
+
+
+enum {
+	none = 0,
+	reg = 1 << 1,
+	indir_reg = 1 << 2,
+	ea = 1 << 3
+}
+opcode:
+
+/*!re2c
+	* { error; }
+	'set' / (ws | eol)   { op = 0x10; flags = reg; goto operand; }
+	'ld' / (ws | eol)    { op = 0x20; flags = reg; goto operand; }
+	'st' / (ws | eol)    { op = 0x30; goto operand; }
+	'ldd' / (ws | eol)   { op = 0x60; goto operand; }
+	'std' / (ws | eol)   { op = 0x70; goto operand; }
+	'pop' / (ws | eol)   { op = 0x80; goto operand; }
+	'stp' / (ws | eol)   { op = 0x90; goto operand; }
+	'add' / (ws | eol)   { op = 0xa0; goto operand; }
+	'sub' / (ws | eol)   { op = 0xb0; goto operand; }
+	'popd' / (ws | eol)  { op = 0xc0; goto operand; }
+	'cpr' / (ws | eol)   { op = 0xd0; goto operand; }
+	'inr' / (ws | eol)   { op = 0xe0; goto operand; }
+	'dcr' / (ws | eol)   { op = 0xf0; goto operand; }
+
+	'rtn' / (ws | eol)   { op = 0x00; goto operand; }
+	'br' / (ws | eol)    { op = 0x01; goto operand; }
+	'bnc' / (ws | eol)   { op = 0x02; goto operand; }
+	'bc' / (ws | eol)    { op = 0x03; goto operand; }
+	'bp' / (ws | eol)    { op = 0x04; goto operand; }
+	'bm' / (ws | eol)    { op = 0x05; goto operand; }
+	'bz' / (ws | eol)    { op = 0x06; goto operand; }
+	'bnz' / (ws | eol)   { op = 0x07; goto operand; }
+	'bm1' / (ws | eol)   { op = 0x08; goto operand; }
+	'bnm1' / (ws | eol)  { op = 0x09; goto operand; }
+	'bk' / (ws | eol)    { op = 0x0a; goto operand; }
+	'rs' / (ws | eol)    { op = 0x0b; goto operand; }
+	'bs' / (ws | eol)    { op = 0x0c; goto operand; }
+*/
+
+operand:
+	/*!re2c
+	'r' [0-9]+ {
+
+	}
+	'@' 'r' [0-9]+ {
+
+	}
+	'*'
+	'*' '+' x{1,2}
+	'*' '-' x{1,2}
+	x{1,4}
+	*/
