@@ -193,7 +193,6 @@ void win_init_console(void) {
 
     //SetConsoleTextAttribute(h, BACKGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 
-
     fd = _open_osfhandle((intptr_t)h, _O_TEXT);
     #if DUPE
     if (fd >= 0 && fd != 1) {
@@ -222,9 +221,10 @@ void win_init_console(void) {
       close(fd);
     }
     #else
-    stdout->_file = fd;
+    stderr->_file = fd;
     #endif
   }
+
 
 #if 0
   dbg = fopen("debug.txt", "a+");
