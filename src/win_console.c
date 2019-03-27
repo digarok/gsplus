@@ -112,6 +112,7 @@ int main(int argc, char **argv)     {
   WNDCLASS wndclass;
   SIZE size;
   RECT rect;
+  HHOOK hook;
 
   wndclass.style = 0;
   wndclass.lpfnWndProc = (WNDPROC)win_event_handler;
@@ -151,9 +152,12 @@ int main(int argc, char **argv)     {
   SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), mode);
 
 
+  hook = SetWindowsHookEx(WH_KEYBOARD_LL, win_ll_keyboard, NULL, 0);
+
   gsportinit(hwnd);
   int ret =  gsplusmain(argc, argv);
 
+  UnhookWindowsHookEx(hook);
   UnregisterClass(wndclass.lpszClassName,GetModuleHandle(NULL));
 
   gsportshut();
