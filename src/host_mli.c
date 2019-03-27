@@ -1048,6 +1048,11 @@ static int mli_open(unsigned dcb, const char *name, const char *path) {
   word16 terr = host_get_file_info(path, &fi);
   if (terr) return terr;
 
+#if _WIN32
+  file->h = INVALID_HANDLE_VALUE;
+#else
+  file->fd = -1;
+#endif
 
   if (fi.storage_type == 0x0f || fi.storage_type == 0x0d) {
       unsigned blocks;
