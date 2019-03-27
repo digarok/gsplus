@@ -484,8 +484,8 @@ void x_get_kimage(Kimage *kimage_ptr)      {
     kimage_ptr->dev_handle = NULL;
 
   }
-  printf("kim: %p, dev:%p data: %p, size: %08x\n", kimage_ptr,
-         kimage_ptr->dev_handle, kimage_ptr->data_ptr, size);
+  //printf("kim: %p, dev:%p data: %p, size: %08x\n", kimage_ptr,
+  //       kimage_ptr->dev_handle, kimage_ptr->data_ptr, size);
 
   return;
 }

@@ -144,9 +144,31 @@ char *x_readline(const char *prompt) {
 	static char buffer[1024];
 	DWORD count = 0;
 	BOOL ok;
-	HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+
+
+	HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
+	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+
+/*
+	if (h == INVALID_HANDLE_VALUE) {
+		//* cygwin? * /
+		fputs("GetStdHandle\n", stderr);
+		fflush(stderr);
+		return NULL;
+
+		char *cp;
+		fputs(prompt, stdout);
+		fflush(stdout);
+		return fgets(buffer, sizeof(buffer), stdin);
+	}
+*/
 
 	if (!readline_init) {
+
+		//struct stat st;
+
+
 		CONSOLE_HISTORY_INFO chi;
 		DWORD mode;
 
@@ -155,17 +177,48 @@ char *x_readline(const char *prompt) {
 		chi.HistoryBufferSize = HISTORY_SIZE;
 		chi.NumberOfHistoryBuffers = 1; /* ???? */
 		chi.dwFlags = HISTORY_NO_DUP_FLAG;
-		SetConsoleHistoryInfo(&chi);
+		ok = SetConsoleHistoryInfo(&chi);
+
+		if (!ok) {
+			fprintf(stderr, "SetConsoleHistoryInfo: %lx\n", GetLastError());
+			fflush(stderr);			
+		}
+
 
 		mode = ENABLE_ECHO_INPUT | ENABLE_EXTENDED_FLAGS | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_QUICK_EDIT_MODE;
-		SetConsoleMode(h, mode);
+		ok = SetConsoleMode(hIn, mode);
+
+		if (!ok) {
+			fprintf(stderr, "SetConsoleMode: %lx (h = %p)\n", GetLastError(), hIn);
+			fflush(stderr);			
+		}
 
 		readline_init = 1;
 	}
 
-	ok = ReadConsole(h, buffer, sizeof(buffer), &count, NULL);
-	if (!ok) return NULL;
+	fflush(stderr);
+	fflush(stdout);
 
+	ok = WriteConsole(hOut, prompt, strlen(prompt), NULL, NULL);
+	if (!ok) {
+		/* msys/cygwin? */
+
+		fprintf(stderr, "WriteConsole: %lx (h = %p)\n", GetLastError(), hOut);
+		fflush(stderr);
+		fputs(prompt, stdout);
+		fflush(stdout);
+		char *cp = fgets(buffer, sizeof(buffer), stdin);
+		if (!cp) return NULL;
+		cleanup_buffer(buffer, strlen(buffer));
+		return buffer;		
+	}
+	ok = ReadConsole(hIn, buffer, sizeof(buffer), &count, NULL);
+	if (!ok) {
+		fprintf(stderr, "Error: %lx (h = %p)\n", GetLastError(), hIn);
+		fprintf(stderr, "Type: %08x\n", GetFileType(hIn));
+		fflush(stderr);
+		return NULL;
+	}
 	cleanup_buffer(buffer, count);
 	return buffer;
 }

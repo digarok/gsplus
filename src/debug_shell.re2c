@@ -1634,6 +1634,8 @@ int debug_shell(int code) {
 			fputs("\n", stdout);
 			if (++control_d_count < 2)
 				continue;
+			fputs("quit\n", stdout);
+			fflush(stdout);
 			return 0;
 		}
 		control_d_count = 0;
@@ -1663,19 +1665,33 @@ int debug_shell(int code) {
 }
 
 static void do_sig_intr(int sig) {
-	/* todo -- raise() if halt already pending */
 	if (halt_sim & 4) {
 		abort();
 	}
 	set_halt(4);
 }
 
+
+#ifdef _WIN32
+static BOOL WINAPI ctrl_handler(DWORD dwCtrlType) {
+	/* handled via a new thread */
+	if (dwCtrlType == CTRL_C_EVENT || dwCtrlType == CTRL_BREAK_EVENT) {
+		do_sig_intr(SIGINT);
+		return TRUE;
+	}
+	return FALSE;
+}
+#endif
+
+
 /* also called by do_step */
-void do_go()      {
+void do_go() {
   int ret;
   int ok;
 
-  #ifndef _WIN32
+  #ifdef _WIN32
+  	//SetConsoleCtrlHandler(ctrl_handler, 1);
+  #else
   /* if -g flag, start with debug shell ... */
   if (isatty(STDIN_FILENO)) {
   	struct sigaction sa;
