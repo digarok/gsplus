@@ -394,10 +394,6 @@ word32 do_stack(word32 address, unsigned bank) {
 
 }
 
-struct disasm_cookie {
-	unsigned psr;
-	unsigned x;
-};
 
 static int is_jsl_e10000(word32 address) {
 	return get_memory_c(address, 0) == 0x22 &&
@@ -448,8 +444,7 @@ static const char *get_inline_debug_name(word32 address) {
 		match = 1;
 		address += 5;
 
-		offset = 3 + (int16_t)get_memory16_c(address + 1, 0);
-		offset &= 0xffff;
+		offset = (int16_t)get_memory16_c(address + 1, 0);
 	}
 
 	if (op == 0x80
@@ -458,16 +453,14 @@ static const char *get_inline_debug_name(word32 address) {
 		match = 1;
 		address += 4;
 
-		offset = 2 + (int8_t)get_memory_c(address + 1, 0);
-		offset &= 0xffff;
-
+		offset = (int8_t)get_memory_c(address + 1, 0);
 	}
 
 
 	if (match) {
 		unsigned i, n;
 
-		/* sanity check it offset */
+		/* sanity check offset? should be positive. */
 
 		n = get_memory_c(address++, 0);
 		for (i = 0; i < n; ++i) {
@@ -770,6 +763,8 @@ word32 do_list(word32 address, int lines) {
 			comment = get_inline_debug_name(ea);
 		}
 
+#if 0
+
 		n = printf("%02x/%04x: %s %s",
 			pc >> 16, pc & 0xffff,
 			opcode_string, buffer);
@@ -781,7 +776,24 @@ word32 do_list(word32 address, int lines) {
 		if (comment) {
 			printf("%*s; %s", 60 - n, "", comment);
 		}
+
+#else
+		/* 12/3456: 01 23 45      LDA #1     ; comment */ 
+		n = printf("%02x/%04x:",
+			pc >> 16, pc & 0xffff);
+
+		for(i = 0; i < bsize; ++i) {
+			n += printf(" %02x", buffer2[i]);
+		}
+		while (n < 40) { fputc(' ', stdout); ++n; }
+		n += printf("%s %s", opcode_string, buffer);
+		if (comment) {
+			while (n < 65) { fputc(' ', stdout); ++n; }
+			printf("; %s", comment);
+		}
+#endif
 		fputc('\n', stdout);
+
 	}
 	return address;
 }
