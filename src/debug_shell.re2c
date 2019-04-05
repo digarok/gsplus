@@ -1115,6 +1115,9 @@ static int do_setting(const char *cp, int value) {
 	const char *YYCTXMARKER = NULL;
 	unsigned psr_bits = 0;
 
+
+	/* TODO - nl uses 'a' to track sep/rep/xce */
+
 	/*!re2c
 		* {
 			fputs("invalid setting\n", stderr); 
@@ -1136,6 +1139,7 @@ static int do_setting(const char *cp, int value) {
 		"e" eol { psr_bits = 0x0100; goto set_psr; }
 		"m" eol { psr_bits = 0x0020; goto set_psr; }
 		"x" eol { psr_bits = 0x0010; goto set_psr; }
+		"mx" eol { psr_bits = 0x0030; goto set_psr; }
 	*/
 
 set_psr:
