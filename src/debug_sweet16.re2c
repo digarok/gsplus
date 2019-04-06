@@ -1,54 +1,387 @@
 
 
-enum {
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+#include "defc.h"
+
+
+enum modes {
 	none = 0,
 	reg = 1 << 1,
 	indir_reg = 1 << 2,
-	ea = 1 << 3
+	reg_imm = 1 << 3,
+	relative = 1 << 4
+};
+
+
+static word32 to_hex(const char *iter, const char *end) {
+	word32 rv = 0;
+	while(iter != end) {
+		char c = *iter++;
+		rv <<= 4;
+		if (isdigit(c)) rv |= c - '0';
+		else rv |= (c | 0x20) - 'a' + 10;
+	}
+	return rv;
 }
-opcode:
+
+const char *ltrim(const char *cp) {
+	while (isspace(*cp)) ++cp;
+	return cp;
+}
 
 /*!re2c
-	* { error; }
-	'set' / (ws | eol)   { op = 0x10; flags = reg; goto operand; }
-	'ld' / (ws | eol)    { op = 0x20; flags = reg; goto operand; }
-	'st' / (ws | eol)    { op = 0x30; goto operand; }
-	'ldd' / (ws | eol)   { op = 0x60; goto operand; }
-	'std' / (ws | eol)   { op = 0x70; goto operand; }
-	'pop' / (ws | eol)   { op = 0x80; goto operand; }
-	'stp' / (ws | eol)   { op = 0x90; goto operand; }
-	'add' / (ws | eol)   { op = 0xa0; goto operand; }
-	'sub' / (ws | eol)   { op = 0xb0; goto operand; }
-	'popd' / (ws | eol)  { op = 0xc0; goto operand; }
-	'cpr' / (ws | eol)   { op = 0xd0; goto operand; }
-	'inr' / (ws | eol)   { op = 0xe0; goto operand; }
-	'dcr' / (ws | eol)   { op = 0xf0; goto operand; }
-
-	'rtn' / (ws | eol)   { op = 0x00; goto operand; }
-	'br' / (ws | eol)    { op = 0x01; goto operand; }
-	'bnc' / (ws | eol)   { op = 0x02; goto operand; }
-	'bc' / (ws | eol)    { op = 0x03; goto operand; }
-	'bp' / (ws | eol)    { op = 0x04; goto operand; }
-	'bm' / (ws | eol)    { op = 0x05; goto operand; }
-	'bz' / (ws | eol)    { op = 0x06; goto operand; }
-	'bnz' / (ws | eol)   { op = 0x07; goto operand; }
-	'bm1' / (ws | eol)   { op = 0x08; goto operand; }
-	'bnm1' / (ws | eol)  { op = 0x09; goto operand; }
-	'bk' / (ws | eol)    { op = 0x0a; goto operand; }
-	'rs' / (ws | eol)    { op = 0x0b; goto operand; }
-	'bs' / (ws | eol)    { op = 0x0c; goto operand; }
+	re2c:define:YYCTYPE = char;
+	re2c:yyfill:enable = 0;
+	eol = "\x00";
+	ws = [ \t];
+	x = [A-Fa-f0-9];
 */
 
-operand:
+
+const char *parse_label(const char *cp, int *pc) {
+	
+	unsigned c;
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+	if (isspace(*cp)) return ltrim(cp);
+
 	/*!re2c
-	'r' [0-9]+ {
-
+	* { return NULL; }
+	x{4} ':' {
+		*pc = to_hex(cp, YYCURSOR - 1);
 	}
-	'@' 'r' [0-9]+ {
-
-	}
-	'*'
-	'*' '+' x{1,2}
-	'*' '-' x{1,2}
-	x{1,4}
 	*/
+
+	return ltrim(YYCURSOR);
+}
+
+const char *parse_opcode(const char *cp, int *opcode, int *mode) {
+	int op = -1;
+	int m = 0;
+	unsigned c;
+
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+	/* TODO - db, dw ? */
+
+	/*!re2c
+	* { return NULL; }
+	'set'   { op = 0x10; m = reg_imm; goto next; }
+	'ld'    { op = 0x20; m = reg | indir_reg; goto next; }
+	'st'    { op = 0x30; m = reg | indir_reg; goto next; }
+	'ldd'   { op = 0x60; m = indir_reg; goto next; }
+	'std'   { op = 0x70; m = indir_reg; goto next; }
+	'pop'   { op = 0x80; m = indir_reg; goto next; }
+	'stp'   { op = 0x90; m = indir_reg; goto next; }
+	'add'   { op = 0xa0; m = reg; goto next; }
+	'sub'   { op = 0xb0; m = reg; goto next; }
+	'popd'  { op = 0xc0; m = indir_reg; goto next; }
+	'cpr'   { op = 0xd0; m = reg; goto next; }
+	'inr'   { op = 0xe0; m = reg; goto next; }
+	'dcr'   { op = 0xf0; m = reg; goto next; }
+
+	'rtn'   { op = 0x00; m = relative; goto next; }
+	'br'    { op = 0x01; m = relative; goto next; }
+	'bnc'   { op = 0x02; m = relative; goto next; }
+	'bc'    { op = 0x03; m = relative; goto next; }
+	'bp'    { op = 0x04; m = relative; goto next; }
+	'bm'    { op = 0x05; m = relative; goto next; }
+	'bz'    { op = 0x06; m = relative; goto next; }
+	'bnz'   { op = 0x07; m = relative; goto next; }
+	'bm1'   { op = 0x08; m = relative; goto next; }
+	'bnm1'  { op = 0x09; m = relative; goto next; }
+	'bk'    { op = 0x0a; goto next; }
+	'rs'    { op = 0x0b; goto next; }
+	'bs'    { op = 0x0c; m = relative; goto next; }
+*/
+
+next:
+	c = *YYCURSOR;
+	if (c && !isspace(c)) return NULL;
+
+	*opcode = op;
+	*mode = m;
+	return ltrim(YYCURSOR);
+}
+
+const char *parse_register(const char *cp, int *opcode) {
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+	/*!re2c
+	* { return NULL; }
+
+	'R' ([0-9]{1,2}) {
+		int r = 0;
+		for(cp = cp + 1; cp < YYCURSOR; ++cp) {
+			r = r * 10 + *cp - '0';		
+		}
+		if (r > 15) return NULL;
+		*opcode |= r;
+		goto next;
+	}
+
+	/*
+	'R' x {
+		int r = to_hex(cp + 1, YYCURSOR);
+		*opcode |= r;
+		goto next;
+	}
+	*/
+	'ACC' { *opcode |= 0x00; goto next; }
+	'PC' { *opcode |= 0x0f; goto next; }
+	'SR' { *opcode |= 0x0e; goto next; }
+	*/
+
+next:
+	return ltrim(YYCURSOR);
+}
+
+const char *parse_address(const char *cp, int *address, int pc) {
+
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+	int ea = 0;
+
+	/*!r2c
+
+	* { return NULL; }
+	'*' { ea = pc; goto next; }
+	'*' [+-] x{1,4} {
+		ea = to_hex(cp + 2, YYCURSOR);
+		if cp[1] == '+' ea += pc;
+		else ea -= pc;
+		goto next;
+	}
+	x{1,4} {
+		ea = to_hex(cp, YYCURSOR);
+		goto next;
+	}
+	*/	
+
+next:
+	*address = ea;
+	return ltrim(YYCURSOR);
+
+}
+
+
+uint32_t sweet16_disasm(uint32_t addr, int lines) {
+	
+	unsigned op;
+	const char *opcode;
+	unsigned mode = none;
+	unsigned operand;
+	unsigned x;
+	int i;
+
+	uint8_t bytes[4];
+
+	while (lines--) {
+		unsigned size = 0;
+		uint32_t pc = addr;
+		op = get_memory_c(addr++, 0);
+		bytes[size++] = op;
+
+		switch (op >> 4) {
+		case 0x00:
+			switch(op) {
+			case 0x00: opcode = "RTN"; break;
+			case 0x01: opcode = "BR"; mode = relative; break;
+			case 0x02: opcode = "BNC"; mode = relative; break;
+			case 0x03: opcode = "BC"; mode = relative; break;
+			case 0x04: opcode = "BP"; mode = relative; break;
+			case 0x05: opcode = "BM"; mode = relative; break;
+			case 0x06: opcode = "BZ"; mode = relative; break;
+			case 0x07: opcode = "BNZ"; mode = relative; break;
+			case 0x08: opcode = "BM1"; mode = relative; break;
+			case 0x09: opcode = "BNM1"; mode = relative; break;
+			case 0x0a: opcode = "BK"; break;
+			case 0x0b: opcode = "RS"; break;
+			case 0x0c: opcode = "BS"; mode = relative; break;
+			case 0x0d: opcode = "???"; break;
+			case 0x0e: opcode = "???"; break;
+			case 0x0f: opcode = "???"; break;
+			}
+			break;
+		case 0x01: opcode = "SET"; mode = reg_imm; break;
+		case 0x02: opcode = "LD"; mode = reg; break;
+		case 0x03: opcode = "ST"; mode = reg; break;
+		case 0x04: opcode = "LD"; mode = indir_reg; break;
+		case 0x05: opcode = "ST"; mode = indir_reg; break;
+		case 0x06: opcode = "LDD"; mode = indir_reg; break;
+		case 0x07: opcode = "STD"; mode = indir_reg; break;
+		case 0x08: opcode = "POP"; mode = indir_reg; break;
+		case 0x09: opcode = "STP"; mode = indir_reg; break;
+		case 0x0a: opcode = "ADD"; mode = reg; break;
+		case 0x0b: opcode = "SUB"; mode = reg; break;
+		case 0x0c: opcode = "POPD"; mode = indir_reg; break;
+		case 0x0d: opcode = "CPR"; mode = reg; break;
+		case 0x0e: opcode = "INR"; mode = reg; break;
+		case 0x0f: opcode = "DCR"; mode = reg; break;
+		}
+
+
+		switch(mode) {
+			case none: break;
+			case reg: x += printf(" R%d", op & 0x0f); break;
+			case indir_reg: x += printf(" @R%d", op & 0x0f); break;
+			case relative:
+				operand = (int8_t)get_memory_c(addr++, 0);
+				bytes[size++] = operand;
+				operand += addr + 2;
+				operand &= 0xffff;
+				break;
+			case reg_imm:
+				operand = get_memory16_c(addr, 0);
+				addr += 2;
+				bytes[size++] = operand & 0xff;
+				bytes[size++] = operand >> 8;
+				break;
+		}
+
+		x = printf("%02x/%04x:", addr >> 16, addr & 0xffff);
+		for (i = 0; i < size; ++i) {
+			x += printf(" %02x", bytes[i]);
+		}
+
+		for( ; x < 20; ++x) fputc(' ', stdout);
+		printf("%-5s", opcode);
+		switch(mode) {
+			case none: break;
+			case reg: x += printf("R%d", op & 0x0f); break;
+			case indir_reg: x += printf("@R%d", op & 0x0f); break;
+			case relative:
+				x += printf("%04x\n", operand);
+				break;
+			case reg_imm:
+				x += printf(" R%x, %04x", op & 0x0f, operand);
+				break;
+		}
+
+		fputc('\n', stdout);
+	}
+	return addr;
+}
+
+
+
+int parse_line(const char *cp, int *pc) {
+	
+	int addr = *pc;
+	int opcode;
+	int operand;
+	int indir = 0;
+	int mode = 0;
+	int i;
+
+	uint8_t bytes[3];
+	int size = 0;
+
+	cp = parse_label(cp, &addr);
+	if (!cp) {
+		fputs("^ error\n", stderr);
+		return -1;
+	}
+
+	/* label only? */
+	if (!*cp) {
+		*pc = addr;
+		return 0;
+	}
+
+	cp = parse_opcode(cp, &opcode, &mode);
+	if (!cp) {
+		fputs("^ bad opcode\n", stderr);
+		return -1;
+	}
+
+	if (mode & (reg | indir_reg | reg_imm)) {
+		if (*cp == '@') {
+			indir = 1;
+			++cp;
+		}
+		cp = parse_register(cp, &opcode);
+		if (!cp) {
+			fputs("^ bad register\n", stderr);
+			return -1;
+		}
+		/* cleanup indir */
+		/* LD / ST */
+		if (indir && mode == reg|indir_reg) {
+			opcode += 0x20;
+			mode = indir_reg;
+		}
+		if (indir && mode != indir_reg) {
+			fputs("^ bad operand\n", stderr);
+			return -1;
+		}
+	}
+
+
+	bytes[size++] = opcode;
+
+	if (mode == reg_imm) {
+		if (*cp++ != ',') {
+			fputs("^ bad operand\n", stderr);
+			return -1;
+		}
+		cp = ltrim(cp);
+	}
+
+	if (mode & (relative | reg_imm)) {
+		cp = parse_address(cp, &operand, addr);
+		if (!cp) {
+			fputs("^ bad operand\n", stderr);
+			return -1;
+		}
+		if (mode == relative) {
+			operand = (addr + 2) - operand;
+			if (operand > 127 || operand < -128) {
+				fputs("^ out of range\n", stderr);
+				return -1;
+			}
+			bytes[size++] = operand;
+		} else {
+			bytes[size++] = operand >> 8;
+			bytes[size++] = operand & 0xff;
+		}
+	}
+
+	for (i = 0; i < size; ++i) {
+		set_memory_c(addr + i, bytes[i], 0);
+	}
+	*pc = addr + size;
+
+	fputs("\r\x1b[A\x1b[K", stdout);
+	sweet16_disasm(addr, 1);
+}
+
+
+
+
+extern char *x_readline(const char *prompt);
+
+
+uint32_t sweet16_asm(uint32_t addr) {
+	
+	for(;;) {
+		const char *cp = x_readline("!!");
+		if (!cp || !*cp) return addr;
+
+		parse_line(cp, &addr);
+
+
+	}
+
+}

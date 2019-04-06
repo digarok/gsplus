@@ -112,6 +112,13 @@ add_custom_command(
 	MAIN_DEPENDENCY debug_template.re2c
 )
 
+
+add_custom_command(
+	OUTPUT debug_sweet16.c
+	COMMAND re2c -W -o ${CMAKE_CURRENT_BINARY_DIR}/debug_sweet16.c "${CMAKE_CURRENT_SOURCE_DIR}/debug_sweet16.re2c"
+	MAIN_DEPENDENCY debug_sweet16.re2c
+)
+
 if (WITH_STATIC)
 	if(__CLANG__ OR __GCC__)
 		#add_link_options(-static) # 3.13
@@ -167,6 +174,7 @@ add_executable(GSplus WIN32 MACOSX_BUNDLE
 	disasm.c
 	debug_shell.c
 	debug_template.c
+	debug_sweet16.c
 
 	$<$<BOOL:${WITH_DEBUGGER}>:debug.c>
 	$<$<BOOL:${WITH_HOST_FST}>:${host_fst_code}>
