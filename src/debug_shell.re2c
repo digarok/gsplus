@@ -1432,6 +1432,12 @@ static int parse_command(const char *cp) {
 		"reset" eol { do_reset(); return 0; }
 		("help" | "?") eol { do_help(); return 0; }
 
+		"!!" eol {
+			extern uint32_t sweet16_asm_shell(uint32_t addr);
+			sweet16_asm_shell(0x300);
+			return 0;
+		}
+
 		"0>" { return do_setting(YYCURSOR, 0); }
 		"1>" { return do_setting(YYCURSOR, 1); }
 
