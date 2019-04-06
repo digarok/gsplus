@@ -41,7 +41,7 @@ const char *ltrim(const char *cp) {
 */
 
 
-const char *parse_pc(const char *cp, int *pc) {
+const char *parse_pc(const char *cp, uint32_t *pc) {
 	
 	const char *YYCURSOR = cp;
 	const char *YYMARKER = NULL;
@@ -52,10 +52,25 @@ const char *parse_pc(const char *cp, int *pc) {
 	/*!re2c
 	* { return NULL; }
 	x{4} ':' {
-		*pc = to_hex(cp, YYCURSOR - 1);
+		*pc &= 0xff0000;
+		*pc |= to_hex(cp, YYCURSOR - 1);
+		goto next;
 	}
+	x{6} ':' {
+		*pc = to_hex(cp, YYCURSOR - 1);
+		goto next;
+	}
+
+	x{2} '/' x{4} ':' {
+		uint32_t tmp = to_hex(cp, cp + 2) << 16;
+		tmp |= to_hex(cp + 3, YYCURSOR - 1);
+		*pc = tmp;
+		goto next;
+	}
+
 	*/
 
+next:
 	return ltrim(YYCURSOR);
 }
 
@@ -169,7 +184,7 @@ const char *parse_address(const char *cp, int *address, int pc) {
 	*/	
 
 next:
-	*address = ea & x0ffff;
+	*address = ea & 0xffff;
 	return ltrim(YYCURSOR);
 }
 
@@ -238,7 +253,7 @@ uint32_t sweet16_disasm(uint32_t addr, int lines) {
 			case relative:
 				operand = (int8_t)get_memory_c(addr++, 0);
 				bytes[size++] = operand;
-				operand += addr + 2;
+				operand += addr;
 				operand &= 0xffff;
 				break;
 			case reg_imm:
@@ -261,7 +276,7 @@ uint32_t sweet16_disasm(uint32_t addr, int lines) {
 			case reg: x += printf("R%d", op & 0x0f); break;
 			case indir_reg: x += printf("@R%d", op & 0x0f); break;
 			case relative:
-				x += printf("%04x\n", operand);
+				x += printf("%04x", operand);
 				break;
 			case reg_imm:
 				x += printf("R%d, %04x", op & 0x0f, operand);
@@ -274,24 +289,29 @@ uint32_t sweet16_disasm(uint32_t addr, int lines) {
 }
 
 
-
+static int error(int offset, const char *msg) {
+	while (offset > 0) { fputc(' ', stderr); --offset; }
+	fputs("  ^", stderr);
+	fputs(msg, stderr);
+	fputc('\n', stderr);
+	return -1;
+}
 int parse_line(const char *cp, uint32_t *pc) {
 	
-	int addr = *pc;
+	uint32_t addr = *pc;
 	int opcode;
 	int operand;
 	int indir = 0;
 	int mode = 0;
 	int i;
+	unsigned offset = 0;
+	const char *start = cp;
 
 	uint8_t bytes[3];
 	int size = 0;
 
 	cp = parse_pc(cp, &addr);
-	if (!cp) {
-		fputs("^ error\n", stderr);
-		return -1;
-	}
+	if (!cp) return error(0, "error");
 
 	/* label only? */
 	if (!*cp) {
@@ -299,67 +319,56 @@ int parse_line(const char *cp, uint32_t *pc) {
 		return 0;
 	}
 
+	offset = cp - start;
 	cp = parse_opcode(cp, &opcode, &mode);
-	if (!cp) {
-		fputs("^ bad opcode\n", stderr);
-		return -1;
-	}
+	if (!cp) return error(offset, "bad opcode");
 
 	if (mode & (reg | indir_reg | reg_imm)) {
 		if (*cp == '@') {
 			indir = 1;
 			++cp;
 		}
+		offset = cp - start;
 		cp = parse_register(cp, &opcode);
-		if (!cp) {
-			fputs("^ bad register\n", stderr);
-			return -1;
-		}
+		if (!cp) return error(offset, "bad register");
+
 		/* cleanup indir */
 		/* LD / ST */
 		if (indir && mode == (reg|indir_reg)) {
 			opcode += 0x20;
 			mode = indir_reg;
 		}
-		if (indir && mode != indir_reg) {
-			fputs("^ bad operand\n", stderr);
-			return -1;
-		}
+		if ((mode == indir_reg) != indir)
+			return error(offset, "bad operand");
 	}
 
 
+	offset = cp - start;
 	bytes[size++] = opcode;
-
 	if (mode == reg_imm) {
-		if (*cp++ != ',') {
-			fputs("^ bad operand\n", stderr);
-			return -1;
-		}
+		if (*cp++ != ',')
+			return error(offset, "bad operand");
+
 		cp = ltrim(cp);
 	}
 
 	if (mode & (relative | reg_imm)) {
 		cp = parse_address(cp, &operand, addr);
-		if (!cp) {
-			fputs("^ bad operand\n", stderr);
-			return -1;
-		}
+		if (!cp) return error(offset, "bad operand");
+
 		if (mode == relative) {
-			operand = (addr + 2) - operand;
-			if (operand > 127 || operand < -128) {
-				fputs("^ out of range\n", stderr);
-				return -1;
-			}
+			int tmp = (addr + 2) & 0xffff;
+			operand -= tmp;
+			if (operand > 127 || operand < -128)
+				return error(offset, "out of range");
 			bytes[size++] = operand;
 		} else {
 			bytes[size++] = operand & 0xff;
 			bytes[size++] = operand >> 8;
 		}
 	}
-	if (!cp) {
-		fputs("^ bad operand\n", stderr);
-		return -1;
-	}
+	if (!cp) return error(offset, "bad operand");
+
 
 	for (i = 0; i < size; ++i) {
 		set_memory_c(addr + i, bytes[i], 0);
@@ -381,10 +390,10 @@ uint32_t sweet16_asm_shell(uint32_t addr) {
 	
 	for(;;) {
 		const char *cp = x_readline("!!");
-		if (!cp || !*cp) return addr;
+		if (!cp) { fputc('\n', stdout); return addr; }
+		if (!*cp) return addr;
 
 		parse_line(cp, &addr);
-
 
 	}
 }
