@@ -407,6 +407,10 @@ static char *get_path2(void) {
 }
 
 
+/*
+ * shutdown is called when switching to p8.
+ * startup is ONLY called during initial boot.
+ */
 
 static word32 fst_shutdown(void) {
 
@@ -418,7 +422,7 @@ static word32 fst_shutdown(void) {
     free_fd(head);
     head = next;
   }
-  host_shutdown();
+  //host_shutdown();
   return 0;
 }
 
@@ -426,6 +430,8 @@ static word32 fst_startup(void) {
   // if restart, close any previous files.
 
   fst_shutdown();
+  host_shutdown();
+
   memset(&cookies, 0, sizeof(cookies));
 
   return host_startup();
