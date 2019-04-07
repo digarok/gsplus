@@ -1827,7 +1827,7 @@ void do_go() {
   int ok;
 
   #ifdef _WIN32
-  	//SetConsoleCtrlHandler(ctrl_handler, 1);
+  	SetConsoleCtrlHandler(ctrl_handler, 1);
   #else
   /* if -g flag, start with debug shell ... */
   if (isatty(STDIN_FILENO)) {
