@@ -57,7 +57,10 @@ char *x_readline(const char *prompt) {
 	el_prompt = prompt;
 	cp = el_gets(el, &count);
 	el_prompt = NULL;
-	if (count <= 0) return NULL;
+	if (count <= 0) {
+		if (prompt) fputc('\n', stdout);
+		return NULL;
+	}
 	if (count > sizeof(buffer) - 1) return "";
 
 
@@ -109,7 +112,10 @@ char *x_readline(const char *prompt) {
 	}
 
 	cp = readline(prompt);
-	if (!cp) return NULL;
+	if (!cp) {
+		if (prompt) fputc('\n', stdout);
+		return NULL;
+	}
 	count = strlen(cp);
 	if (count > sizeof(buffer) - 1) {
 		free(cp);
@@ -149,6 +155,7 @@ char *x_readline(const char *prompt) {
 	HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
 	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 
+	/* MS CRT uses -2 to indicate there is no stdin/stdout/stderr fileno */
 
 /*
 	if (h == INVALID_HANDLE_VALUE) {
@@ -203,20 +210,25 @@ char *x_readline(const char *prompt) {
 	if (!ok) {
 		/* msys/cygwin? */
 
-		fprintf(stderr, "WriteConsole: %lx (h = %p)\n", GetLastError(), hOut);
+		// fprintf(stderr, "WriteConsole: %lx (h = %p)\n", GetLastError(), hOut);
 		fflush(stderr);
-		fputs(prompt, stdout);
+		if (prompt) fputs(prompt, stdout);
 		fflush(stdout);
 		char *cp = fgets(buffer, sizeof(buffer), stdin);
-		if (!cp) return NULL;
+		if (!cp) {
+			if (prompt) fputc('\n', stdout);
+			return NULL;
+		}
 		cleanup_buffer(buffer, strlen(buffer));
 		return buffer;		
 	}
 	ok = ReadConsole(hIn, buffer, sizeof(buffer), &count, NULL);
 	if (!ok) {
-		fprintf(stderr, "Error: %lx (h = %p)\n", GetLastError(), hIn);
-		fprintf(stderr, "Type: %08x\n", GetFileType(hIn));
-		fflush(stderr);
+		if (prompt) fputc('\n', stdout);
+		// fflush(stdout);
+		// fprintf(stderr, "Error: %lx (h = %p)\n", GetLastError(), hIn);
+		// fprintf(stderr, "Type: %08x\n", GetFileType(hIn));
+		// fflush(stderr);
 		return NULL;
 	}
 	cleanup_buffer(buffer, count);
@@ -230,16 +242,17 @@ char *x_readline(const char *prompt) {
 
 char *x_readline(const char *prompt) {
 	static char buffer[1024];
-	fputs(prompt, stdout);
+
+	if (prompt) fputs(prompt, stdout);
 	fflush(stdout);
 
 	for(;;) {
 		int ok = read(STDIN_FILENO, buffer, sizeof(buffer)-1);
-		if (ok < 0) {
-			if (ok == EINTR) continue;
+		if (ok < 0 && ok == EINTR) continue;
+		if (ok <= 0) {
+			if (prompt) fputc('\n', stdout);
 			return NULL;
 		}
-		if (ok == 0) return NULL;
 		cleanup_buffer(buffer, ok);
 
 		return buffer;

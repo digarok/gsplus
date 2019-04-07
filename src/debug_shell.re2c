@@ -1769,7 +1769,6 @@ int debug_shell(int code) {
 	for(;;) {
 		cp = x_readline("] ");
 		if (!cp) {
-			fputs("\n", stdout);
 			if (++control_d_count < 2)
 				continue;
 			fputs("quit\n", stdout);

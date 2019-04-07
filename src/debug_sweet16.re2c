@@ -390,8 +390,7 @@ uint32_t sweet16_asm_shell(uint32_t addr) {
 	
 	for(;;) {
 		const char *cp = x_readline("!!");
-		if (!cp) { fputc('\n', stdout); return addr; }
-		if (!*cp) return addr;
+		if (!cp || !*cp) return addr;
 
 		parse_line(cp, &addr);
 
