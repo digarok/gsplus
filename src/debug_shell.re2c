@@ -1708,13 +1708,6 @@ command:
 	*/
 }
 
-enum {
-	MODE_NORMAL,
-	MODE_ASSEMBER
-};
-
-static int g_debugger_mode = MODE_NORMAL;
-
 
 int debug_shell(int code) {
 	int c;
