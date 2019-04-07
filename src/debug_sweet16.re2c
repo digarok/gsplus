@@ -312,6 +312,7 @@ int parse_line(const char *cp, uint32_t *pc) {
 
 	cp = parse_pc(cp, &addr);
 	if (!cp) return error(0, "error");
+	offset = cp - start;
 
 	/* label only? */
 	if (!*cp) {
@@ -319,18 +320,18 @@ int parse_line(const char *cp, uint32_t *pc) {
 		return 0;
 	}
 
-	offset = cp - start;
 	cp = parse_opcode(cp, &opcode, &mode);
 	if (!cp) return error(offset, "bad opcode");
+	offset = cp - start;
 
 	if (mode & (reg | indir_reg | reg_imm)) {
 		if (*cp == '@') {
 			indir = 1;
 			++cp;
 		}
-		offset = cp - start;
 		cp = parse_register(cp, &opcode);
 		if (!cp) return error(offset, "bad register");
+		offset = cp - start;
 
 		/* cleanup indir */
 		/* LD / ST */
@@ -343,18 +344,19 @@ int parse_line(const char *cp, uint32_t *pc) {
 	}
 
 
-	offset = cp - start;
 	bytes[size++] = opcode;
 	if (mode == reg_imm) {
 		if (*cp++ != ',')
-			return error(offset, "bad operand");
+			return error(offset, "expected ,");
 
 		cp = ltrim(cp);
+		offset = cp - start;
 	}
 
 	if (mode & (relative | reg_imm)) {
 		cp = parse_address(cp, &operand, addr);
 		if (!cp) return error(offset, "bad operand");
+		offset = cp - start;
 
 		if (mode == relative) {
 			int tmp = (addr + 2) & 0xffff;
