@@ -1386,6 +1386,7 @@ int run_prog()      {
   int fast, zip_speed, faster_than_28, unl_speed;
   int this_type;
 
+  fflush(stderr);
   fflush(stdout);
 
   g_cur_sim_dtime = 0.0;
@@ -1408,6 +1409,7 @@ int run_prog()      {
   }
 
   while(1) {
+    fflush(stderr);
     fflush(stdout);
 
 // OG Disabling control panel
