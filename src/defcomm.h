@@ -49,17 +49,21 @@
 
 #define BANK_BAD_MEM		(&g_dummy_memory1_ptr[0xff])
 
-
-#define ENGINE_FCYCLES		0x00
-#define ENGINE_REG_KPC		0x08
-#define ENGINE_REG_ACC		0x0c
-#define ENGINE_REG_XREG		0x10
-#define ENGINE_REG_YREG		0x14
-#define ENGINE_REG_STACK	0x18
-#define ENGINE_REG_DBANK	0x1c
-#define ENGINE_REG_DIRECT	0x20
-#define ENGINE_REG_PSR		0x24
-#define ENGINE_FPLUS_PTR	0x28
+/*
+ * this is only relevant for the PA RISC asm.
+ *
+ */
+#define ENGINE_FPLUS_PTR	0x00
+#define ENGINE_FCYCLES		0x08
+#define ENGINE_REG_KPC		0x10
+#define ENGINE_REG_ACC		0x14
+#define ENGINE_REG_XREG		0x18
+#define ENGINE_REG_YREG		0x1c
+#define ENGINE_REG_STACK	0x20
+#define ENGINE_REG_DBANK	0x24
+#define ENGINE_REG_DIRECT	0x28
+#define ENGINE_REG_PSR		0x2c
+#define ENGINE_FLAGS		0x30
 
 #define LOG_PC_DCYCS		0x00
 #define LOG_PC_DBANK_KPC	0x08
@@ -77,20 +81,29 @@
 #define FPLUS_PLUS_3		0x10
 #define FPLUS_PLUS_X_M1		0x18
 
-#define RET_BREAK	0x1
+#define RET_BRK		0x1
 #define RET_COP		0x2
 #define RET_WDM		0x3
 #define RET_MVP		0x4
 #define RET_MVN		0x5
 #define RET_WAI		0x6
 #define RET_STP		0x7
-#define RET_ADD_DEC_8	0x8
-#define RET_ADD_DEC_16	0x9
+#define RET_HALT	0x8
 #define RET_C700	0xa
 #define RET_C70A	0xb
 #define RET_C70D	0xc
 #define RET_IRQ		0xd
+#define RET_BP		0xe
+#define RET_MP		0xf
 
+#define FLAG_IGNORE_MP	0x01
+#define FLAG_IGNORE_BP	0x02
+#define FLAG_STEP		0x04
+#define FLAG_WANT_BRK	0x08
+#define FLAG_WANT_COP	0x10
+#define FLAG_WANT_RET	0x20
+#define FLAG_WANT_JSL	0x40
+#define FLAG_IGNORE_BRK	0x80 /* and cop */
 
 #define MODE_BORDER		0
 #define MODE_TEXT		1

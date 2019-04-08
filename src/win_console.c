@@ -15,6 +15,11 @@
 #include "defc.h"
 #include "protos_windriver.h"
 
+#include <io.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
 
 extern void gsportinit(HWND _hwnd);
 extern void gsportshut();
@@ -104,9 +109,149 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   return main(0,0);
 }
 
-int main(int argc, char **argv)     {
+
+int g_win32_cygwin;
+void win_init_console(void) {
+  /*
+    powershell/cmd
+    fd 0/1/2 closed
+    GetStdHandle return 0
+    stdin = -2, stdout = -2, stderr = -2
+
+    msys/cygwin
+    fd 0/1/2 open
+    GetStdHandle return value (type = 3/pipe)
+    stdin = 0, stdout = 1, stderr = 2
+  */
+
+  //struct stat st;
+  //int ok;
+  int fd;
+  HANDLE h;
+  DWORD mode;
+
+#if 0
+  FILE *dbg = fopen("debug.txt", "a+");
+  h = GetStdHandle(STD_INPUT_HANDLE);
+  fprintf(dbg, "STD_INPUT_HANDLE: %p\n", h);
+  fprintf(dbg, "GetFileType: %08x\n", GetFileType(h));
+  fprintf(dbg, "%d %d %d\n", stdin->_file, stdout->_file, stderr->_file);
+  fclose(dbg);
+#endif
+
+  g_win32_cygwin = 0;
+
+  setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
+  setvbuf(stderr, NULL, _IOLBF, BUFSIZ);
+
+#if 0
+  if (fstat(0, &st) == 0) {
+    g_win32_cygwin = 1;
+    return;
+  }
+#endif
+
+  SetStdHandle(STD_INPUT_HANDLE, 0);
+  SetStdHandle(STD_OUTPUT_HANDLE, 0);
+  SetStdHandle(STD_ERROR_HANDLE, 0);
+  #if 0
+  stdin->_file = 0;
+  stdout->_file = 1;
+  stderr->_file = 2;
+  #endif
+
+
+  AllocConsole();
+  SetConsoleTitle("GS+");
+
+
+  h = GetStdHandle(STD_INPUT_HANDLE);
+  if (h != INVALID_HANDLE_VALUE) {
+
+    mode = 0;
+    GetConsoleMode(h, &mode);
+    mode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
+    SetConsoleMode(h, mode);
+
+    fd = _open_osfhandle((intptr_t)h, _O_TEXT);
+    #if DUPE
+    if (fd >= 0 && fd != 0) {
+      _dup2(fd, 0);
+      close(fd);
+    }
+    #else
+    stdin->_file = fd;
+    #endif
+  }
+  h = GetStdHandle(STD_OUTPUT_HANDLE);
+  if (h != INVALID_HANDLE_VALUE) {
+
+    mode = 0;
+    GetConsoleMode(h, &mode);
+    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
+    SetConsoleMode(h, mode);
+
+    //SetConsoleTextAttribute(h, BACKGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+
+    fd = _open_osfhandle((intptr_t)h, _O_TEXT);
+    #if DUPE
+    if (fd >= 0 && fd != 1) {
+      _dup2(fd, 1);
+      close(fd);
+    }
+    #else
+    stdout->_file = fd;
+    #endif
+  }
+
+
+  h = GetStdHandle(STD_ERROR_HANDLE);
+  if (h != INVALID_HANDLE_VALUE) {
+
+    mode = 0;
+    GetConsoleMode(h, &mode);
+    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
+    SetConsoleMode(h, mode);
+
+
+    fd = _open_osfhandle((intptr_t)h, _O_TEXT);
+    #if DUPE
+    if (fd >= 0 && fd != 2) {
+      _dup2(fd, 2);
+      close(fd);
+    }
+    #else
+    stderr->_file = fd;
+    #endif
+  }
+
+
+#if 0
+  dbg = fopen("debug.txt", "a+");
+  h = GetStdHandle(STD_INPUT_HANDLE);
+  fprintf(dbg, "STD_INPUT_HANDLE: %p\n", h);
+  fprintf(dbg, "GetFileType: %08x\n", GetFileType(h));
+  fprintf(dbg, "%d %d %d\n", stdin->_file, stdout->_file, stderr->_file);
+  fclose(dbg);
+#endif
+
+}
+
+
+static void exit_sleep(void) {
+  /* todo -- "press return to continue" */
+  if (!g_win32_cygwin)
+    sleep(10);
+}
+
+int main(int argc, char **argv) {
   // Hide the console initially to reduce window flashing.  We'll show the console later if needed.
-  x_show_console(0);
+
+  //atexit(exit_sleep);
+  win_init_console();
+
+  //x_show_console(0);
+
 
   // Register the window class.
   WNDCLASS wndclass;
@@ -144,13 +289,16 @@ int main(int argc, char **argv)     {
   printf("...rect is: %ld, %ld, %ld, %ld\n", rect.left, rect.top,
          rect.right, rect.bottom);
 
+#if 0
   // Enable non-blocking, character-at-a-time console I/O.
   // win_nonblock_read_stdin() expects this behavior.
   DWORD mode;
   GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode);
   mode &= ~ENABLE_LINE_INPUT;
   SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), mode);
+#endif
 
+  hook = SetWindowsHookEx(WH_KEYBOARD_LL, win_ll_keyboard, NULL, 0);
 
   hook = SetWindowsHookEx(WH_KEYBOARD_LL, win_ll_keyboard, NULL, 0);
 
@@ -159,6 +307,7 @@ int main(int argc, char **argv)     {
 
   UnhookWindowsHookEx(hook);
   UnregisterClass(wndclass.lpszClassName,GetModuleHandle(NULL));
+
 
   gsportshut();
   return ret;

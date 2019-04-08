@@ -7,6 +7,8 @@
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
+#include <unistd.h>
+#include <libgen.h>
 
 #if defined(__APPLE__)
 #include <sys/xattr.h>
@@ -510,3 +512,58 @@ unsigned host_storage_type(const char *path, word16 *error) {
   *error = badStoreType;
   return 0;
 }
+
+
+/*
+ * error remapping.
+ * NOTE - GS/OS errors are a superset of P8 errors
+ */
+
+static word32 enoent(const char *path) {
+  /*
+          some op on path return ENOENT. check if it's
+          fileNotFound or pathNotFound
+   */
+  char *p = (char *)path;
+  for(;;) {
+    struct stat st;
+    p = dirname(p);
+    if (p == NULL) break;
+    if (p[0] == '.' && p[1] == 0) break;
+    if (p[0] == '/' && p[1] == 0) break;
+    if (stat(p, &st) < 0) return pathNotFound;
+  }
+  return fileNotFound;
+}
+
+word32 host_map_errno(int xerrno) {
+  switch(xerrno) {
+    case 0: return 0;
+    case EBADF:
+      return invalidAccess;
+#ifdef EDQUOT
+    case EDQUOT:
+#endif
+    case EFBIG:
+      return volumeFull;
+    case ENOENT:
+      return fileNotFound;
+    case ENOTDIR:
+      return pathNotFound;
+    case ENOMEM:
+      return outOfMem;
+    case EEXIST:
+      return dupPathname;
+    case ENOTEMPTY:
+      return invalidAccess;
+
+    default:
+      return drvrIOError;
+  }
+}
+
+word32 host_map_errno_path(int xerrno, const char *path) {
+  if (xerrno == ENOENT) return enoent(path);
+  return host_map_errno(xerrno);
+}
+

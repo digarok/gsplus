@@ -71,27 +71,43 @@ brk_testing_SYM
 	DEC_KPC2;
 	CYCLES_PLUS_2
 	b	dispatch_done
-	depi	RET_BREAK,3,4,ret0
+	depi	RET_BRK,3,4,ret0
 
 #else
 	GET_1BYTE_ARG;
-	if(g_testing) {
-		CYCLES_PLUS_2;
-		FINISH(RET_BREAK, arg);
+
+	if (flags & FLAG_WANT_BRK) {
+		if (~flags & FLAG_IGNORE_BRK) {
+			CYCLES_PLUS_2;
+			FINISH(RET_BRK, arg);
+		}
 	}
-	g_num_brk++;
 	INC_KPC_2;
+	g_num_brk++;
+
+	psr = psr & (~0x82);
+	psr |= (neg << 7);
+	psr |= ((!zero) << 1);
+	tmp1 = psr & 0xff;
 	if(psr & 0x100) {
-		PUSH16(kpc & 0xffff);
-		PUSH8(psr & 0xff);
+		MMU_CHECK(
+			((stack - 2) & 0xff) | 0x0100,
+			(kpc << 8) | tmp1, 3, 1, 1
+		)
+		_PUSH16(kpc & 0xffff);
+		_PUSH8(tmp1);
 		GET_MEMORY16(0xfffe, kpc, 0);
 		dbank = 0;
 	} else {
-		PUSH8(kpc >> 16);
-		PUSH16(kpc);
-		PUSH8(psr & 0xff);
+		MMU_CHECK(
+			(stack - 3) & 0xffff,
+			(kpc << 8) | tmp1, 4, 0, 1
+		)
+		_PUSH8(kpc >> 16);
+		_PUSH16(kpc);
+		_PUSH8(tmp1);
 		GET_MEMORY16(0xffe6, kpc, 0);
-		halt_printf("Halting for native break!\n");
+		//halt_printf("Halting for native break!\n");
 	}
 	kpc = kpc & 0xffff;
 	psr |= 0x4;
@@ -153,18 +169,42 @@ cop_native_SYM
 
 
 #else
-	g_num_cop++;
+	GET_1BYTE_ARG;
+
+	if (flags & FLAG_WANT_COP) {
+		if (~flags & FLAG_IGNORE_BRK) {
+			CYCLES_PLUS_2;
+			FINISH(RET_COP, arg);
+		}
+	}
 	INC_KPC_2;
+	g_num_cop++;
+
+	psr = psr & (~0x82);
+	psr |= (neg << 7);
+	psr |= ((!zero) << 1);
+	tmp1 = psr & 0xff;
+
 	if(psr & 0x100) {
-		halt_printf("Halting for emul COP at %04x\n", kpc);
-		PUSH16(kpc & 0xffff);
-		PUSH8(psr & 0xff);
+		//halt_printf("Halting for emul COP at %04x\n", kpc);
+		MMU_CHECK(
+			((stack - 2) & 0xff) | 0x0100,
+			(kpc << 8) | tmp1, 3, 1, 1
+		)
+
+		_PUSH16(kpc & 0xffff);
+		_PUSH8(tmp1);
 		GET_MEMORY16(0xfff4, kpc, 0);
 		dbank = 0;
 	} else {
-		PUSH8(kpc >> 16);
-		PUSH16(kpc & 0xffff);
-		PUSH8(psr & 0xff);
+		MMU_CHECK(
+			(stack - 3) & 0xffff,
+			(kpc << 8) | tmp1, 4, 0, 1
+		)
+
+		_PUSH8(kpc >> 16);
+		_PUSH16(kpc & 0xffff);
+		_PUSH8(tmp1);
 		GET_MEMORY16(0xffe4, kpc, 0);
 	}
 	kpc = kpc & 0xffff;

@@ -6,9 +6,10 @@
  */
 
 #include "defc.h"
+#include <stddef.h>
 
-#ifdef HAVE_TFE
-#include "tfe/protos_tfe.h"
+#ifdef HAVE_RAWNET
+#include "rawnet/cs8900.h"
 #endif
 
 extern char const g_gsplus_version_str[];
@@ -24,8 +25,16 @@ extern unsigned char iostrobe;
 
 extern word32 slow_mem_changed[];
 
-extern int g_num_breakpoints;
-extern word32 g_breakpts[];
+
+extern int g_num_mp_breakpoints;
+extern word32 g_mp_breakpoints[];
+
+extern int g_num_bp_breakpoints;
+extern word32 g_bp_breakpoints[];
+
+extern int g_num_tp_breakpoints;
+extern word32 g_tp_breakpoints[];
+
 
 extern Page_info page_info_rd_wr[];
 
@@ -33,6 +42,8 @@ extern int Verbose;
 extern int g_rom_version;
 extern int g_user_page2_shadow;
 extern int g_parallel;
+
+extern int g_ethernet_enabled;
 
 char c;
 /* from iwm.c */
@@ -240,11 +251,48 @@ void moremem_init() {
 
 void fixup_brks()      {
   word32 page;
-  word32 tmp, tmp2;
   Pg_info val;
-  int is_wr_only;
-  int i, num;
+  int i;
 
+  /* need to clear break bit from all pages first? */
+  for (page = 0; page < 0xffff; ++page) {
+    val = GET_PAGE_INFO_RD(page);
+    val = (Pg_info)((ptrdiff_t)val &~ BANK_BREAK);
+    SET_PAGE_INFO_RD(page, val);
+  }
+  for (page = 0; page < 0xffff; ++page) {
+    val = GET_PAGE_INFO_WR(page);
+    val = (Pg_info)((ptrdiff_t)val &~ BANK_BREAK);
+    SET_PAGE_INFO_WR(page, val);
+  }
+
+
+  /* bp are read-only. mp are read/write */
+  for (i = 0; i < g_num_bp_breakpoints; ++i) {
+    page = (g_bp_breakpoints[i] >> 8) & 0xffff;
+    val = GET_PAGE_INFO_RD(page);
+    val = (Pg_info)((ptrdiff_t)val | BANK_BREAK);
+    SET_PAGE_INFO_RD(page, val);
+    /* why IO_TMP? */
+  }
+
+  for (i = 0; i < g_num_tp_breakpoints; ++i) {
+    page = (g_tp_breakpoints[i] >> 8) & 0xffff;
+    val = GET_PAGE_INFO_RD(page);
+    val = (Pg_info)((ptrdiff_t)val | BANK_BREAK);
+    SET_PAGE_INFO_RD(page, val);
+    /* why IO_TMP? */
+  }
+
+  for (i = 0; i < g_num_mp_breakpoints; ++i) {
+    page = (g_mp_breakpoints[i] >> 8) & 0xffff;
+    val = GET_PAGE_INFO_WR(page);
+    val = (Pg_info)((ptrdiff_t)val | BANK_BREAK);
+    SET_PAGE_INFO_WR(page, val);
+    /* why IO_TMP? */
+  }
+
+#if 0
   num = g_num_breakpoints;
   for(i = 0; i < num; i++) {
     page = (g_breakpts[i] >> 8) & 0xffff;
@@ -260,6 +308,8 @@ void fixup_brks()      {
     tmp2 = tmp | BANK_IO_TMP | BANK_BREAK;
     SET_PAGE_INFO_WR(page, val - tmp + tmp2);
   }
+#endif
+
 }
 
 void fixup_hires_on()      {
@@ -1591,7 +1641,7 @@ int io_read(word32 loc, double *cyc_ptr)     {
           //case 0xb8:
           //	return 0;
           //	break;
-#ifdef HAVE_TFE
+#ifdef HAVE_RAWNET
         /*Uthernet read access on slot 3*/
         case 0xb0:
         case 0xb1:
@@ -1609,8 +1659,8 @@ int io_read(word32 loc, double *cyc_ptr)     {
         case 0xbd:
         case 0xbe:
         case 0xbf:
-          if (tfe_enabled) {
-            return tfe_read((word16)loc & 0xf);
+          if (g_ethernet_enabled) {
+            return cs8900_read((word16)loc & 0xf);
           }
           else
           {return 0;}
@@ -2326,7 +2376,7 @@ void io_write(word32 loc, int val, double *cyc_ptr)      {
           //case 0xb8: case 0xb9: case 0xba: case 0xbb:
           //case 0xbc: case 0xbd: case 0xbe: case 0xbf:
           //	UNIMPL_WRITE;
-#ifdef HAVE_TFE
+#ifdef HAVE_RAWNET
         /*Uthernet write access on slot 3*/
         case 0xb0:
         case 0xb1:
@@ -2344,9 +2394,9 @@ void io_write(word32 loc, int val, double *cyc_ptr)      {
         case 0xbd:
         case 0xbe:
         case 0xbf:
-          if (tfe_enabled)
+          if (g_ethernet_enabled)
           {
-            tfe_store((word16)loc & 0xf, (byte)val);
+            cs8900_store((word16)loc & 0xf, (byte)val);
             return;
           }
           else

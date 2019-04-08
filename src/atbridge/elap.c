@@ -16,12 +16,12 @@
 #include "elap_defs.h"
 #include "pcap_delay.h"
 
-#ifdef __CYGWIN__
-#include <Windows.h>
-#include <NspAPI.h>
-#endif
+// #ifdef __CYGWIN__
+// #include <Windows.h>
+// #include <NspAPI.h>
+// #endif
 #ifdef WIN32
-#include <winsock.h>
+#include <winsock2.h>
 #include <IPHlpApi.h>
 #endif
 #ifdef __linux__

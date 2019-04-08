@@ -1,22 +1,45 @@
-# GSplus
-An Apple IIgs emulator for Mac OSX, Windows, and Linux.
+# GS+ Pro Xtreme HD Developer Edition
 
-![Screenshot of starting the program](doc/web/Screenshot.png "Screenshot of starting the program")
+My personal fork of GSplus which is a fork of GSport which is fork of KEGS. Replaces the edbugger facilities with something more suitable for my tastes.
 
-# About
-This is an early release of an experimental project to modernize the
-KEGS/GSport emulator platform and eventually extend it.
+# Build instructions
 
-# Install
-Go to https://apple2.gs/plus to get the latest downloads for your system.
+## OS X dependencies
+    brew install re2c sdl2 sdl2_image freetype
 
-# Usage Notes
-You need to provide the ROM file and disk images and a config file.  I'd
-recommend you just drop it in your current GSport or KEGS folder and run it
-from there.
+## Linux dependencies
+    apt-get install re2c libsdl2-dev libsdl2-image-dev libfreetype6-dev libpcap0.8-dev
 
-See the doc/gsplusmanual.pdf file for much more complete documentation.
+## WIN32 dependencies
+Install MSYS2 (not MSYS, not cygwin)
 
-# Build Instructions
-See the /doc/ directory for "Developer-Quickstart" docs which cover building
-for the various platforms.  
+32-bit build:
+
+    pacman  -S re2c mingw-w64-i686-cmake mingw-w64-i686-SDL2 mingw-w64-i686-SDL2_image mingw-w64-i686-freetype
+
+64-bit build:
+
+    pacman  -S re2c mingw-w64-x86_64-cmake mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_image mingw-w64-x86_64-freetype
+
+
+## Linux, OS X, build
+    mkdir build
+    cd build
+    cmake ..
+    (optionally: ccmake .. to configure stuff)
+    make
+
+
+## Windows Build
+
+### mingw SDL build
+    mkdir build
+    cd build
+    cmake ../ -DDRIVER=SDL2 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
+    make GSplus.exe
+### mingw GDI build
+
+    mkdir build
+    cd build
+    cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -G "MSYS Makefiles"
+    make GSplus.exe

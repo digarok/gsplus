@@ -8,9 +8,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include "options.h"
 #include "glog.h"
 #include "defc.h"
+
+#ifdef _MSC_VER
+#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
 
 // config is parsed in config.c :: config_parse_config_gsplus_file()
 // cli is parsed here.  would be nice to reuse some code
@@ -61,6 +66,8 @@ extern int g_preferred_rate;          // defined in sound_driver.c, implemented 
 extern int g_audio_enable;            // defined in sound.c
 // Start in fullscreen mode
 extern int g_fullscreen;              // defined in adb.c, because weird driver writing for x
+
+extern int g_dbg_shell;
 
 // Specify the joystick - SDL2
 extern int g_joystick_number;         // defined in joystick_driver.c
@@ -314,15 +321,6 @@ void parse_cli_options(int argc, char **argv) {
       glogf("%s Setting scanline simulator darkness to %d%%", parse_log_prefix, tmp1);
       g_scanline_simulator = tmp1;
       i++;
-    } else if(!strcmp("-enet", argv[i])) {
-      if((i+1) >= argc) {
-        glogf("%s Error, option '-enet' missing argument", parse_log_prefix);
-        exit(1);
-      }
-      tmp1 = strtol(argv[i+1], 0, 0);
-      glogf("%s Using %d as ethernet enable val", parse_log_prefix, tmp1);
-      g_ethernet = tmp1;
-      i++;
     } else if(!strcmp("-x", argv[i])) {
       if((i+1) >= argc) {
         glogf("%s Error, option '-x' missing argument", parse_log_prefix);
@@ -386,6 +384,8 @@ void parse_cli_options(int argc, char **argv) {
         g_dbg_enable_port = strtol(argv[i+1], 0, 0);
         glogf("%s Using %d for debug port", parse_log_prefix, g_dbg_enable_port);
         i++;
+    } else if (!strcmp("-g", argv[i])) {
+      g_dbg_shell = 1;
     } else {
       if ((i == (argc - 1)) && (strncmp("-", argv[i], 1) != 0)) {
         final_arg = argv[i];
@@ -421,7 +421,6 @@ void help_exit() {
   printf("    -skip value           Set skip_amt to value\n");
   printf("    -audio value          Set audio enable to value\n");
   printf("    -arate value          Set preferred audio rate to value\n");
-  printf("    -enet value           Set ethernet to value\n");
   printf("    -config value         Set config file to value\n");
   printf("    -debugport value      Set debugport to value\n");
   printf("    -ssdir value          Set screenshot save directory to value\n");

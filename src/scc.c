@@ -6,6 +6,7 @@
  */
 
 #include "defc.h"
+#include "scc.h"
 #include "scc_llap.h"
 
 #ifdef UNDER_CE
@@ -25,7 +26,6 @@ extern int g_appletalk_turbo;
 /* my scc port 0 == channel A = slot 1 = c039/c03b */
 /*        port 1 == channel B = slot 2 = c038/c03a */
 
-#include "scc.h"
 #define SCC_R14_DPLL_SOURCE_BRG         0x100
 #define SCC_R14_FM_MODE                 0x200
 

@@ -8,8 +8,9 @@
 /* This is an interface between the SCC emulation and the Virtual Imagewriter. */
 
 #include "defc.h"
-#include "scc.h"
 #include "imagewriter.h"
+#include "scc.h"
+
 extern Scc scc_stat[2];
 extern word32 g_vbl_count;
 
