@@ -9,6 +9,8 @@
 
 #include "defc.h"
 #include "scc.h"
+#include "glog.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
