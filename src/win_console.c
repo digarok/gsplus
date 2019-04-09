@@ -55,7 +55,11 @@ void x_dialog_create_gsport_conf(const char *str)      {
   config_write_config_gsplus_file();
 }
 
-int x_show_alert(int is_fatal, const char *str)     {
+int x_show_alert(int is_fatal, const char *str) {
+
+  if (str && *str) {
+    MessageBox(NULL, str, "GS+", is_fatal ? MB_ICONERROR : MB_ICONWARNING);
+  }
   return 0;
 }
 
