@@ -12,10 +12,13 @@ build-ubuntu-x:
     - ubuntu
   stage: build
   script:
-    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libxext-dev
-    - cd src
-    - ln -s vars_x86linux_x11 vars
+    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libxext-dev re2c cmake
+    - mkdir build
+    - cd build
+    - cmake ..
+    - make
     - make clean ; make
+    - mv bin/GSplus ../gsplusx
   artifacts:
     paths:
       - gsplusx
@@ -62,11 +65,12 @@ build-ubuntu-sdl2:
     - ubuntu
   stage: build
   script:
-    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev libsdl2-image-dev
-    - cd src
-    - ln -s vars_x86linux_sdl2 vars
-    - make clean ; make
-    - mv ../gsplus ../gsplus-ubuntu-sdl.bin
+    - sudo apt-get update -qq && sudo apt-get install -y -qq g++ libpcap0.8-dev libx11-dev libsdl2-dev libfreetype6-dev libsdl2-image-dev re2c cmake
+    - mkdir build
+    - cd build
+    - cmake ..
+    - make
+    - mv bin/GSplus ../gsplus-ubuntu-sdl.bin
   artifacts:
     paths:
       - gsplus-ubuntu-sdl.bin
@@ -126,22 +130,22 @@ deploy-ubuntu:
     - aws s3 cp $PACKAGE_NAME.deb s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/ubuntu-sdl-deb/$CI_BUILD_ID/ --acl public-read
 
 
-
-
 # TARGET SYSTEM: OSX 10.SOMETHING
 build-osx:
   tags:
     - osx
   stage: build
   script:
-    - cd src
-    - ln -s vars_osx_sdl2 vars
+    - mkdir build
+    - cd build
+    - cmake ..
+    - make
     - make clean ; make
-    - mv ../gsplus ../gsplus-osx
+    - mv bin/GSplus.app/Contents/MacOS/GSplus ../gsplus-osx
   artifacts:
     paths:
       - gsplus-osx
-    expire_in: 10 minutes
+    expire_in: 15 minutes
 
 package-osx:
   tags:
@@ -170,123 +174,139 @@ deploy-osx:
     - aws s3 cp GSplus-Install.dmg s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/osx/$CI_BUILD_ID/ --acl public-read
 
 
-# TARGET SYSTEM: WIN32 WIN API UNDER CYGWIN
-build-win32:
+# TARGET SYSTEM: WIN32 GDI WIN API UNDER MSYS2
+build-win32-gdi:
   tags:
-    - windows
+    - windows,msys
   stage: build
   script:
-    - bash -c "cd src; ln -s vars_win32 vars; make clean ; make"
+    - ls
+    - mkdir build
+    - cd build
+    - cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "Unix Makefiles"
+    - make VERBOSE=1 GSplus
+    - mv bin/GSplus.exe ../GSplus-win32-gdi.exe
   artifacts:
     paths:
-      - gsplus32.exe
+      - GSplus-win32-gdi.exe
     expire_in: 10 minutes
   only:
     - master
     - /^win.*/
+    - /^ks.*/
 
-package-win32:
+package-win32-gdi:
   tags:
-    - windows
+    - windows,msys
+  variables:
+    GIT_STRATEGY: fetch
+    PACKAGE_DIR: gsplus-win32-gdi
   stage: package
   script:
-    - cp src/config.txt .
-    - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> config.txt'
+    - ls
+    - mkdir %PACKAGE_DIR%
+    - cp src/config.txt %PACKAGE_DIR%
+    - 'echo "# CI_BUILD_ID: $CI_BUILD_ID" >> %PACKAGE_DIR%/config.txt'
     - cp LICENSE.txt doc/
-    - cp /bin/cyggcc_s-1.dll .
-    - cp /bin/cygstdc++-6.dll	.
-    - cp /bin/cygwin1.dll .
-    - cp /bin/cygfreetype-6.dll .
-  variables:
-    GIT_STRATEGY: fetch
-    PACKAGE_DIR: gsplus-win32
-  script:
-    - mkdir %PACKAGE_DIR%
-    - cp gsplus32.exe %PACKAGE_DIR%
+    - cp GSplus-win32-gdi.exe %PACKAGE_DIR%/GSplus.exe
     - cp LICENSE.txt %PACKAGE_DIR%
     - cp src/config.txt %PACKAGE_DIR%
     - cp src/parallel.rom %PACKAGE_DIR%
     - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
     - cp doc/README.txt %PACKAGE_DIR%
-    - cp /bin/cyggcc_s-1.dll %PACKAGE_DIR%
-    - cp /bin/cygstdc++-6.dll %PACKAGE_DIR%
-    - cp /bin/cygwin1.dll %PACKAGE_DIR%
-    - cp /bin/cygfreetype-6.dll %PACKAGE_DIR%
-    - zip gsplus-win32.zip -r %PACKAGE_DIR%
+    - cp /mingw32/bin/libgcc_s_dw2-1.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libstdc++-6.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libwinpthread-1.dll %PACKAGE_DIR%
+    - zip gsplus-win32-gdi.zip -r %PACKAGE_DIR%
   artifacts:
     paths:
-      - gsplus-win32.zip
+      - gsplus-win32-gdi.zip
     expire_in: 10 minutes
   only:
     - master
     - /^win.*/
+    - /^ks.*/
 
-deploy-win32:
+deploy-win32-gdi:
   tags:
-    - windows
+    - osx
   stage: deploy
   variables:
     GIT_STRATEGY: none
   script:
-    - aws s3 cp gsplus-win32.zip s3://%AWS_BUCKET%/%CI_TAG%/%CI_VERSION%/%CI_PIPELINE_ID%/win32/%CI_BUILD_ID%/ --acl public-read
+    - aws s3 cp gsplus-win32-gdi.zip s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/win32/$CI_BUILD_ID/ --acl public-read
   only:
     - master
     - /^win.*/
+    - /^ks.*/
 
-# TARGET SYSTEM: WIN32 SDL2 UNDER CYGWIN W MINGW64 SDL2 LIBS
-build-win-sdl2:
+# TARGET SYSTEM: MSYS2 MINGW32 SDL2
+build-win32-sdl2:
   tags:
     - windows
   stage: build
   script:
-    - cd src
-    - ln -s vars_win32_sdl2 vars
-    - make clean
-    - make
+    - mkdir build
+    - cd build
+    - bash -l -c 'PATH=/mingw32/bin:$PATH ; MSYSTEM=MINGW32 MSYSTEM_PREFIX=/mingw32 /mingw32/bin/cmake ../ -DDRIVER=SDL2 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "MSYS Makefiles"'
+    - bash -l -c 'PATH=/mingw32/bin:$PATH ;MSYSTEM=MINGW32 MSYSTEM_PREFIX=/mingw32 /mingw32/bin/mingw32-make VERBOSE=1 GSplus'
+    - mv bin/GSplus.exe ../GSplus-win32-sdl.exe
+
   artifacts:
     paths:
-      - gsplus.exe
+      - GSplus-win32-sdl.exe
     expire_in: 10 minutes
+  only:
+    - master
+    - /^win.*/
+    - /^ks.*/
 
-package-win-sdl2:
+
+package-win32-sdl2:
   tags:
     - windows
   stage: package
   variables:
     GIT_STRATEGY: fetch
-    PACKAGE_DIR: gsplus-win-sdl
+    PACKAGE_DIR: gsplus-win32-sdl
   script:
+    - ls
     - mkdir %PACKAGE_DIR%
-    - cp gsplus.exe %PACKAGE_DIR%
+    - cp GSplus-win32-sdl.exe %PACKAGE_DIR%/GSplus.exe
     - cp LICENSE.txt %PACKAGE_DIR%
     - cp src/config.txt %PACKAGE_DIR%
     - cp src/parallel.rom %PACKAGE_DIR%
     - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
     - cp doc/README.txt %PACKAGE_DIR%
-    - cp /cygdrive/c/cygwin/bin/cygbz2-1.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/cygwin/bin/cygfreetype-6.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/cygwin/bin/cyggcc_s-1.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/cygwin/bin/cygpng16-16.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/cygwin/bin/cygjpeg-8.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/cygwin/bin/cygstdc++-6.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/cygwin/bin/cygwin1.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/cygwin/bin/cygz.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2.dll %PACKAGE_DIR%
-    - cp /cygdrive/c/mingw/i686-w64-mingw32/bin/SDL2_image.dll %PACKAGE_DIR%
-    - zip gsplus-win-sdl.zip -r %PACKAGE_DIR%
+    - cp /mingw32/bin/libbz2-1.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libfreetype-6.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libgcc_s_dw2-1.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libglib-2.0-0.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libgraphite2.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libharfbuzz-0.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libiconv-2.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libintl-8.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libpcre-1.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libpng16-16.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libstdc++-6.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/libwinpthread-1.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/SDL2.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/SDL2_image.dll %PACKAGE_DIR%
+    - cp /mingw32/bin/zlib1.dll %PACKAGE_DIR%
+    - zip gsplus-win32-sdl.zip -r %PACKAGE_DIR%
   artifacts:
     paths:
-      - gsplus-win-sdl.zip
+      - gsplus-win32-sdl.zip
     expire_in: 10 minutes
-deploy-win-sdl2:
+
+deploy-win32-sdl2:
   tags:
-    - windows
+    - osx
   stage: deploy
   variables:
     GIT_STRATEGY: none
   script:
-    - aws s3 cp gsplus-win-sdl.zip s3://%AWS_BUCKET%/%CI_TAG%/%CI_VERSION%/%CI_PIPELINE_ID%/win-sdl/%CI_BUILD_ID%/ --acl public-read
+    - aws s3 cp gsplus-win32-sdl.zip s3://$AWS_BUCKET/$CI_TAG/$CI_VERSION/$CI_PIPELINE_ID/win-sdl/$CI_BUILD_ID/ --acl public-read
 
 update-website-universal:
   tags:
@@ -299,4 +319,3 @@ update-website-universal:
     - php assets/updatewebsite.php s3artifacts.txt public > index.html
     - php assets/updatewebsite.php s3artifacts.txt auto > index_auto.html
     - aws s3 cp index.html s3://$AWS_BUCKET/ --acl public-read
-    - aws s3 cp index_auto.html s3://$AWS_BUCKET/ --acl public-read

@@ -6,11 +6,10 @@
 # relatively straightforward to modify for something like yum
 
 
-# system prep
+# Build tools
 sudo apt-get -y update
 sudo apt-get -y upgrade
-sudo apt-get -y install git
-sudo apt-get -y install g++
+sudo apt-get -y install git g++ cmake re2c
 sudo apt-get -y install libpcap0.8-dev
 sudo apt-get -y install libfreetype6-dev
 
@@ -27,8 +26,9 @@ sudo apt-get -y install libsdl2-dev
 sudo apt-get -y install libsdl2-image-dev
 
 
-# Example build to test out our system
-cd gsplus/src
-ln -s vars_x86linux_sdl2 vars
-make clean ; make
 
+# Clone & Build.
+git clone git@github.com:digarok/gsplus.git
+mkdir build ; cd build
+cmake ..
+make
