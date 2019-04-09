@@ -196,11 +196,7 @@ int g_engine_doc_int = 0;
 
 int g_testing = 0;
 
-#define MAX_FATAL_LOGS          20
 
-int g_debug_file_fd = -1;
-int g_fatal_log = -1;
-char *g_fatal_log_strs[MAX_FATAL_LOGS];
 
 word32 stop_run_at;
 
@@ -288,9 +284,6 @@ void sim65816_initglobals() {
   g_engine_doc_int = 0;
 
   g_testing = 0;
-
-  g_debug_file_fd = -1;
-  g_fatal_log = -1;
 
   g_25sec_cntr = 0;
   g_1sec_cntr = 0;
@@ -2571,70 +2564,7 @@ void size_fail(int val, word32 v1, word32 v2)      {
   halt_printf("Size failure, val: %08x, %08x %08x\n", val, v1, v2);
 }
 
-int gsplus_vprintf(const char *fmt, va_list ap)     {
-  char    *bufptr, *buf2ptr;
-  int len;
-  int ret;
 
-  bufptr = (char*)malloc(4096);       // OG Added Cast
-  ret = vsnprintf(bufptr, 4090, fmt, ap);
-
-  // OG Display warning
-  printf("Warning:%s",bufptr);
-
-  len = strlen(bufptr);
-  if(g_fatal_log >= 0 && g_fatal_log < MAX_FATAL_LOGS) {
-    buf2ptr = (char*)malloc(len+1);             // OG Added Cast
-    memcpy(buf2ptr, bufptr, len+1);
-    g_fatal_log_strs[g_fatal_log++] = buf2ptr;
-  }
-  must_write(1, bufptr, len);
-  if(g_debug_file_fd >= 0) {
-    must_write(g_debug_file_fd, bufptr, len);
-  }
-  free(bufptr);
-
-  return ret;
-}
-
-
-int fatal_printf(const char *fmt, ...)     {
-  va_list ap;
-  int ret;
-
-  va_start(ap, fmt);
-
-  if(g_fatal_log < 0) {
-    g_fatal_log = 0;
-  }
-  ret = gsplus_vprintf(fmt, ap);
-  va_end(ap);
-
-  return ret;
-}
-
-void must_write(int fd, char *bufptr, int len)      {
-  int ret;
-  while(len > 0) {
-    ret = write(fd, bufptr, len);
-    if(ret >= 0) {
-      len -= ret;
-      bufptr += ret;
-    } else if(errno != EAGAIN && errno != EINTR) {
-      return;                           // just get out
-    }
-  }
-}
-
-void clear_fatal_logs()      {
-  int i;
-
-  for(i = 0; i < g_fatal_log; i++) {
-    free(g_fatal_log_strs[i]);
-    g_fatal_log_strs[i] = 0;
-  }
-  g_fatal_log = -1;
-}
 
 char *gsplus_malloc_str(char *in_str)       {
   char    *str;

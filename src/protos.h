@@ -403,10 +403,6 @@ void do_wdm(word32 arg);
 void do_wai(void);
 void do_stp(void);
 void size_fail(int val, word32 v1, word32 v2);
-int fatal_printf(const char *fmt, ...);
-int gsport_vprintf(const char *fmt, va_list ap);
-void must_write(int fd, char *bufptr, int len);
-void clear_fatal_logs(void);
 char *gsplus_malloc_str(char *in_str);
 
 
