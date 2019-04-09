@@ -109,6 +109,81 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   return main(0,0);
 }
 
+/* cygwin may have old headers ... */
+#ifndef ENABLE_VIRTUAL_TERMINAL_INPUT
+#define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
+#endif
+
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+
+#ifndef DISABLE_NEWLINE_AUTO_RETURN
+#define DISABLE_NEWLINE_AUTO_RETURN 0x0008
+#endif
+
+
+#ifdef __CYGWIN__
+
+static ssize_t handle_read(void *r, void *cookie, char *buffer, size_t size) {
+
+  BOOL ok;
+  DWORD n;
+  ok = ReadConsole((HANDLE)cookie, buffer, size, &n, NULL);
+  if (!ok) { errno = EIO; return -1; }
+  return n;
+}
+
+static ssize_t handle_write(void *r, void *cookie, const char *buffer, size_t size) {
+
+  static char *crbuffer = NULL;
+  static int crbuffer_size = 0;
+
+  BOOL ok;
+  DWORD n;
+  int crcount = 0;
+  int i, j;
+
+  for (i = 0; i < size; ++i) {
+    if (buffer[i] == '\n') ++crcount;
+  }
+
+  if (crcount) {
+    if (crbuffer_size < crcount + size) {
+      crbuffer = realloc(crbuffer, size + crcount);
+      if (!crbuffer) return -1;
+      crbuffer_size = crcount + size;
+    }
+
+    for (i = 0, j = 0; i < size; ++i) {
+      char c = buffer[i];
+      if (c == '\n') crbuffer[j++] = '\r';
+      crbuffer[j++] = c;
+    }
+  }
+
+
+  ok = WriteConsole((HANDLE)cookie, crcount ? crbuffer : buffer, size + crcount, &n, NULL);
+  if (!ok) { errno = EIO; return -1; }
+  return size;
+}
+
+#endif
+
+static void set_file_handle(FILE *fp, HANDLE h) {
+
+  #ifdef __CYGWIN__
+  fp->_file = -1;
+  fp->_cookie = (void *)h;
+  fp->_read = handle_read;
+  fp->_write = handle_write;
+  fp->_seek = NULL;
+  fp->_close = NULL;
+  #else
+  int fd = _open_osfhandle((intptr_t)h, _O_TEXT);
+  fp->_file = fd;
+  #endif
+}
 
 int g_win32_cygwin;
 void win_init_console(void) {
@@ -173,16 +248,9 @@ void win_init_console(void) {
     mode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
     SetConsoleMode(h, mode);
 
-    fd = _open_osfhandle((intptr_t)h, _O_TEXT);
-    #if DUPE
-    if (fd >= 0 && fd != 0) {
-      _dup2(fd, 0);
-      close(fd);
-    }
-    #else
-    stdin->_file = fd;
-    #endif
+    set_file_handle(stdin, h);
   }
+
   h = GetStdHandle(STD_OUTPUT_HANDLE);
   if (h != INVALID_HANDLE_VALUE) {
 
@@ -192,16 +260,7 @@ void win_init_console(void) {
     SetConsoleMode(h, mode);
 
     //SetConsoleTextAttribute(h, BACKGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
-
-    fd = _open_osfhandle((intptr_t)h, _O_TEXT);
-    #if DUPE
-    if (fd >= 0 && fd != 1) {
-      _dup2(fd, 1);
-      close(fd);
-    }
-    #else
-    stdout->_file = fd;
-    #endif
+    set_file_handle(stdout, h);
   }
 
 
@@ -213,16 +272,7 @@ void win_init_console(void) {
     mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
     SetConsoleMode(h, mode);
 
-
-    fd = _open_osfhandle((intptr_t)h, _O_TEXT);
-    #if DUPE
-    if (fd >= 0 && fd != 2) {
-      _dup2(fd, 2);
-      close(fd);
-    }
-    #else
-    stderr->_file = fd;
-    #endif
+    set_file_handle(stderr, h);
   }
 
 
@@ -234,7 +284,6 @@ void win_init_console(void) {
   fprintf(dbg, "%d %d %d\n", stdin->_file, stdout->_file, stderr->_file);
   fclose(dbg);
 #endif
-
 }
 
 
