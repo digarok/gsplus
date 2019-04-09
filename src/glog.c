@@ -12,6 +12,7 @@
 
 #include "glog.h"
 
+extern int x_show_alert(int fatal, const char *str);
 
 #define MAX_FATAL_LOGS          20
 
@@ -70,10 +71,12 @@ int fatal_printf(const char *fmt, ...)     {
 
   glog(buffer);
 
+  x_show_alert(1, buffer);
+  /*
   if (g_fatal_log < MAX_FATAL_LOGS) {
     g_fatal_log_strs[g_fatal_log++] = strdup(buffer);
   }
-
+  */
 
   va_end(ap);
   return ret;
