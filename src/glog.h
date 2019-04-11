@@ -5,7 +5,6 @@ extern "C" {
   int glogf(const char *s, ...);
 
   int fatal_printf(const char *fmt, ...);
-  void clear_fatal_logs(void);
 
 #ifdef __cplusplus
 }

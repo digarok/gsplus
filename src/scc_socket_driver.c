@@ -224,7 +224,6 @@ void scc_socket_open_outgoing(int port, double dcycs) {
 #endif
     scc_socket_close_handle(sockfd);
     scc_socket_close(port, 1, dcycs);
-    x_show_alert(0, 0);
     return;
   }
   memcpy(&sa_in.sin_addr.s_addr, hostentptr->h_addr,

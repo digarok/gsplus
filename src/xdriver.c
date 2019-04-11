@@ -254,7 +254,6 @@ int x_show_alert(int is_fatal, const char *str) {
   /* Not implemented yet */
   adb_all_keys_up();
 
-  clear_fatal_logs();
   return 0;
 }
 

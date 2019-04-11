@@ -421,7 +421,6 @@ void x_dialog_create_gsport_conf(const char *str) {
 int x_show_alert(int is_fatal, const char *str) {
   // Not implemented yet
   adb_all_keys_up();
-  clear_fatal_logs();
   return 0;
 }
 void x_toggle_status_lines(void) {

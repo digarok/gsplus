@@ -58,7 +58,6 @@ extern byte *g_rom_fc_ff_ptr;
 extern byte *g_rom_cards_ptr;
 extern double g_cur_dcycs;
 extern int g_rom_version;
-extern int g_fatal_log;
 
 extern word32 g_adb_repeat_vbl;
 
@@ -3223,9 +3222,6 @@ void config_control_panel() {
   g_cfg_slotdrive = -1;
   g_cfg_select_partition = -1;
   while(g_config_control_panel & !(halt_sim&HALT_WANTTOQUIT)) {
-    if(g_fatal_log > 0) {
-      x_show_alert(0, 0);
-    }
     cfg_home();
     line = 1;
     cfg_printf("%s\n\n", menuptr[0].str);

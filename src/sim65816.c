@@ -904,7 +904,6 @@ int gsplusmain(int argc, char **argv) {
   iwm_shut();
   fixed_memory_ptrs_shut();
   load_roms_shut_memory();
-  clear_fatal_logs();
 
 #if HAVE_RAWNET
   if (g_ethernet_enabled) {
@@ -1084,8 +1083,6 @@ void setup_gsplus_file(char *outname, int maxlen, int ok_if_missing, int can_cre
     x_dialog_create_gsport_conf(*name_ptr);
     can_create_file = 0;
 
-    // But clear out the fatal_printfs first
-    clear_fatal_logs();
     setup_gsplus_file(outname, maxlen, ok_if_missing,       can_create_file, name_ptr);
     // It's one-level of recursion--it cannot loop since we
     //  clear can_create_file.
