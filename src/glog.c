@@ -14,11 +14,6 @@
 
 extern int x_show_alert(int fatal, const char *str);
 
-#define MAX_FATAL_LOGS          20
-
-int g_fatal_log = 0;
-char *g_fatal_log_strs[MAX_FATAL_LOGS];
-
 int glog(const char *s) {
   time_t timer;
   char buffer[26];
@@ -63,33 +58,12 @@ int fatal_printf(const char *fmt, ...)     {
 
   va_start(ap, fmt);
 
-  if(g_fatal_log < 0) {
-    g_fatal_log = 0;
-  }
-
   ret = vsnprintf(buffer, sizeof(buffer), fmt, ap);
 
   glog(buffer);
 
   x_show_alert(1, buffer);
-  /*
-  if (g_fatal_log < MAX_FATAL_LOGS) {
-    g_fatal_log_strs[g_fatal_log++] = strdup(buffer);
-  }
-  */
 
   va_end(ap);
   return ret;
-}
-
-
-
-void clear_fatal_logs()      {
-  int i;
-
-  for(i = 0; i < g_fatal_log; i++) {
-    free(g_fatal_log_strs[i]);
-    g_fatal_log_strs[i] = 0;
-  }
-  g_fatal_log = 0;
 }
