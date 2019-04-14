@@ -263,7 +263,7 @@ struct opcode_entry opcode_table[] = {
   { ORA, ABS_X       , 0x1d, 2 },
   { ORA, ABS_LONG_X  , 0x1f, 3 },
   /* pea abs or pea #imm */
-  { PEA, ABS         , 0xf4, 2 }, { PEA, IMMEDIATE   , 0xf4, 2 },
+  { PEA, ABS         , 0xf4, 2 }, { PEA, DP          , 0xf4, 2 }, { PEA, IMMEDIATE   , 0xf4, 2 },
   /* pei (dp) or pei dp */
   { PEI, INDIR       , 0xd4, 1 }, { PEI, DP          , 0xd4, 1 },
   { PER, RELATIVE    , 0x62, 2 },
