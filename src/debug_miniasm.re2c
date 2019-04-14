@@ -479,10 +479,10 @@ static const char *parse_paren_tail(const char *cp, struct cookie *cookie) {
 	if (!cp) return cp;
 	/*!re2c
 	* { return NULL; }
-	")" { return cp; }
-	"),y" { cookie->mode += _y; return YYCURSOR; }
-	",x)" { cookie->mode += _x; return YYCURSOR; }
-	",s),y" { cookie->mode = SR_Y; return YYCURSOR; }
+	')' { return YYCURSOR; }
+	'),y' { cookie->mode += _y; return YYCURSOR; }
+	',x)' { cookie->mode += _x; return YYCURSOR; }
+	',s),y' { cookie->mode = SR_Y; return YYCURSOR; }
 	*/
 
 }
@@ -496,8 +496,8 @@ static const char *parse_bracket_tail(const char *cp, struct cookie *cookie) {
 	if (!cp) return cp;
 	/*!re2c
 	* { return NULL; }
-	"]" { return YYCURSOR; }
-	"],y" { cookie->mode += _y; return YYCURSOR; }
+	']' { return YYCURSOR; }
+	'],y' { cookie->mode += _y; return YYCURSOR; }
 	*/
 }
 
