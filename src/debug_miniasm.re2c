@@ -592,7 +592,7 @@ static const char *parse_operand(const char *cp, struct cookie *cookie) {
       cp = parse_tail(cp, cookie);
       break;
   }
-
+  if (!cp) return NULL;
   if (*cp && !isspace(*cp)) return NULL;
   return ltrim(cp);
 }
