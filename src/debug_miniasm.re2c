@@ -663,8 +663,7 @@ static int parse_line(const char *cp, uint32_t *pc) {
     return 0;
   }
 
-	/* address ... */
-	cookie.pc = *pc;
+	cookie.pc = addr;
 
 
 	cp = parse_opcode(cp, &cookie);
@@ -673,7 +672,7 @@ static int parse_line(const char *cp, uint32_t *pc) {
 
 
 	if (*cp) {
-		parse_operand(cp, &cookie);
+		cp = parse_operand(cp, &cookie);
 		if (!cp) return error(offset, "bad operand");
 		//offset = cp - start;
 	}
@@ -684,29 +683,29 @@ static int parse_line(const char *cp, uint32_t *pc) {
 
 	/* clean up relative */
 	if (cookie.mode == RELATIVE) {
-		int pc = (cookie.pc + 1 + cookie.size) & 0xffff;
-		int tmp = (int16_t)(cookie.operand & 0xffff);
+		int pc = (addr + 1 + cookie.size) & 0xffff;
+		int tmp = cookie.operand & 0xffff;
 		int offset = tmp - pc; 
 		if (cookie.size == 1) {
-			if (tmp < -128 || tmp > 127) return error(offset, "out of range");
-			tmp &= 0xff;
+			if (offset < -128 || offset > 127) return error(offset, "out of range");
+			offset &= 0xff;
 		}
-		else tmp &= 0xffff;
-		cookie.operand = tmp;
+		else offset &= 0xffff;
+		cookie.operand = offset;
 	}
 
 
-	set_memory_c(addr, cookie.opcode, 0);
-	unsigned operand = cookie.operand;
+	set_memory_c(addr++, cookie.opcode, 0);
+  unsigned operand = cookie.operand;
 	for (i = 0; i < cookie.size; ++i) {
-		set_memory_c(addr, operand & 0xff, 0);
+		set_memory_c(addr++, operand & 0xff, 0);
 		operand >>= 8;
 	}
 
 
 	fputs("\r\x1b[A\x1b[K", stdout);
-	do_list(addr, 1);
-	*pc = addr + 1 + cookie.size;
+	do_list(cookie.pc, 1);
+	*pc = addr;
 	return 1;
 }
 
