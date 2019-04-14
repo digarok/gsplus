@@ -420,7 +420,7 @@ static int is_jsr_bf00(word32 address) {
 		get_memory16_c(address + 1, 0) == 0xbf00;
 }
 
-static int g_disasm_psr;
+int g_disasm_psr;
 
 static const char *get_inline_debug_name(word32 address) {
 	static char buffer[256];
@@ -1434,7 +1434,12 @@ static int parse_command(const char *cp) {
 
 		"!!" eol {
 			extern uint32_t sweet16_asm_shell(uint32_t addr);
-			sweet16_asm_shell(0x300);
+			addr = sweet16_asm_shell(addr);
+			return 0;
+		}
+		"!" eol {
+			extern uint32_t mini_asm_shell(uint32_t addr);
+			addr = mini_asm_shell(addr);
 			return 0;
 		}
 
