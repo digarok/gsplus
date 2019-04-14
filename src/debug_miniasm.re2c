@@ -426,10 +426,11 @@ static const char *parse_expr(const char *cp, struct cookie *cookie) {
 
 	cookie->size = 0;
 	switch(*cp) {
-		case '|': ++cp; cookie->size = 2;  break;
+		case '|': ++cp; cookie->size = 2; break;
 		case '>': ++cp; cookie->size = 3; break;
 		case '<': ++cp; cookie->size = 1; break;
 	}
+  YYCURSOR = cp;
 
 	/*!re2c
 	* { return NULL; }
