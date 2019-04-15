@@ -762,6 +762,12 @@ uint32_t mini_asm_shell(uint32_t addr) {
 		init = 1;
 	}
 
+  printf("%02x/%04x: ; e=%d m=%d x=%d\n",
+    addr >> 16, addr & 0xffff,
+    g_disasm_psr & 0x0100 ? 1 : 0,
+    g_disasm_psr & 0x0020 ? 1 : 0,
+    g_disasm_psr & 0x0010 ? 1 : 0
+  );
 	for(;;) {
 		const char *cp = x_readline("!");
 		if (!cp || !*cp) return addr;
