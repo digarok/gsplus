@@ -68,7 +68,7 @@ enum {
   MLI_CALL
 };
 
-
+#define CC3(a) ((a[0] << 16) | (a[1] << 8) | a[2]) 
 struct mnemonic_entry {
 	const char *name;
 	int value;
@@ -76,7 +76,7 @@ struct mnemonic_entry {
 };
 struct mnemonic_entry mnemonic_table[] = {
 	{ NULL, 0 },
-	#define x(a) { #a, (#a[0] << 16)| (#a[1] << 8) | (#a[2]), a },
+	#define x(a) { #a, CC3(#a), a },
 	#include "mnemonics.x"
 	#undef x
 };
@@ -553,6 +553,10 @@ static const char *parse_opcode(const char *cp, struct cookie *cookie) {
 		e = bsearch((void *)(uintptr_t)tmp, mnemonic_table,
       sizeof(mnemonic_table) / sizeof(mnemonic_table[0]),
       sizeof(mnemonic_table[0]), mnemonic_cmp);
+    if (e == NULL) {
+      if (tmp == CC3("BLT")) e = &mnemonic_table[BCC];
+      if (tmp == CC3("BGE")) e = &mnemonic_table[BCS];
+    }
 		if (!e) return NULL;
 		cookie->mnemonic = e->mnemonic;
 		cookie->mode = IMPLIED;
