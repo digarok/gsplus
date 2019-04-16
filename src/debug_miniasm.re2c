@@ -370,7 +370,7 @@ struct opcode_entry opcode_table[] = {
 
 
 /* generate an index of mnemonics to opcodes in the opcode_table */
-struct opcode_entry *opcode_table_index[MNEMONIC_LAST] = { 0 };
+struct opcode_entry *opcode_table_index[MNEMONIC_LAST+1] = { 0 };
 static void init_table_index(void) {
 	unsigned i;
 	unsigned prev = 0;
