@@ -65,7 +65,8 @@ enum {
 enum {
   TOOL_CALL = MNEMONIC_LAST,
   GSOS_CALL,
-  MLI_CALL
+  MLI_CALL,
+  LONG_SHORT,
 };
 
 #define CC3(a) ((a[0] << 16) | (a[1] << 8) | a[2]) 
@@ -422,7 +423,23 @@ static int find_opcode(struct cookie *cookie) {
 }
 
 
+/* long m,x | mx | ai | i | a, etc */
+static const char *parse_mx(const char *cp, struct cookie *cookie) {
+  unsigned rv = 0;
+  char c;
+  for( ; c = *cp; ++cp) {
+    if (isspace(c)) break;
+    if (c == ',') continue;
+    c = toupper(c);
+    if (c == 'M' || c == 'A') rv |= 0x20;
+    else if (c == 'X' || c == 'I') rv |= 0x10;
+    else return NULL;
+  }
 
+  if (rv == 0) rv = 0x30;
+  cookie->operand = rv;
+  return ltrim(cp);
+}
 
 static const char *parse_expr(const char *cp, struct cookie *cookie) {
 
@@ -543,6 +560,18 @@ static const char *parse_opcode(const char *cp, struct cookie *cookie) {
 
     return ltrim(YYCURSOR);
   }
+
+  'long' / (ws|eol) {
+    cookie->mnemonic = LONG_SHORT;
+    cookie->mode = 0;
+    return ltrim(YYCURSOR);
+  }
+  'short' / (ws|eol) {
+    cookie->mnemonic = LONG_SHORT;
+    cookie->mode = 1;
+    return ltrim(YYCURSOR);
+  }
+
 
 	[A-Za-z]{3} / (ws|eol) {
 
@@ -711,6 +740,28 @@ static int parse_line(const char *cp, uint32_t *pc) {
     set_memory_c(addr++, 0x00, 0);
     set_memory_c(addr++, 0xe1, 0);
     goto out;
+  }
+
+  if (cookie.mnemonic == LONG_SHORT) {
+
+    cp = parse_mx(cp, &cookie);
+    if (!cp || *cp) return error(offset, "bad operand");
+
+    if (cookie.mode == 0) {
+      g_disasm_psr &= ~cookie.operand;
+      g_disasm_psr &= ~0x0100; /* disable e */
+    } else {
+      g_disasm_psr |= cookie.operand;
+    }
+
+    fputs("\r\x1b[A\x1b[K", stdout);
+    printf("%02x/%04x: ; e=%d m=%d x=%d\n",
+      addr >> 16, addr & 0xffff,
+      g_disasm_psr & 0x0100 ? 1 : 0,
+      g_disasm_psr & 0x0020 ? 1 : 0,
+      g_disasm_psr & 0x0010 ? 1 : 0
+    );
+    return 1;
   }
 
 	if (*cp) {
