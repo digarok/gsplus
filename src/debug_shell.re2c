@@ -1391,12 +1391,12 @@ static int parse_command(const char *cp) {
 
 		"!!" eol {
 			extern uint32_t sweet16_asm_shell(uint32_t addr);
-			addr = sweet16_asm_shell(addr);
+			g_prev_address = sweet16_asm_shell(g_prev_address);
 			return 0;
 		}
 		"!" eol {
 			extern uint32_t mini_asm_shell(uint32_t addr);
-			addr = mini_asm_shell(addr);
+			g_prev_address = mini_asm_shell(g_prev_address);
 			return 0;
 		}
 
