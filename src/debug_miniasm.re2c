@@ -91,6 +91,7 @@ struct cookie {
 	unsigned opcode;
 	unsigned operand;
 	unsigned pc;
+	unsigned extra;
 };
 
 
@@ -392,6 +393,8 @@ static int find_opcode(struct cookie *cookie) {
 
 	unsigned mode = cookie->mode;
 
+  if (cookie->mnemonic >= MNEMONIC_LAST) return -1;
+
 	const struct opcode_entry *iter = opcode_table_index[cookie->mnemonic];
 	const struct opcode_entry *end = opcode_table_index[cookie->mnemonic + 1];
 
@@ -427,7 +430,7 @@ static int find_opcode(struct cookie *cookie) {
 static const char *parse_mx(const char *cp, struct cookie *cookie) {
   unsigned rv = 0;
   char c;
-  for( ; c = *cp; ++cp) {
+  for( ; (c = *cp); ++cp) {
     if (isspace(c)) break;
     if (c == ',') continue;
     c = toupper(c);
@@ -446,13 +449,14 @@ static const char *parse_expr(const char *cp, struct cookie *cookie) {
   const char *YYCURSOR = cp;
   const char *YYMARKER = NULL;
   const char *YYCTXMARKER = NULL;
+  unsigned mask = 0xffffff;
 	if (!cp) return NULL;
 
 	cookie->size = 0;
 	switch(*cp) {
-		case '|': ++cp; cookie->size = 2; break;
-		case '>': ++cp; cookie->size = 3; break;
-		case '<': ++cp; cookie->size = 1; break;
+    case '<': ++cp; cookie->size = 1; mask = 0xff; break;
+		case '|': ++cp; cookie->size = 2; mask = 0xffff; break;
+		case '>': ++cp; cookie->size = 3; mask = 0xffffff; break;
 	}
   YYCURSOR = cp;
 
@@ -472,7 +476,7 @@ static const char *parse_expr(const char *cp, struct cookie *cookie) {
 	}
 
 	x{1,6} {
-		cookie->operand = to_hex(cp, YYCURSOR);
+		cookie->operand = to_hex(cp, YYCURSOR) & mask;
 		if (!cookie->size) cookie->size = ((YYCURSOR - cp + 1) & ~1)>>1;
     return YYCURSOR;
 	}
@@ -539,7 +543,6 @@ static const char *parse_opcode(const char *cp, struct cookie *cookie) {
   const char *YYMARKER = NULL;
   const char *YYCTXMARKER = NULL;
 
-	/* todo -- long m|x, short m|x, _toolcall */
 	/*!re2c
 	* { return NULL; }
 
@@ -548,17 +551,22 @@ static const char *parse_opcode(const char *cp, struct cookie *cookie) {
     extern int lookup_tool_number(const char *name, unsigned vector);
 
     char name[20];
-    int tool;
+    int i;
+
     memcpy(name, cp, YYCURSOR - cp);
     name[YYCURSOR - cp] = 0;
 
-    tool = lookup_tool_number(name, 0xe10000);
-    if (tool <= 0) return NULL;
+    for (i = 0; i < 3; ++i) {
+      static unsigned vectors[] = { 0xe10000, 0xe100a8, 0xbf00 };
+      static unsigned types[] = { TOOL_CALL, GSOS_CALL, MLI_CALL };
 
-    cookie->mnemonic = TOOL_CALL;
-    cookie->operand = tool;
-
-    return ltrim(YYCURSOR);
+      int tool = lookup_tool_number(name, vectors[i]);
+      if (tool <= 0) continue;
+      cookie->mnemonic = types[i];
+      cookie->extra = tool;
+      return ltrim(YYCURSOR);
+    }
+    return NULL;
   }
 
   'long' / (ws|eol) {
@@ -728,19 +736,6 @@ static int parse_line(const char *cp, uint32_t *pc) {
 	if (!cp) return error(offset, "bad opcode");
   offset = cp - start;
 
-  if (cookie.mnemonic == TOOL_CALL) {
-    if (*cp) return error(offset, "invalid address mode");
-    if (g_disasm_psr & 0x30) return error(0, "8-bit m/x");
-
-    set_memory_c(addr++, 0xa2, 0);
-    set_memory_c(addr++, cookie.operand >> 0, 0);
-    set_memory_c(addr++, cookie.operand >> 8, 0);
-    set_memory_c(addr++, 0x22, 0);
-    set_memory_c(addr++, 0x00, 0);
-    set_memory_c(addr++, 0x00, 0);
-    set_memory_c(addr++, 0xe1, 0);
-    goto out;
-  }
 
   if (cookie.mnemonic == LONG_SHORT) {
 
@@ -771,6 +766,58 @@ static int parse_line(const char *cp, uint32_t *pc) {
 	}
 
 	if (*cp) return error(offset, "bad operand");
+
+  if (cookie.mnemonic == TOOL_CALL) {
+    if (cookie.mode != IMPLIED) return error(offset, "invalid address mode");
+    if (g_disasm_psr & 0x30) return error(0, "8-bit m/x");
+
+    set_memory_c(addr++, 0xa2, 0);
+    set_memory_c(addr++, cookie.extra >> 0, 0);
+    set_memory_c(addr++, cookie.extra >> 8, 0);
+    set_memory_c(addr++, 0x22, 0);
+    set_memory_c(addr++, 0x00, 0);
+    set_memory_c(addr++, 0x00, 0);
+    set_memory_c(addr++, 0xe1, 0);
+    goto out;
+  }
+
+
+
+  if (cookie.mnemonic == GSOS_CALL) {
+    if (cookie.mode != DP && cookie.mode != ABS && cookie.mode != ABS_LONG)
+      return error(offset, "invalid address mode");
+    if (g_disasm_psr & 0x30) return error(0, "8-bit m/x");
+
+    set_memory_c(addr++, 0x22, 0);
+    set_memory_c(addr++, 0xa8, 0);
+    set_memory_c(addr++, 0x00, 0);
+    set_memory_c(addr++, 0xe1, 0);
+    set_memory_c(addr++, cookie.extra >> 0, 0);
+    set_memory_c(addr++, cookie.extra >> 8, 0);
+    set_memory_c(addr++, cookie.operand >> 0, 0);
+    set_memory_c(addr++, cookie.operand >> 8, 0);
+    set_memory_c(addr++, cookie.operand >> 16, 0);
+    set_memory_c(addr++, cookie.operand >> 24, 0);
+
+    goto out;
+  }
+
+  if (cookie.mnemonic == MLI_CALL) {
+    if (cookie.mode != DP && cookie.mode != ABS)
+      return error(offset, "invalid address mode");
+    if ((g_disasm_psr & 0x30) != 0x30) return error(0, "16-bit m/x");
+    if (addr >> 16) return error(0, "invalid bank");
+
+    set_memory_c(addr++, 0x20, 0);
+    set_memory_c(addr++, 0xbf, 0);
+    set_memory_c(addr++, 0x00, 0);
+    set_memory_c(addr++, cookie.extra >> 0, 0);
+    set_memory_c(addr++, cookie.operand >> 0, 0);
+    set_memory_c(addr++, cookie.operand >> 8, 0);
+
+    goto out;
+  }
+
 
 	if (find_opcode(&cookie) < 0) return error(offset, "invalid address mode");
 
