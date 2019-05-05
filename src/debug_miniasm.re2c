@@ -56,7 +56,7 @@ enum {
 
 enum {
 	MNEMONIC_NONE,
-	#define x(a) a,
+	#define x(a, b) a,
 	#include "mnemonics.x"
 	#undef x
 	MNEMONIC_LAST
@@ -69,7 +69,6 @@ enum {
   LONG_SHORT,
 };
 
-#define CC3(a) ((a[0] << 16) | (a[1] << 8) | a[2]) 
 struct mnemonic_entry {
 	const char *name;
 	int value;
@@ -77,7 +76,7 @@ struct mnemonic_entry {
 };
 struct mnemonic_entry mnemonic_table[] = {
 	{ NULL, 0 },
-	#define x(a) { #a, CC3(#a), a },
+	#define x(a, b) { #a, b, a },
 	#include "mnemonics.x"
 	#undef x
 };
@@ -536,7 +535,8 @@ static int mnemonic_cmp(const void *a, const void *b) {
 	return key - e->value;
 }
 
-
+#define kBLT 0x424c54
+#define kBGE 0x424745
 static const char *parse_opcode(const char *cp, struct cookie *cookie) {
 
   const char *YYCURSOR = cp;
@@ -592,8 +592,8 @@ static const char *parse_opcode(const char *cp, struct cookie *cookie) {
       sizeof(mnemonic_table) / sizeof(mnemonic_table[0]),
       sizeof(mnemonic_table[0]), mnemonic_cmp);
     if (e == NULL) {
-      if (tmp == CC3("BLT")) e = &mnemonic_table[BCC];
-      if (tmp == CC3("BGE")) e = &mnemonic_table[BCS];
+      if (tmp == kBLT) e = &mnemonic_table[BCC];
+      if (tmp == kBGE) e = &mnemonic_table[BCS];
     }
 		if (!e) return NULL;
 		cookie->mnemonic = e->mnemonic;
