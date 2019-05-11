@@ -15,6 +15,8 @@
 #include "defc.h"
 #include "protos.h"
 #include "protos_windriver.h"
+#include "adb_keycodes.h"
+
 #include "win_keymap.h"
 
 extern int Verbose;
@@ -234,7 +236,7 @@ void win_event_key(HWND hwnd, UINT raw_vk, BOOL down, int repeat, UINT flags)   
     capslock_down = GetKeyState(VK_CAPITAL) & 0x01;
     if(capslock_down != g_win_capslock_down) {
       g_win_capslock_down = capslock_down;
-      adb_physical_key_update(0x39, !capslock_down);
+      adb_physical_key_update(kVK_CapsLock, !capslock_down);
     }
 
     return;                     // Do no more processing!
@@ -420,13 +422,12 @@ void show_xcolor_array()      {
 
 // OG Add function to clear all get_images loaded (dev dependent)
 void x_release_kimage(Kimage *kimage_ptr) {
-  if ((int)kimage_ptr->dev_handle != -1)
+  if (kimage_ptr->dev_handle)
   {
     DeleteObject(kimage_ptr->dev_handle);
-    kimage_ptr->dev_handle = (void*)-1;
+    kimage_ptr->dev_handle = NULL;
   }
-  else
-  if (kimage_ptr->data_ptr)
+  else if (kimage_ptr->data_ptr)
   {
     free(kimage_ptr->data_ptr);
     kimage_ptr->data_ptr = NULL;
@@ -480,11 +481,11 @@ void x_get_kimage(Kimage *kimage_ptr)      {
 
     kimage_ptr->data_ptr = ptr;
 
-    kimage_ptr->dev_handle = (void *)-1;
+    kimage_ptr->dev_handle = NULL;
 
   }
-  printf("kim: %p, dev:%p data: %p, size: %08x\n", kimage_ptr,
-         kimage_ptr->dev_handle, kimage_ptr->data_ptr, size);
+  //printf("kim: %p, dev:%p data: %p, size: %08x\n", kimage_ptr,
+  //       kimage_ptr->dev_handle, kimage_ptr->data_ptr, size);
 
   return;
 }

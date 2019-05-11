@@ -1,0 +1,35 @@
+Networking
+----------
+
+GS+ can emulate an Uthernet (the original) card in slot 3. Marinetti is supported with the Uthernet Link Layer. Version 1.0.2 or newer is recommended.
+
+Configuration:
+
+In the settings menu, select Ethernet Card Configuration.
+
+Make sure Uthernet Card in Slot 3 is set to On.
+
+Select the Interface menu to choose the selected interface from a menu.
+
+Win32:
+
+Ethernet support uses Winpcap or its modern successor, npcap. You need to install them.
+
+Winpcap/npcap require a hardwired ethernet connection in promiscuous mode -- they work by tapping into the ethernet stream.
+
+Interface names are not particularly meaningful.  Sorry.  Run `getmac /v` from cmd.exe to get a human friendly name for the interface device.
+
+In marinetti, hardcode the ip address, gateway, and dns servers.
+
+OS X:
+
+Ethernet support uses the vmnet framework.  This provides a virtual ethernet device, dhcp server, and dns server, all bridged to the Macintosh's network.
+
+Unfortunately, vmnet requires root permissions or a codesigning entitlment which may only valid for applications through the Mac App Store.
+
+In marinetti, use DHCP.
+
+Linux:
+
+Ethernet support uses the tap ethernet device.  This require setting up the device and bridging it to your local network.
+

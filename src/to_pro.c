@@ -16,6 +16,11 @@
 #include <sys/xattr.h>
 #endif
 
+#ifdef _MSC_VER
+#define strcasecmp stricmp
+#define strncasecmp strnicmp
+#endif
+
 #define DEF_DISK_SIZE   (800*1024)
 #define MAX_FILE_NAMES  51
 

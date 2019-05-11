@@ -14,13 +14,7 @@ This wrapper provides a subset of the available PCAP APIs necessary for ATBridge
 Feel free to extend the wrapper.
 */
 
-#ifdef WIN32
-#include "../arch/win32/pcap.h"
-#elif __linux__
 #include <pcap.h>
-#elif __APPLE__
-#include <pcap/pcap.h>
-#endif
 
 bool pcapdelay_load();
 bool pcapdelay_is_loaded();

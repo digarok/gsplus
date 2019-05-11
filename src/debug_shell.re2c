@@ -1,0 +1,1891 @@
+
+/*
+ * requires re2c (http://re2c.org)
+ *
+ */
+
+#include <stdio.h>
+#include <stdarg.h>
+#include <ctype.h>
+#include <string.h>
+
+#include <unistd.h>
+#include <signal.h>
+
+#include "defc.h"
+#include "disasm.h"
+
+
+extern char *x_readline(const char *prompt);
+
+extern int g_fullscreen;
+extern int g_config_control_panel;
+extern Engine_reg engine;
+extern int halt_sim;
+
+
+int g_num_mp_breakpoints = 0;
+word32 g_mp_breakpoints[MAX_BREAK_POINTS];
+
+int g_num_bp_breakpoints = 0;
+word32 g_bp_breakpoints[MAX_BREAK_POINTS];
+
+int g_num_tp_breakpoints = 0;
+word32 g_tp_breakpoints[MAX_BREAK_POINTS];
+
+int g_dbg_shell = 0;
+int g_stepping = 0;
+
+word32 g_abort_address = 0;
+word32 g_abort_value = 0;
+word32 g_abort_bytes = 0;
+
+
+static word32 g_prev_address = 0;
+static word32 g_prev_stack_address = 0;
+static word32 g_prev_stack_bank = 0;
+
+
+static int g_templates_loaded = 0;
+extern void debug_load_templates(const char *path);
+extern word32 debug_apply_template(word32 address, const char *name);
+extern void debug_load_nifty(const char *path);
+extern const char *debug_tool_name(unsigned, unsigned vector);
+
+
+
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+static char *get_resource_path(const char *leaf) {
+
+	uint32_t size = 0;
+	char *buffer = 0;
+	int ok;
+	char *cp;
+	int l;
+
+	l = strlen(leaf);
+	ok = _NSGetExecutablePath(NULL, &size);
+	size += l + 1 + sizeof("Resources/");
+	buffer = malloc(size);
+	if (!buffer) return NULL;
+
+	/*
+	 * expect .../GSPlus.app/Contents/MacOS/GSPlus
+	 * drop
+	 */
+	ok = _NSGetExecutablePath(buffer, &size);
+	if (ok < 0) {
+		free(buffer);
+		return NULL;
+	}
+	cp = strrchr(buffer, '/');
+	if (!cp) { free(buffer); return NULL; }
+	*cp = 0;
+	cp = strrchr(buffer, '/');
+	if (!cp) { free(buffer); return NULL; }
+
+	strcpy(cp + 1, "Resources/");
+	strcat(cp, leaf);
+
+	return buffer;	
+}
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+/* todo -- something clever like find the home directory */
+static char *get_resource_path(const char *leaf) {
+	DWORD size;
+	char *buffer = 0;
+	char *cp;
+	int l;
+
+	l = strlen(leaf);
+
+	size = GetModuleFileName(NULL, buffer, 0);
+	if (size == 0) return strdup(leaf);
+
+	size += l + 2;
+	buffer = malloc(size);
+	if (!buffer) return NULL;
+
+	size = GetModuleFileName(NULL, buffer, size);
+	if (!size) return strdup(leaf);
+
+	cp = strrchr(buffer, '\\');
+	strcpy(cp + 1, leaf);
+	return buffer;
+}
+#else
+static char *get_resource_path(const char *leaf) {
+	int l;
+	char *cp;
+	static char path[] = "/usr/local/share/gsplus/";
+	l = strlen(leaf);
+	cp = malloc(l + sizeof(path) + 1);
+	if (!cp) return NULL;
+	strcpy(cp, path);
+	strcat(cp, leaf);
+	return cp;
+}
+#endif
+
+void clear_line(void) {
+	/* carriage return, clear_eol */
+	/* cr, ce */
+	fputs("\r\x1b[K", stdout);
+}
+
+void clear_prev_line(void) {
+	/* carriage return, cursor_up, clear_eol */
+	/* cr, up, ce */
+	fputs("\r\x1b[A\x1b[K", stdout);
+
+}
+
+
+/*
+ * todo 
+ * - tool break support
+ * - gs/os break support
+ * - p8 break support
+ * - r -> run to next rts/rtl
+ * - ! -> mini assembler
+ */
+
+
+
+static void do_handle(word32 value, int action) {
+	/* action = I)nfo, W)who, H)handle */
+
+	enum {
+		MemList	= 0xe11600,
+		PurgeList = 0xe11604,
+		FreeList = 0xe11608
+	};
+
+	enum {
+		offset_address = 0,
+		offset_attr = 4,
+		offset_owner = 6, 
+		offset_size = 8,
+		offset_prev = 12,
+		offset_next = 16 
+	};
+
+	unsigned mask = 0;
+	unsigned count = 0;
+
+	/* return information on who owns an address. */
+	/* Nifty list can get info from the GS/OS... we can't */
+
+	fputs("handle addr   size   flgs ownr\n", stdout);
+	fputs("------ ------ ------ ---- ----\n", stdout);
+
+
+	if (action == 'i') {
+		value &= 0xffff;
+		mask = 0x0000;
+		if (value & 0xf000) mask |= 0xf000;
+		if (value & 0x0f00) mask |= 0x0f00;
+		if (value & 0x00f0) mask |= 0x00f0;
+		if (value & 0x000f) mask |= 0x000f;
+	}
+
+	for (unsigned i = 0; i < 2; ++i) {
+
+		word32 handle;
+		handle = get_memory24_c(i == 0 ? MemList : PurgeList, 0);
+
+		for(; handle ; handle = get_memory24_c(handle + offset_next, 0)) {
+
+			word32 address = get_memory32_c(handle + offset_address, 0);
+			word32 size = get_memory24_c(handle + offset_size, 0);
+			unsigned owner = get_memory16_c(handle + offset_owner, 0);
+			unsigned attr = get_memory16_c(handle + offset_attr, 0);
+
+			/* size not 32-bit clean.  may be $ffxxxxxx */
+
+			if (action == 'w') {
+				if (value < address || value >= address + size) continue;
+			}
+
+			if (action == 'i') {
+				if ((owner & mask) != value) continue;
+			}
+
+			if (action == 'h') {
+				if (value != handle) continue;
+			}
+
+			fprintf(stdout, "%06x %06x %06x %04x %04x\n",
+				handle, address, size, attr, owner
+			);
+			++count;
+			if (action == 'w' || action == 'h') break;
+		}
+
+		if (action == 'w') break;
+		if (action == 'h' && handle) break;
+	}
+
+
+	if (action == 'w' && !count) {
+		fputs("not allocated\n", stderr);
+	}
+	if (action == 'h' && !count) {
+		fputs("not handle\n", stderr);
+	}
+
+}
+
+
+word32 do_hexdump(word32 address, int lines) {
+	static char hex[] = "0123456789abcdef";
+
+	char buffer1[64];
+	char buffer2[20];
+	int i;
+
+	while (--lines) {
+		char *cp = buffer1;
+		for (i = 0; i < 16; ++i) {
+			uint8_t c = get_memory_c(address + i, 0);
+			*cp++ = hex[c >> 4];
+			*cp++ = hex[c & 0x0f];
+			*cp++ = ' ';
+			if (i == 7) *cp++ = ' ';
+
+			buffer2[i] = (c < 0x80) && isprint(c) ? c : '.';
+		}
+		*cp = 0;
+		buffer2[16] = 0;
+		printf("%02x/%04x: %s  %s\n",
+			address >> 16, address & 0xffff,
+			buffer1, buffer2
+			);
+		address += 16;
+		address &= 0xffffff;
+	}
+
+	return address;
+}
+
+static int check_stack_rts(word32 address, unsigned bank, char *buffer) {
+	word32 rt;
+	unsigned op;
+
+	rt = get_memory24_c(address, 0);
+	if (rt == 0) return 0;
+
+	rt = (rt & 0xff0000) | ((rt - 3) & 0xffff);
+	op = get_memory_c(rt, 0);
+	if (op == 0x22) {
+		word32 tmp = get_memory24_c(rt + 1, 0); /* crosses bank :/ */
+		/* todo -- check if tmp is known address, include below */
+		/* todo -- if jsl e10000, check for prev. ldx # */
+		sprintf(buffer, "%02x/%04x: JSL %06x",
+			rt >> 16, rt & 0xffff, tmp);
+		return 3;
+	}
+	/* sigh... this might re-check 0000 a lot */
+	rt = get_memory16_c(address, 0);
+	rt = bank | ((rt - 2) & 0xffff);
+
+	op = get_memory_c(rt, 0);
+	if (op == 0x20 || op == 0xfc) {
+		word32 tmp = get_memory16_c(rt + 1, 0);
+		if (op == 0x20) {
+			sprintf(buffer, "%02x/%04x: JSR %04x",
+				rt >> 16, rt & 0xffff, tmp);
+		}
+		if (op == 0xfc) {
+			sprintf(buffer, "%02x/%04x: JSR (%04x,x)",
+				rt >> 16, rt & 0xffff, tmp);	
+		}
+
+		return 2;
+	}
+
+
+	return 0;
+}
+
+word32 do_stack(word32 address, unsigned bank) {
+
+	/* scan through stack.
+	 * if address looks like jsr return address
+	 * or jsl return address, print it.
+	 * otherwise, hexdump it.
+	 *
+	 * jsr absolute = 0x20
+	 * jsr (absolute,x) = 0xfc
+	 * jsl abslong = 0x22
+	 *
+	 *
+	 * TODO - in Niftylist, JSL updates the bank.
+	 * TODO - don't display c000, etc.
+	 */
+
+	static char hex[] = "0123456789abcdef";
+
+	char buffer1[64];
+	char buffer2[64];
+
+	unsigned offset = 0;
+	unsigned line = 0;
+	char *cp = buffer1;
+
+	++address;
+
+	while(line < 20) {
+		unsigned c;
+		int tmp = check_stack_rts(address + offset, bank, buffer2);
+		if (tmp) {
+			/* flush any pending data */
+
+			if (offset) {
+				*cp = 0;
+				printf("%02x/%04x: %s\n",
+					address >> 16, address & 0xffff, buffer1);
+				++line;
+				address += offset;
+				offset = 0;
+				cp = buffer1;
+			}
+
+			for (offset = 0; offset < tmp; ++offset) {
+				c = get_memory_c(address + offset, 0);
+				*cp++ = hex[c >> 4];
+				*cp++ = hex[c & 0x0f];
+				*cp++ = ' ';
+			}
+
+			*cp = 0;
+			printf("%02x/%04x: %-12s%s\n",
+				address >> 16, address & 0xffff, buffer1, buffer2);
+			++line;
+			address += offset;
+			offset = 0;
+			cp = buffer1;
+			continue;
+		}
+
+		c = get_memory_c(address + offset, 0);
+		*cp++ = hex[c >> 4];
+		*cp++ = hex[c & 0x0f];
+		*cp++ = ' ';
+
+		if (offset == 7) *cp++ = ' ';
+		++offset;
+
+		if (offset == 16) {
+			*cp = 0;
+			printf("%02x/%04x: %s\n",
+				address >> 16, address & 0xffff, buffer1);
+			++line;
+			address += offset;
+			offset = 0;
+			cp = buffer1;
+		}
+	}
+
+	return address;
+
+}
+
+
+static int is_jsl_e10000(word32 address) {
+	return get_memory_c(address, 0) == 0x22 &&
+		get_memory24_c(address + 1, 0) == 0xe10000;
+}
+
+static int is_jsl_e10008(word32 address) {
+	return get_memory_c(address, 0) == 0x22 &&
+		get_memory24_c(address + 1, 0) == 0xe10008;
+}
+static int is_jsl_e100a8(word32 address) {
+	return get_memory_c(address, 0) == 0x22 &&
+		get_memory24_c(address + 1, 0) == 0xe100a8;
+}
+
+
+static int is_jsl_e100b0(word32 address) {
+	return get_memory_c(address, 0) == 0x22 &&
+		get_memory24_c(address + 1, 0) == 0xe100b0;
+}
+
+static int is_jsr_bf00(word32 address) {
+	return get_memory_c(address, 0) == 0x20 &&
+		get_memory16_c(address + 1, 0) == 0xbf00;
+}
+
+static int g_disasm_psr;
+
+static const char *get_inline_debug_name(word32 address) {
+	static char buffer[256];
+
+	/* see IIgs technote #103 */
+	/* 82 xx xx brl pastname
+	   71 77
+	   name
+	   pastname:
+	 */
+
+	/* uthernet uses bra ... tsk tsk. */
+
+	int match = 0;
+	int offset = 0;
+
+	unsigned op = get_memory_c(address, 0);
+	if (op == 0x82
+		&& get_memory_c(address + 3, 0) == 0x71
+		&& get_memory_c(address + 4, 0) == 0x77) {
+		match = 1;
+		address += 5;
+
+		offset = (int16_t)get_memory16_c(address + 1, 0);
+	}
+
+	if (op == 0x80
+		&& get_memory_c(address + 2, 0) == 0x71
+		&& get_memory_c(address + 3, 0) == 0x77) {
+		match = 1;
+		address += 4;
+
+		offset = (int8_t)get_memory_c(address + 1, 0);
+	}
+
+
+	if (match) {
+		unsigned i, n;
+
+		/* sanity check offset? should be positive. */
+
+		n = get_memory_c(address++, 0);
+		for (i = 0; i < n; ++i) {
+			unsigned char c = get_memory_c(address++, 0);
+			if (c & 0x80) return NULL;
+			if (!isprint(c)) return NULL;
+			buffer[i] = c;
+		}
+		buffer[i] = 0;
+		return buffer;
+	}
+
+	return NULL;
+}
+
+word32 do_list(word32 address, int lines) {
+
+	unsigned char buffer2[32];
+	char buffer[32];
+
+	const char *opcode_string;
+	const char *comment;
+
+	unsigned opcode;
+	unsigned dtype;
+	unsigned operand;
+
+	word32 pc;
+	int i;
+	int args;
+	int n;
+
+	while (lines--) {
+
+		int bsize = 0;
+		unsigned bank;
+		pc = address;
+
+		opcode = get_memory_c(address++, 0);
+		dtype = disasm_types[opcode];
+		args = dtype >> 8;
+
+		buffer2[bsize++] = opcode;
+		opcode_string = disasm_opcodes[opcode];
+		comment = NULL;
+
+		switch (args) {
+			case 4:
+				args = g_disasm_psr & 0x20 ? 1 : 2;
+				break;
+			case 5:
+				args = g_disasm_psr & 0x10 ? 1 : 2;
+				break;
+		}
+		operand = 0;
+		switch(args) {
+			case 1:
+				operand = get_memory_c(address, 0);
+				buffer2[bsize++] = operand;
+				break;
+			case 2:
+				operand = get_memory16_c(address, 0);
+				buffer2[bsize++] = operand;
+				buffer2[bsize++] = operand >> 8;
+				break;
+			case 3:
+				operand = get_memory24_c(address, 0);
+				buffer2[bsize++] = operand;
+				buffer2[bsize++] = operand >> 8;
+				buffer2[bsize++] = operand >> 16;
+				break;
+		}
+		address += args;
+		buffer[0] = 0;
+
+		switch(dtype & 0xff) {
+			case ABS:
+				sprintf(buffer, "$%04x", operand);
+				break;
+			case ABSX:
+				sprintf(buffer, "$%04x,x", operand);
+				break;
+			case ABSY:
+				sprintf(buffer, "$%04x,y", operand);
+				break;
+
+			case ABSIND:
+				sprintf(buffer,"($%04x)",operand );
+				break;
+			case ABSXIND:
+				sprintf(buffer,"($%04x,x)",operand );
+				break;
+			case IMPLY:
+				break;
+			case ACCUM:
+				break;
+			case IMMED:
+				sprintf(buffer,"#$%0*x",args * 2, operand);
+				break;
+			case JUST8:
+				sprintf(buffer,"$%02x",operand);
+				break;
+			case DLOC:
+				sprintf(buffer,"$%02x",operand);
+				break;
+			case DLOCX:
+				sprintf(buffer,"$%02x,x",operand);
+				break;
+			case DLOCY:
+				sprintf(buffer,"$%02x,y",operand);
+				break;
+			case ABSLONG:
+				sprintf(buffer,"$%06x",operand);
+				bank = operand >> 16;
+				if (bank == 0xe0 || bank == 0xe1 || bank == 0x01 || bank == 0xff)
+					comment = debug_tool_name(operand & 0xffff, bank);
+				break;
+			case ABSLONGX:
+				sprintf(buffer,"$%06x,x",operand);
+				bank = operand >> 16;
+				if (bank == 0xe0 || bank == 0xe1 || bank == 0x01 || bank == 0xff)
+					comment = debug_tool_name(operand & 0xffff, bank);
+				break;
+			case DLOCIND:
+				sprintf(buffer,"($%02x)",operand);
+				break;
+			case DLOCINDY:
+				sprintf(buffer,"($%02x),y",operand);
+				break;
+			case DLOCXIND:
+				sprintf(buffer,"($%02x,x)",operand);
+				break;
+			case DLOCBRAK:
+				sprintf(buffer,"[$%02x]",operand);
+				break;
+			case DLOCBRAKY:
+				sprintf(buffer,"[$%02x],y",operand);
+				break;
+			case DISP8:
+				sprintf(buffer,"$%04x",
+				      (address+(int8_t)operand) & 0xffff);
+				break;
+			case DISP8S:
+				sprintf(buffer,"$%02x,s",operand);
+				break;
+			case DISP8SINDY:
+				sprintf(buffer,"($%02x,s),y",operand);
+				break;
+			case DISP16:
+				sprintf(buffer,"$%04x",
+				      (address+(int16_t)(operand)) & 0xffff);
+				break;
+			case MVPMVN:
+				sprintf(buffer,"$%02x,$%02x",operand >> 8, operand & 0xff);
+				break;
+			case SEPVAL:
+			case REPVAL:
+				sprintf(buffer,"#$%02x",operand);
+				break;
+		}
+
+		if (!comment) {
+			bank = pc >> 16;
+			if (bank == 0xe0 || bank == 0xe1 || bank == 0x01 || bank == 0xff)
+				comment = debug_tool_name(pc & 0xffff, bank);
+		}
+
+		uint32_t ea = 0;
+		switch (opcode) {
+			case 0xe2: /* sep */
+				g_disasm_psr|= operand;
+				break;
+			case 0xc2: /* rep */
+				g_disasm_psr &= ~operand;
+				break;
+			case 0xfb: /* xce */
+				g_disasm_psr |= 0x0130;
+				break;
+			case 0xa2: /* ldx # */
+				if (is_jsl_e10000(address)) {
+					/* tool call ... */
+					const char *name = debug_tool_name(operand, 0xe10000);
+					if (name) {
+						opcode_string = name;
+						buffer[0] = 0;
+						for (i = 0; i < 4; ++i) {
+							buffer2[bsize++] = get_memory_c(address++, 0);
+						}
+					}
+				}
+				break;
+#if 0
+			case 0xae: /* ldx ... */
+			case 0xbe:
+			case 0xa6:
+			case 0xb6:
+			case 0xfa: /* plx */
+			case 0xaa: /* tax */
+			case 0xba: /* tsx */
+			case 0xbb: /* tyx */
+			case 0xca: /* dex */
+			case 0xe8: /* inx */
+				break;
+#endif
+			case 0x22: /* jsl */
+				if (operand == 0xe100a8) {
+					/* inline GS/OS call? */
+					unsigned num = get_memory16_c(address, 0);
+					const char *name = debug_tool_name(num, operand);
+					if (name) {
+						comment = NULL;
+						opcode_string = name;
+						unsigned parms = get_memory24_c(address + 2, 0);
+						sprintf(buffer, "$%06x", parms);
+
+						for (i = 0; i < 6; ++i) {
+							buffer2[bsize++] = get_memory_c(address++, 0);
+						}
+					}
+				} else {
+					ea = operand;
+				}
+				break;
+			case 0x20: /* jsr */
+				if (operand == 0xbf00) {
+					unsigned num = get_memory_c(address, 0);
+					const char *name = debug_tool_name(num, operand);
+					if (name) {
+						opcode_string = name;
+						unsigned parms = get_memory16_c(address + 1, 0);
+						sprintf(buffer, "$%04x", parms);
+
+						for (i = 0; i < 3; ++i) {
+							buffer2[bsize++] = get_memory_c(address++, 0);
+						}
+					}
+				} else {
+					ea = (operand | (address & 0xff0000));
+				}
+				break;
+			case 0x82: {
+				ea = address + (int16_t)operand;
+				ea &= 0xffff;
+				ea |= pc & 0xff0000;
+
+				const char *name = get_inline_debug_name(pc);
+				/* start of an inline debug name? */
+				if (name) {
+					opcode_string = name;
+					buffer[0] = 0;
+
+					/* include the 0x77 71 magic bytes */
+					for (i = 0; i < 2; ++i) {
+						buffer2[bsize++] = get_memory_c(address++, 0);
+					}
+					address = ea;
+					ea = 0;
+				}
+				break;
+			}
+			case 0x80: {
+				ea = address + (int8_t)operand;
+				ea &= 0xffff;
+				ea |= pc & 0xff0000;
+
+				const char *name = get_inline_debug_name(pc);
+				/* start of an inline debug name? */
+				if (name) {
+					opcode_string = name;
+					buffer[0] = 0;
+
+					/* include the 0x77 71 magic bytes */
+					for (i = 0; i < 2; ++i) {
+						buffer2[bsize++] = get_memory_c(address++, 0);
+					}
+					address = ea;
+					ea = 0;
+				}
+				break;
+			}
+
+
+			case 0x10:
+			case 0x30:
+			case 0x50:
+			case 0x70:
+			case 0x90:
+			case 0xb0:
+			case 0xd0:
+			case 0xf0: {
+				ea = address + (int8_t)operand;
+				ea &= 0xffff;
+				ea |= pc & 0xff0000;
+				break;
+			}
+
+		}
+
+		if (ea && !comment) {
+			comment = get_inline_debug_name(ea);
+		}
+
+#if 0
+
+		n = printf("%02x/%04x: %s %s",
+			pc >> 16, pc & 0xffff,
+			opcode_string, buffer);
+		for(; n < 40; ++n) putchar(' ');
+
+		for(i = 0; i < bsize; ++i) {
+			n += printf(" %02x", buffer2[i]);
+		}
+		if (comment) {
+			printf("%*s; %s", 60 - n, "", comment);
+		}
+
+#else
+		/* 12/3456: 01 23 45      LDA #1     ; comment */ 
+		n = printf("%02x/%04x:",
+			pc >> 16, pc & 0xffff);
+
+		for(i = 0; i < bsize; ++i) {
+			n += printf(" %02x", buffer2[i]);
+		}
+		while (n < 40) { fputc(' ', stdout); ++n; }
+		n += printf("%s %s", opcode_string, buffer);
+		if (comment) {
+			while (n < 65) { fputc(' ', stdout); ++n; }
+			printf("; %s", comment);
+		}
+#endif
+		fputc('\n', stdout);
+
+	}
+	return address;
+}
+
+#if 0
+word32 next_pc(void) {
+	/* return next pc, skipping subroutines,
+	   accounting for inline calls, and branches
+	 */
+	word32 pc = engine.kpc;
+
+	enum {
+		C = 1 << 0,
+		Z = 1 << 1,
+		I = 1 << 2,
+		D = 1 << 3,
+		X = 1 << 4,
+		M = 1 << 5,
+		V = 1 << 6,
+		N = 1 << 7,
+		E = 1 << 8
+	};
+
+	unsigned opcode = get_memory_c(pc++, 0);
+	unsigned operand = 0;
+
+	unsigned dtype = disasm_types[opcode];
+	unsigned args = dtype >> 8;
+
+	switch (args) {
+		case 4:
+			args = engine.psr & M ? 1 : 2;
+			break;
+		case 5:
+			args = engine.psr & X ? 1 : 2;
+			break;
+	}
+	operand = 0;
+	switch(args) {
+		case 1:
+			operand = get_memory_c(pc, 0);
+			break;
+		case 2:
+			operand = get_memory16_c(pc, 0);
+			break;
+		case 3:
+			operand = get_memory24_c(pc, 0);
+			break;
+	}
+	pc += args;
+
+	switch (opcode) {
+		case 0x20:
+			if ((pc & 0xff0000) == 0 && operand == 0xbf00)
+				return pc + 3;
+			break;
+		case 0x22:
+			if (operand == 0xe100a8)
+				return pc + 6;
+			break;
+
+		case 0x82: /* brl */
+			operand += pc & 0xffff;
+			return (pc & 0xff0000) | operand;
+			break;
+		case 0x80: /* bra */
+			operand = (pc + (int8_t)operand) & 0xffff;
+			return (pc & 0xff0000) | operand;
+			break;
+
+		case 0x90: /* bcc */
+			operand = (pc + (int8_t)operand) & 0xffff;
+			if (~engine.psr & C)
+				return (pc & 0xff0000) | operand;
+			break;
+		case 0xb0: /* bcc */
+			operand = (pc + (int8_t)operand) & 0xffff;
+			if (engine.psr & C)
+				return (pc & 0xff0000) | operand;
+			break;
+
+		case 0x10: /* bpl */
+			operand = (pc + (int8_t)operand) & 0xffff;
+			if (~engine.psr & N)
+				return (pc & 0xff0000) | operand;
+			break;
+		case 0x30: /* bmi */
+			operand = (pc + (int8_t)operand) & 0xffff;
+			if (engine.psr & N)
+				return (pc & 0xff0000) | operand;
+			break;
+
+		case 0x50: /* bvc */
+			operand = (pc + (int8_t)operand) & 0xffff;
+			if (~engine.psr & V)
+				return (pc & 0xff0000) | operand;
+			break;
+		case 0x70: /* bvs */
+			operand = (pc + (int8_t)operand) & 0xffff;
+			if (engine.psr & V)
+				return (pc & 0xff0000) | operand;
+			break;
+
+		case 0xd0: /* bvc */
+			operand = (pc + (int8_t)operand) & 0xffff;
+			if (~engine.psr & Z)
+				return (pc & 0xff0000) | operand;
+			break;
+		case 0xf0: /* beq */
+			operand = (pc + (int8_t)operand) & 0xffff;
+			if (engine.psr & Z)
+				return (pc & 0xff0000) | operand;
+			break;
+
+	}
+
+
+	return 0;
+}
+#endif
+
+/*
+ * todo -- 
+ * should use tmp breakpoint instead of g_stepping?
+ * don't want to step into an interrupt, for example.
+ * also, step should steps over gs/os, toolbox calls
+ * (gsbug has protected memory ranges)
+ */
+int next_pc(void) {
+
+	word32 pc = engine.kpc;
+	unsigned opcode = get_memory_c(pc++, 0);
+	unsigned operand = 0;
+
+	switch (opcode) {
+		case 0x20: /* jsr abs */
+			operand = get_memory16_c(pc, 0);
+			pc += 2;
+			if ((pc & 0xff0000) == 0 && operand == 0xbf00)
+				pc += 3;
+			return pc;
+			break;
+		case 0xfc: /* jsr (abs,x) */
+			return pc + 2;
+			break;
+		case 0x22: /* jsl */
+			operand = get_memory24_c(pc, 0);
+			pc += 3;
+			if (operand == 0xe100a8)
+				pc += 6;
+			return pc;
+			break;
+		case 0x00: /* brk arg */
+		case 0x02: /* cop arg */
+			return pc + 2;
+			break;
+	}
+
+	return -1;
+}
+
+
+enum {
+	REG_A,
+	REG_B,
+	REG_D,
+	REG_E,
+	REG_K,
+	REG_MX,
+	REG_P,
+	REG_PC,
+	REG_S,
+	REG_X,
+	REG_Y,
+};
+
+static word32 to_hex(const char *iter, const char *end) {
+	word32 rv = 0;
+	while(iter != end) {
+		char c = *iter++;
+		rv <<= 4;
+		if (isdigit(c)) rv |= c - '0';
+		else rv |= (c | 0x20) - 'a' + 10;
+	}
+	return rv;
+}
+
+
+/*!re2c
+	re2c:define:YYCTYPE = char;
+	re2c:yyfill:enable = 0;
+	eol = "\x00";
+	ws = [ \t];
+	x = [A-Fa-f0-9];
+*/
+
+static int do_assign(const char *cp, int reg) {
+
+	word32 addr = 0;
+	int has_bank = 0;
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+	/*!re2c
+
+		* { return -1; }
+		x{6} eol {
+			addr = to_hex(cp, cp + 6);
+			has_bank = 1;
+			goto next;
+		}
+		x{2} "/" x{4} eol {
+			addr = to_hex(cp, cp + 2) << 16;
+			addr |= to_hex(cp + 3, cp + 7);
+			has_bank = 1;
+			goto next;
+		} 
+		x{4} eol {
+			addr = to_hex(cp, cp + 4);
+			has_bank = 0;
+			goto next;
+		}
+		"%"[01]{2} eol {
+			if (reg != REG_MX) return -1;
+			if (cp[1] == '1') addr |= 0x20;
+			if (cp[2] == '1') addr |= 0x10;
+			goto next;
+		}
+		"%pc" eol {
+			addr = engine.kpc;
+			has_bank = 1;
+			goto next;
+		}
+		"%a" eol {
+			addr = engine.acc;
+			goto next;
+		}
+		"%x" eol {
+			addr = engine.xreg;
+			goto next;
+		}
+		"%y" eol {
+			addr = engine.yreg;
+			goto next;
+		}
+		"%d" eol {
+			addr = engine.direct;
+			goto next;
+		}
+		"%s" eol {
+			addr = engine.stack;
+			goto next;
+		}
+		"%b" eol {
+			addr = engine.dbank;
+			goto next;
+		}
+		"%k" eol {
+			addr = engine.kpc >> 16;
+			goto next;
+		}
+		"%p" eol {
+			addr = engine.psr & 0xff;
+			goto next;
+		}
+		"%e" eol {
+			addr = engine.psr >> 8;
+			goto next;
+		}
+	*/
+
+next:
+
+	if (has_bank && reg != REG_PC) return -1;
+
+	switch(reg) {
+		case REG_A: engine.acc = addr; break;
+		case REG_X: engine.xreg = addr; break;
+		case REG_Y: engine.yreg = addr; break;
+		case REG_D: engine.direct = addr; break;
+		case REG_S: engine.stack = addr; break;
+		case REG_B: engine.dbank = addr & 0xff; break;
+
+		case REG_E:
+			engine.psr &= 0xff;
+			if (addr) engine.psr |= 0x0100;
+			break;
+
+		case REG_K:
+			addr = (addr & 0xff) << 16;
+			engine.kpc = (engine.kpc & 0xffff) | addr;
+			break;
+
+		case REG_PC:
+			if (!has_bank) addr |= (engine.kpc & 0xff0000);
+			engine.kpc = addr;
+			break;
+
+		case REG_P:
+			engine.psr &= ~0xff;
+			engine.psr |= (addr & 0xff);
+			break;
+
+		case REG_MX:
+			/* only 00, 10, 20, 30 are legal values */
+			if ((addr | 0x30) != 0x30) return -1;
+			engine.psr &= ~0x30;
+			engine.psr |= addr;
+			break;
+
+
+	}
+
+	/* fixup registers */
+	if (engine.psr & 0x0100) {
+		engine.psr |= 0x30;
+		engine.stack = (engine.stack & 0xff) | 0x0100;
+	}
+	if (engine.psr & 0x10) {
+		engine.xreg &= 0xff;
+		engine.yreg &= 0xff;
+	}
+	return 0;
+}
+
+static int do_setting(const char *cp, int value) {
+
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+	unsigned psr_bits = 0;
+
+
+	/* TODO - nl uses 'a' to track sep/rep/xce */
+
+	/*!re2c
+		* {
+			fputs("invalid setting\n", stderr); 
+			return -1;
+		}
+		"brk" eol {
+			engine.flags &= ~FLAG_WANT_BRK;
+			if (value) engine.flags |= FLAG_WANT_BRK;
+			printf("brk intercept %s\n", value ? "on" : "off");
+			return 0;
+		}
+		"cop" eol {
+			engine.flags &= ~FLAG_WANT_COP;
+			if (value) engine.flags |= FLAG_WANT_COP;
+			printf("cop intercept %s\n", value ? "on" : "off");
+			return 0;			
+		}
+
+		"e" eol { psr_bits = 0x0100; goto set_psr; }
+		"m" eol { psr_bits = 0x0020; goto set_psr; }
+		"x" eol { psr_bits = 0x0010; goto set_psr; }
+		"mx" eol { psr_bits = 0x0030; goto set_psr; }
+	*/
+
+set_psr:
+	if (value) g_disasm_psr |= psr_bits;
+	else g_disasm_psr &= ~psr_bits;
+	if (g_disasm_psr & 0x0100) g_disasm_psr = 0x0130;
+	printf("disasm psr %03x\n", g_disasm_psr);
+	return 0;
+}
+
+#if 0
+static int do_brk_cop(const char *cp, int which) {
+	/* brk=1 / brk=0 */
+
+	const char *YYCURSOR = cp;
+	int value = 0;
+
+	/*!re2c
+		[01] eol {
+			value = *cp - '0';
+			goto next;
+		}
+		* { return -1; }
+	*/
+next:
+
+	switch(which) {
+		case 0x00:
+			engine.flags &= ~FLAG_WANT_BRK;
+			if (value) engine.flags |= FLAG_WANT_BRK;
+			printf("brk intercept %s\n\n", value ? "on" : "off");
+			break;
+		case 0x02:
+			engine.flags &= ~FLAG_WANT_COP;
+			if (value) engine.flags |= FLAG_WANT_COP;
+			printf("cop intercept %s\n\n", value ? "on" : "off");
+			break;
+	}
+	return 0;
+}
+#endif
+
+
+static word32 do_mem_assign(word32 addr, const char *cp) {
+	/* "string" -> pokes ASCII chars */
+	/* 'string' -> pokes ASCII chars | 0x80 */
+	/* xx -> pokes hex byte */
+
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+	for(;;) {
+		const char *start = YYCURSOR;
+		/*!re2c
+			eol { return addr; }
+			ws { continue; }
+			* {
+				fputs("Invalid data\n", stderr);
+				return addr;
+			}
+			x{2} {
+				set_memory_c(addr++, to_hex(start, YYCURSOR), 0);
+				continue;
+			}
+			["] [^"\x00]* ["] {
+				for(++start; start < YYCURSOR -1; ++start) {
+					set_memory_c(addr++, *start, 0);				
+				}
+				continue;
+			}
+			['] [^'\x00]* ['] {
+				for(++start; start < YYCURSOR -1; ++start) {
+					set_memory_c(addr++, *start | 0x80, 0);				
+				}
+				continue;
+			}
+
+		*/
+	}
+}
+
+
+static int addr_cmp(const void *a, const void *b) {
+	word32 aa = *(const word32 *)a;
+	word32 bb = *(const word32 *)b;
+
+	return (int)aa - (int)bb;
+}
+
+
+
+void show_bp(int type) {
+	int i;
+	word32 addr;
+	word32 *breakpoints;
+	int num_breakpoints;
+
+	switch(type) {
+		case 'B':
+			breakpoints = g_bp_breakpoints;
+			num_breakpoints = g_num_bp_breakpoints;
+			break;
+		case 'M':
+			breakpoints = g_mp_breakpoints;
+			num_breakpoints = g_num_mp_breakpoints;
+			break;
+
+		case 'T':
+			breakpoints = g_tp_breakpoints;
+			num_breakpoints = g_num_tp_breakpoints;
+			break;
+
+
+		default:
+			fputs("Invalid breakpoint type\n", stderr);
+			return;
+	}
+
+	fputs("Breakpoints:\n", stdout);
+	for (i = 0; i < num_breakpoints; ++i) {
+		addr = breakpoints[i];
+		printf("%02x/%04x\n", addr >> 16, addr & 0xffff);
+	}
+}
+
+int set_bp(int type, word32 addr) {
+	int i;
+
+	word32 *breakpoints;
+	int num_breakpoints;
+
+	switch(type) {
+		case 'B':
+			breakpoints = g_bp_breakpoints;
+			num_breakpoints = g_num_bp_breakpoints;
+			break;
+		case 'M':
+			breakpoints = g_mp_breakpoints;
+			num_breakpoints = g_num_mp_breakpoints;
+			break;
+		case 'T':
+			breakpoints = g_tp_breakpoints;
+			num_breakpoints = g_num_tp_breakpoints;
+			break;
+
+		default:
+			fputs("Invalid breakpoint type\n", stderr);
+			return 0;
+	}
+
+	for (i = 0; i < num_breakpoints; ++i) {
+		if (breakpoints[i] == addr) break;
+	}
+
+	if (i < num_breakpoints) return 1; /* already set */
+	if (num_breakpoints == MAX_BREAK_POINTS) {
+		printf("Too many breakpoints.\n");
+		return 0;
+	}
+	breakpoints[num_breakpoints++] = addr;
+
+	switch(type) {
+		case 'B': g_num_bp_breakpoints = num_breakpoints; break;
+		case 'M': g_num_mp_breakpoints = num_breakpoints; break;
+		case 'T': g_num_tp_breakpoints = num_breakpoints; break;
+	}
+
+	qsort(breakpoints, num_breakpoints, sizeof(word32), addr_cmp);
+	fixup_brks();
+	return 1;
+}
+
+/* returns 1 if address deleted */
+int delete_bp(int type, word32 addr) {
+	int i;
+
+	word32 *breakpoints;
+	int num_breakpoints;
+
+	switch(type) {
+		case 'B':
+			breakpoints = g_bp_breakpoints;
+			num_breakpoints = g_num_bp_breakpoints;
+			break;
+		case 'M':
+			breakpoints = g_mp_breakpoints;
+			num_breakpoints = g_num_mp_breakpoints;
+			break;
+		case 'T':
+			breakpoints = g_tp_breakpoints;
+			num_breakpoints = g_num_tp_breakpoints;
+			break;
+
+		default:
+			fputs("Invalid breakpoint type\n", stderr);
+			return 0;
+	}
+
+	for (i = 0; i < num_breakpoints; ++i) {
+		if (breakpoints[i] == addr) break;
+	}
+
+	if (i == num_breakpoints) return 0; /* not set */
+	breakpoints[i] = 0;
+	breakpoints[i] = breakpoints[--num_breakpoints]; 
+
+	switch(type) {
+		case 'B': g_num_bp_breakpoints = num_breakpoints; break;
+		case 'M': g_num_mp_breakpoints = num_breakpoints; break;
+		case 'T': g_num_tp_breakpoints = num_breakpoints; break;
+	}
+
+	qsort(breakpoints, num_breakpoints, sizeof(word32), addr_cmp);
+	fixup_brks();
+	return 1;
+}
+
+
+static void do_help(void) {
+
+	fputs(
+		"  *                       Print registers\n"
+		"  reg=value               Assign register (a,x,y,etc)\n"
+		"  reset                   Reset computer\n"
+		"  quit                    Exit debugger\n"
+		"  s                       Single step\n"
+		"  g                       Go\n"
+		"  bp                      List PC breakpoints\n"
+		"  mp                      List memory breakpoints\n"
+		"\n"
+		"  [address];l             List\n"
+		"  [address];h             Hexdump\n"
+		"  [address];bp            Set PC breakpoint\n"
+		"  [address];bp-           Remove PC breakpoint\n"
+		"  [address];mp            Set memory breakpoint\n"
+		"  [address];mp-           Remove memory breakpoint\n"
+		"  [address]\\temp name    Display template\n"
+		"\n"
+		"\n"
+		"Address = 12/3456, 123456, or 1234\n"
+		"Register = %%a, %%x, %%y, %%pc, etc\n",
+		stdout);
+}
+
+
+
+/* return -1 on error, 0 on success, 1 if debug shell should exit. */
+static int parse_command(const char *cp) {
+
+
+	/* TODO:
+		! -> mini assembler mode.
+	 */
+
+	const char *YYCURSOR = cp;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+	int addr = 0;
+	int has_bank = 0;
+	int has_addr = 0;
+
+	while (*cp == ' ') ++cp;
+
+	/*!re2c
+
+		_ = (ws | eol);
+
+		* { --YYCURSOR; if (cp == YYCURSOR) goto command; return -1; }
+
+		"bp" eol { show_bp('B'); return 0; }
+		"mp" eol { show_bp('M'); return 0; }
+
+		"*" eol { show_regs(); return 0; }
+
+		("q" | "quit" | "exit" | "bye") eol { return 'q'; }
+		"reset" eol { do_reset(); return 0; }
+		("help" | "?") eol { do_help(); return 0; }
+
+		"!!" eol {
+			extern uint32_t sweet16_asm_shell(uint32_t addr);
+			sweet16_asm_shell(0x300);
+			return 0;
+		}
+
+		"0>" { return do_setting(YYCURSOR, 0); }
+		"1>" { return do_setting(YYCURSOR, 1); }
+
+		// register stuff
+
+		"%pc++" eol {
+			/* todo */
+			unsigned opcode = get_memory_c(engine.kpc, 0);
+			unsigned dtype = disasm_types[opcode];
+			unsigned args = dtype >> 8;
+			word32 tmp;
+
+			switch (args) {
+				case 4:
+					args = engine.psr & 0x20 ? 1 : 2;
+					break;
+				case 5:
+					args = engine.psr & 0x10 ? 1 : 2;
+					break;
+			}
+			tmp = engine.kpc + 1 + args;
+			tmp &= 0xffff;
+			engine.kpc = (engine.kpc & 0xff0000) | tmp;
+			return 0;	
+		}
+
+		"%s++" eol {
+			unsigned tmp = engine.stack + 1;
+			if (engine.psr & 0x0100) {
+				tmp &= 0xff;
+				tmp |= 0x0100;
+			} else {
+				tmp &= 0xffff;
+			}
+			engine.stack = tmp;
+		}
+
+		"%s--" eol {
+			unsigned tmp = engine.stack + 1;
+			if (engine.psr & 0x0100) {
+				tmp &= 0xff;
+				tmp |= 0x0100;
+			} else {
+				tmp &= 0xffff;
+			}
+			engine.stack = tmp;
+		}
+
+		"%a=" { return do_assign(YYCURSOR, REG_A); }
+		"%x=" { return do_assign(YYCURSOR, REG_X); }
+		"%y=" { return do_assign(YYCURSOR, REG_Y); }
+		"%d=" { return do_assign(YYCURSOR, REG_D); }
+		"%e=" { return do_assign(YYCURSOR, REG_E); }
+		"5s=" { return do_assign(YYCURSOR, REG_S); }
+		"%k=" { return do_assign(YYCURSOR, REG_K); }
+		"%b=" { return do_assign(YYCURSOR, REG_B); }
+		"%p=" { return do_assign(YYCURSOR, REG_P); }
+		"%pc=" { return do_assign(YYCURSOR, REG_PC); }
+		"%mx=" { return do_assign(YYCURSOR, REG_MX); }
+
+
+		"%pc" {
+			addr = engine.kpc;
+			has_addr = 1;
+			has_bank = 1;
+			goto indir;
+		}
+		"%a" {
+			addr = engine.acc;
+			has_addr = 1;
+			has_bank = 0;
+			goto indir;
+		}
+		"%x" {
+			addr = engine.xreg;
+			has_addr = 1;
+			has_bank = 0;
+			goto indir;
+		}
+		"%y" {
+			addr = engine.yreg;
+			has_addr = 1;
+			has_bank = 0;
+			goto indir;
+		}
+		"%s" {
+			addr = engine.stack;
+			has_addr = 1;
+			has_bank = 1;
+			goto indir;
+		}
+		"%d" {
+			addr = engine.direct;
+			has_addr = 1;
+			has_bank = 1;
+			goto indir;
+		}
+
+
+
+		x{6} {
+			addr = to_hex(cp, cp + 6);
+			has_bank = 1;
+			has_addr = 1;
+			goto indir;
+		}
+		x{2} "/" x{4} {
+			addr = to_hex(cp, cp + 2) << 16;
+			addr |= to_hex(cp + 3, cp + 7);
+			has_bank = 1;
+			has_addr = 1;
+			goto indir;
+		} 
+		x{1,4} {
+			addr = to_hex(cp, YYCURSOR);
+			has_bank = 0;
+			has_addr = 1;
+			goto indir;
+		}
+	*/
+indir:
+	cp = YYCURSOR;
+	/* only gets here if address specified */
+	for(;;) {
+	/*!re2c
+		"" { break; }
+		"^" {
+			/* 3-byte indirection */
+			if (!has_bank) addr = (g_prev_address & 0xff0000) | addr;
+			addr = get_memory24_c(addr, 0);
+			has_bank = 1;
+			continue; 
+		}
+		"@" {
+			/* 2-byte indirection */
+			/* 3-byte indirection */
+			if (!has_bank) addr = (g_prev_address & 0xff0000) | addr;
+			word32 b = addr & 0xff0000;
+			addr = get_memory16_c(addr, 0) | b;
+			has_bank = 1;
+			continue; 
+		}
+	*/
+	}
+
+command:
+	if (!has_bank) {
+		addr |= (g_prev_address & 0xff0000);
+	}
+	if (!has_addr) {
+		addr = g_prev_address;
+	}
+
+	cp = YYCURSOR;
+	/*!re2c
+		* { return  -1; }
+
+		":" {
+			g_prev_address = do_mem_assign(addr, YYCURSOR);
+			return 0;
+		}
+
+		(";l" | "l") eol {
+			g_prev_address = do_list(addr, 20);
+			return 0;
+		}
+		";h" eol {
+			g_prev_address = do_hexdump(addr, 20);
+			return 0;
+		}
+
+		";s" eol {
+			/* print the stack */
+			word32 bank;
+			if (!has_addr) {
+				addr = g_prev_stack_address;
+				bank = g_prev_stack_bank;
+			}
+			if (has_bank) {
+				bank = addr & 0xff0000;
+				addr &= 0xffff;
+			}
+			g_prev_stack_address = do_stack(addr,bank);
+			return 0;
+		}
+
+		"g" eol {
+			/* GO! */
+			if (has_addr) {
+				engine.kpc = addr;
+			}
+			g_stepping = 0;
+			return 1;
+		}
+		"s" eol {
+			/* step */
+			if (has_addr) {
+				engine.kpc = addr;
+			}
+			g_stepping = 1;
+
+			clear_prev_line();
+			return 1;
+		}
+
+		"n" eol {
+			/* next.  steps OVER jsr/jsl */
+
+			if (has_addr) {
+				engine.kpc = addr;
+			}
+			int tmp = next_pc();
+			if (tmp < 0) {
+				g_stepping = 1;
+			} else {
+				g_stepping = 0;
+				set_bp('T', tmp);
+			}
+
+			clear_prev_line();
+			return 1;
+		}
+
+		";bp" [+-]? eol {
+			char plus = cp[3];
+			if (!has_addr && plus == 0) { show_bp('B'); return 0; }
+			if (!has_addr) return -1;
+			if (plus == '-') delete_bp('B', addr);
+			else set_bp('B', addr);
+			return 0;
+		}
+
+		";mp" [+-]? eol {
+			char plus = cp[3];
+			if (!has_addr && plus == 0) { show_bp('M'); return 0; }
+			if (!has_addr) return -1;
+			if (plus == '-') delete_bp('M', addr);
+			else set_bp('M', addr);
+			return 0;
+		}
+		"\\temp" / (ws|eol) {
+			/* apply a gsbug template to memory */
+			/* address\temp name */
+			while (isspace(*YYCURSOR)) ++YYCURSOR;
+			g_prev_address = debug_apply_template(addr, YYCURSOR);
+			return 0;
+		}
+
+		"h" eol {
+			g_prev_address = addr;
+			do_handle(addr, 'h');
+			return 0;
+		}
+
+		"i" eol {
+			g_prev_address = addr;
+			do_handle(addr, 'i');
+			return 0;
+		}
+
+		"w" eol {
+			g_prev_address = addr;
+			do_handle(addr, 'w');
+			return 0;
+		}
+
+
+	*/
+}
+
+
+int debug_shell(int code) {
+	int c;
+	char *cp;
+	int control_d_count = 0;
+	word32 kpc = engine.kpc;
+
+	fflush(stderr);
+	fflush(stdout);
+
+	if (!g_templates_loaded) {
+		char *path;
+		g_templates_loaded = 1;
+
+		path = get_resource_path("GSBug.Templates");
+		if (path) {
+			debug_load_templates(path);
+			free(path);
+		}
+		path = get_resource_path("NList.Data");
+		if (path) {
+			debug_load_nifty(path);
+			free(path);
+		}
+	}
+
+
+	if (code == RET_BP) {
+
+		/* check for temp. breakpoint */
+		if (!delete_bp('T', engine.kpc)) {
+			printf("Breakpoint hit:\n");
+		}
+	}
+	if (code == RET_MP) {
+		printf("Memory breakpoint hit\n");
+		switch (g_abort_bytes) {
+			case 1: g_abort_value &= 0xff; break;
+			case 2: g_abort_value &= 0xffff; break;
+			case 3: g_abort_value &= 0xffffff; break;
+		} 
+		printf("%06x: %0*x\n", g_abort_address, g_abort_bytes * 2, g_abort_value);
+	}
+	if (code == RET_BRK || code == RET_COP) {
+		/* hit a BRK op */
+	}
+	if (code == RET_HALT) {
+		/* halt_printf or ^C */
+		fputs("\n", stdout);
+	}
+
+
+	g_prev_stack_address = engine.stack;
+	g_prev_stack_bank = engine.kpc & 0xff0000;
+	g_prev_address = engine.kpc;
+	g_disasm_psr = engine.psr;
+	do_list(engine.kpc, 1);
+
+	for(;;) {
+		cp = x_readline("] ");
+		if (!cp) {
+			if (++control_d_count < 2)
+				continue;
+			fputs("quit\n", stdout);
+			fflush(stdout);
+			return 0;
+		}
+		control_d_count = 0;
+		if (!*cp) continue;
+		c = parse_command(cp);
+		if (c < 0) printf("error.\n");
+		if (c == 'q') return 0;
+		if (c == 1) break;
+	}
+
+	if (engine.kpc == kpc) {
+		switch(code) {
+			case RET_BRK:
+			case RET_COP:
+				engine.flags |= FLAG_IGNORE_BRK;
+				break;
+			case RET_MP:
+				engine.flags |= FLAG_IGNORE_MP;
+				break;
+			case RET_BP:
+				engine.flags |= FLAG_IGNORE_BP;
+				break;
+		}	
+	}
+
+	return 1;
+}
+
+static void do_sig_intr(int sig) {
+	if (halt_sim & 4) {
+		abort();
+	}
+	set_halt(4);
+}
+
+
+#ifdef _WIN32
+static BOOL WINAPI ctrl_handler(DWORD dwCtrlType) {
+	/* handled via a new thread */
+	if (dwCtrlType == CTRL_C_EVENT || dwCtrlType == CTRL_BREAK_EVENT) {
+		do_sig_intr(SIGINT);
+		return TRUE;
+	}
+	return FALSE;
+}
+#endif
+
+
+/* also called by do_step */
+void do_go() {
+  int ret;
+  int ok;
+
+  #ifdef _WIN32
+  	SetConsoleCtrlHandler(ctrl_handler, 1);
+  #else
+  /* if -g flag, start with debug shell ... */
+  if (isatty(STDIN_FILENO)) {
+  	struct sigaction sa;
+  	memset(&sa, 0, sizeof(sa));
+  	sigemptyset(&sa.sa_mask);
+  	sa.sa_handler = do_sig_intr;
+  	sigaction(SIGINT, &sa, NULL);
+
+  } else {
+  	g_dbg_shell = 0;  	
+  }
+  #endif
+
+  g_config_control_panel = 1;
+  if (g_dbg_shell) {
+  	ok = debug_shell(0);
+  	if (!ok) return;
+  }
+
+  g_config_control_panel = 0;
+  clear_halt();
+
+  for(;;) {
+
+    ret = run_prog();
+    if (halt_sim & HALT_WANTTOQUIT) return;
+
+    if (ret || g_stepping) {
+      g_config_control_panel = 1;
+      ok = debug_shell(ret);
+      if (!ok) return;
+      g_config_control_panel = 0;
+      halt_sim &= ~0x07; /* clear any pending control-Cs, etc. */
+    }
+  }
+}
+
+/* legacy */
+
+
+
+void halt_printf(const char *fmt, ...)      {
+  va_list args;
+
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+
+  set_halt(1);
+}
+
+void halt2_printf(const char *fmt, ...)      {
+  va_list args;
+
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+
+  set_halt(2);
+}

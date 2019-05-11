@@ -5,14 +5,13 @@
 	See LICENSE.txt for license (GPL v2)
 */
 
-#include <ctype.h>
-
 #ifdef _WIN32
 # include <winsock2.h>
 #else
 # include <sys/socket.h>
 # include <netinet/in.h>
 # include <netdb.h>
+typedef int SOCKET;
 #endif
 
 #if defined(HPUX) || defined(__linux__) || defined(SOLARIS) || defined(MAC) || defined(__MACH__) || defined(_WIN32)
@@ -27,10 +26,6 @@
 #define	SCC_OUTBUF_SIZE		1024	/* must be a power of 2 */
 
 #define SCC_MODEM_MAX_CMD_STR	128
-
-#ifndef SOCKET
-# define SOCKET		word32		/* for non-windows */
-#endif
 
 STRUCT(Scc) {
 	int	port;

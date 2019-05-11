@@ -14,12 +14,10 @@ xcode-select --install
 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 
 # Use brew to install dependencies.
-brew install sdl2
-brew install sdl2_image
-brew install freetype
+brew install sdl2 sdl2_image freetype re2c cmake
 
-# Build.
+# Clone & Build.
 git clone git@github.com:digarok/gsplus.git
-cd gsplus/src
-ln -s vars_osx_sdl2 vars
-make clean ; make
+mkdir build ; cd build
+cmake ..
+make

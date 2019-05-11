@@ -7,25 +7,39 @@
 
 #include "defc.h"
 #include <stdarg.h>
+#include <ctype.h>
 #include "config.h"
 #include "glog.h"
 #include "imagewriter.h"
-#if defined(_MSC_VER)
-#include "arch\win32\dirent-win32.h"
-#else
-#include <dirent.h>
-#endif
 
-#ifdef HAVE_TFE
-#include "tfe/tfesupp.h"
-#include "tfe/protos_tfe.h"
+#include <dirent.h>
+
+#ifdef HAVE_RAWNET
+#include "rawnet/rawnet.h"
 #endif
 
 #if defined _MSC_VER
-#include <direct.h>
-#define snprintf _snprintf
+
 typedef unsigned int mode_t;
+
+#define strcasecmp stricmp
+#define strncasecmp strnicmp
+
 #endif
+
+
+#define KEY_DOWN_ARROW 0x0a
+#define KEY_UP_ARROW 0x0b
+#define KEY_RIGHT_ARROW 0x15
+#define KEY_LEFT_ARROW 0x08
+#define KEY_TAB 0x09
+#define KEY_RETURN 0x0d
+#define KEY_PAGE_DOWN 0x1079
+#define KEY_PAGE_UP 0x1074
+#define KEY_ESC 0x1b
+#define KEY_DELETE 0x7f
+
+
 
 static const char parse_log_prefix_file[] = "Option set [file]:";
 
@@ -75,7 +89,8 @@ extern int g_joystick_button_0;
 extern int g_joystick_button_1;
 extern int g_joystick_button_2;
 extern int g_joystick_button_3;
-extern int g_ethernet;
+
+
 extern int g_halt_on_bad_read;
 extern int g_ignore_bad_acc;
 extern int g_ignore_halts;
@@ -100,7 +115,8 @@ extern int g_joystick_trim_amount_y;
 extern int g_swap_paddles;
 extern int g_invert_paddles;
 extern int g_ethernet;
-extern int g_ethernet_interface;
+extern int g_ethernet_enabled;
+extern char * g_ethernet_interface;
 extern int g_appletalk_bridging;
 extern int g_appletalk_turbo;
 extern int g_appletalk_diagnostics;
@@ -129,7 +145,7 @@ extern char* g_imagewriter_prop_font;
 extern int g_imagewriter_paper;
 extern int g_imagewriter_banner;
 
-#if defined(_WIN32) && !defined(WIN_SDL) || defined(__CYGWIN__) && !defined(WIN_SDL)
+#if defined(_WIN32) && !defined(HAVE_SDL)
 extern int g_win_show_console_request;
 extern int g_win_status_debug_request;
 #endif
@@ -199,6 +215,8 @@ int g_cfg_file_dir_only = 0;
 
 #define MAX_PARTITION_BLK_SIZE          65536
 
+void display_rawnet_menu(const char *name, const char **value);
+
 extern Cfg_menu g_cfg_main_menu[];
 
 #define KNMP(a)         &a, #a, 0
@@ -233,7 +251,6 @@ Cfg_menu g_cfg_uiless_menu[] = {
   { "", KNMP(g_joystick_button_1), CFGTYPE_INT },
   { "", KNMP(g_joystick_button_2), CFGTYPE_INT },
   { "", KNMP(g_joystick_button_3), CFGTYPE_INT },
-  { "", KNMP(g_ethernet), CFGTYPE_INT },
   { "", KNMP(g_halt_on_bad_read), CFGTYPE_INT },
   { "", KNMP(g_ignore_bad_acc), CFGTYPE_INT },
   { "", KNMP(g_ignore_halts), CFGTYPE_INT },
@@ -350,10 +367,11 @@ Cfg_menu g_cfg_parallel_menu[] = {
   { 0, 0, 0, 0, 0 },
 };
 
+#ifdef HAVE_RAWNET
 Cfg_menu g_cfg_ethernet_menu[] = {
   { "Ethernet Card Configuration", g_cfg_ethernet_menu, 0, 0, CFGTYPE_MENU },
-  { "Use Interface Number,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10",
-    KNMP(g_ethernet_interface), CFGTYPE_INT },
+  { "Interface",
+    KNMP(g_ethernet_interface), CFGTYPE_STR_FUNC, display_rawnet_menu },
   { "", 0, 0, 0, 0 },
   { "Uthernet Card in Slot 3,0,Off,1,On",
     KNMP(g_ethernet), CFGTYPE_INT },
@@ -368,6 +386,8 @@ Cfg_menu g_cfg_ethernet_menu[] = {
   { "Back to Main Config", g_cfg_main_menu, 0, 0, CFGTYPE_MENU },
   { 0, 0, 0, 0, 0 },
 };
+#endif
+
 #ifdef HAVE_SDL
 Cfg_menu g_cfg_printer_menu[] = {
   { "Virtual Epson Configuration", g_cfg_printer_menu, 0, 0, CFGTYPE_MENU },
@@ -428,7 +448,7 @@ Cfg_menu g_cfg_imagewriter_menu[] = {
 
 Cfg_menu g_cfg_devel_menu[] = {
   { "Developer Options", g_cfg_devel_menu, 0, 0, CFGTYPE_MENU },
-#if defined(_WIN32) && !defined(WIN_SDL) || defined(__CYGWIN__) && !defined(WIN_SDL)
+#if defined(_WIN32) && !defined(HAVE_SDL)
   { "Status lines,0,Hide,1,Show", KNMP(g_win_status_debug_request), CFGTYPE_INT },
   { "Console,0,Hide,1,Show", KNMP(g_win_show_console_request), CFGTYPE_INT },
 #endif
@@ -457,7 +477,9 @@ Cfg_menu g_cfg_main_menu[] = {
   { "ROM File Selection", g_cfg_rom_menu, 0, 0, CFGTYPE_MENU },
   { "HOST FST Configuration", g_cfg_host_menu, 0, 0, CFGTYPE_MENU },
   { "Serial Port Configuration", g_cfg_serial_menu, 0, 0, CFGTYPE_MENU },
+#ifdef HAVE_RAWNET
   { "Ethernet Card Configuration", g_cfg_ethernet_menu, 0, 0, CFGTYPE_MENU },
+#endif
   { "Parallel Card Configuration", g_cfg_parallel_menu, 0, 0, CFGTYPE_MENU },
 #ifdef HAVE_SDL
   { "Virtual Epson Configuration", g_cfg_printer_menu, 0, 0, CFGTYPE_MENU },
@@ -469,15 +491,14 @@ Cfg_menu g_cfg_main_menu[] = {
   { "Expansion Mem Size,0,0MB,0x100000,1MB,0x200000,2MB,0x300000,3MB,"
     "0x400000,4MB,0x600000,6MB,0x800000,8MB,0xa00000,10MB,0xc00000,12MB,"
     "0xe00000,14MB", KNMP(g_mem_size_exp), CFGTYPE_INT },
-  { "Dump text screen to file", (void *)cfg_text_screen_dump, 0, 0, CFGTYPE_FUNC},
+  { "Dump text screen to file", 0, 0, 0, CFGTYPE_FUNC, cfg_text_screen_dump},
 #ifdef HAVE_SDL
-  { "Reset Virtual ImageWriter", (void *)cfg_iwreset, 0, 0, CFGTYPE_FUNC },
+  { "Reset Virtual ImageWriter", 0, 0, 0, CFGTYPE_FUNC, cfg_iwreset },
 #endif
   { "", 0, 0, 0, 0 },
-  { "Save changes to configuration file", (void *)config_write_config_gsplus_file, 0, 0,
-    CFGTYPE_FUNC },
+  { "Save changes to configuration file", 0, 0, 0, CFGTYPE_FUNC, config_write_config_gsplus_file },
   { "", 0, 0, 0, 0 },
-  { "Exit Config (or press F4)", (void *)cfg_exit, 0, 0, CFGTYPE_FUNC },
+  { "Exit Config (or press F4)", 0, 0, 0, CFGTYPE_FUNC, cfg_exit },
   { 0, 0, 0, 0, 0 },
 };
 
@@ -595,6 +616,7 @@ void config_init_menus(Cfg_menu *menuptr)      {
         case CFGTYPE_STR:
         case CFGTYPE_FILE:
         case CFGTYPE_DIR:
+        case CFGTYPE_STR_FUNC:
           str_ptr = (char **)menuptr->ptr;
           str = *str_ptr;
           // We need to malloc this string since all
@@ -695,36 +717,7 @@ void cfg_iwreset()      {
   imagewriter_init(g_imagewriter_dpi,g_imagewriter_paper,g_imagewriter_banner, g_imagewriter_output,g_imagewriter_multipage);
   return;
 }
-#ifdef HAVE_TFE
-void cfg_get_tfe_name()      {
-  int i = 0;
-  char *ppname = NULL;
-  char *ppdes = NULL;
-  cfg_htab_vtab(0,11);
-  if (tfe_enumadapter_open())
-  {
-    cfg_printf("Interface List:\n---------------");
-    while(tfe_enumadapter(&ppname,&ppdes))
-    {
-      cfg_htab_vtab(0, 13+i);
-      cfg_printf("%2d: %s",i,ppdes);
-      i++;
-      lib_free(ppname);
-      lib_free(ppdes);
-    }
-    tfe_enumadapter_close();
-  }
-  else
-  {
-                #if defined(_WIN32) || defined(__CYGWIN__)
-    cfg_printf("ERROR: Install/Enable WinPcap for Ethernet Support!!");
-                #else
-    cfg_printf("ERROR: Install/Enable LibPcap for Ethernet Support!!");
-                #endif
-  }
-  return;
-}
-#endif
+
 
 void config_vbl_update(int doit_3_persec)      {
   if(doit_3_persec) {
@@ -810,6 +803,7 @@ void config_parse_option(char *buf, int pos, int len, int line)      {
     case CFGTYPE_STR:
     case CFGTYPE_FILE:
     case CFGTYPE_DIR:
+    case CFGTYPE_STR_FUNC:
       strptr = (char **)menuptr->ptr;
       if(strptr && *strptr) {
         free(*strptr);
@@ -1333,6 +1327,7 @@ void config_write_config_gsplus_file()      {
       case CFGTYPE_STR:
       case CFGTYPE_FILE:
       case CFGTYPE_DIR:
+      case CFGTYPE_STR_FUNC:
         curstr = *((char **)menuptr->ptr);
         defstr = *((char **)menuptr->defptr);
         if(strcmp(curstr, defstr) != 0) {
@@ -1421,7 +1416,7 @@ void insert_disk(int slot, int drive, const char *name, int ejected, int force_s
 
   name_len = strlen(name);
   name_ptr = (char *)malloc(name_len + 1);
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32)
   // On Windows, we need to change backslashes to forward slashes.
   for (i = 0; i < name_len; i++) {
     if (name[i] == '\\') {
@@ -2059,6 +2054,11 @@ void cfg_putchar(int c)      {
   g_cfg_curs_x = x;
 }
 
+void cfg_puts(const char *str, int nl) {
+  for(;*str; ++str) cfg_putchar(*str);
+    if (nl) cfg_putchar('\n');
+}
+
 void cfg_printf(const char *fmt, ...)      {
   va_list ap;
   int c;
@@ -2260,6 +2260,7 @@ void cfg_parse_menu(Cfg_menu *menuptr, int menu_pos, int highlight_pos, int chan
     case CFGTYPE_STR:
     case CFGTYPE_FILE:
     case CFGTYPE_DIR:
+    case CFGTYPE_STR_FUNC:
       str_ptr = (char **)menuptr->ptr;
       curstr = *str_ptr;
       str_ptr = (char **)menuptr->defptr;
@@ -2292,6 +2293,7 @@ void cfg_parse_menu(Cfg_menu *menuptr, int menu_pos, int highlight_pos, int chan
     case CFGTYPE_INT:
     case CFGTYPE_FILE:
     case CFGTYPE_DIR:
+    case CFGTYPE_STR_FUNC:
       g_cfg_opt_buf[bufpos++] = ' ';
       g_cfg_opt_buf[bufpos++] = '=';
       g_cfg_opt_buf[bufpos++] = ' ';
@@ -2371,6 +2373,7 @@ void cfg_parse_menu(Cfg_menu *menuptr, int menu_pos, int highlight_pos, int chan
         snprintf(str, CFG_OPT_MAXSTR, "%d", curval);
         break;
       case CFGTYPE_STR:
+      case CFGTYPE_STR_FUNC:
         str = &(g_cfg_opts_strs[0][0]);
         //printf("curstr is: %s str is: %s\n", curstr,str);
         snprintf(str, CFG_OPT_MAXSTR, "%s", curstr);
@@ -3068,16 +3071,14 @@ void cfg_file_handle_key(int key) {
     listhdrptr = &g_cfg_partitionlist;
   }
 
-  // can't hotkey numbers because it falsely matches PGUP/PGDN
-  if( (g_cfg_file_pathfield == 0) &&
-      ((key >= 'a' && key <= 'z') || (key >= 'A' && key <= 'Z')) ) {
+  if( (g_cfg_file_pathfield == 0) && isalnum(key)) {
     /* jump to file starting with this letter */
     g_cfg_file_match[0] = key;
     g_cfg_file_match[1] = 0;
     g_cfg_dirlist.invalid = 1;                  /* re-read directory */
   } else {
     switch(key) {
-      case 0x1b:
+      case KEY_ESC:
         if(g_cfg_slotdrive < 0xfff) {
           eject_disk_by_num(g_cfg_slotdrive >> 8, g_cfg_slotdrive & 0xff);
         }
@@ -3085,41 +3086,41 @@ void cfg_file_handle_key(int key) {
         g_cfg_select_partition = -1;
         g_cfg_dirlist.invalid = 1;
         break;
-      case 0x0a:          /* down arrow */
+      case KEY_DOWN_ARROW:          /* down arrow */
         if(g_cfg_file_pathfield == 0) {
           listhdrptr->curent++;
           cfg_fix_topent(listhdrptr);
         }
         break;
-      case 0x0b:          /* up arrow */
+      case KEY_UP_ARROW:          /* up arrow */
         if(g_cfg_file_pathfield == 0) {
           listhdrptr->curent--;
           cfg_fix_topent(listhdrptr);
         }
         break;
-      case 0x33:     /* pg dn */
+      case KEY_PAGE_DOWN:     /* pg dn */
         if(g_cfg_file_pathfield == 0) {
           listhdrptr->curent += CFG_PG_SCROLL_AMT;
           cfg_fix_topent(listhdrptr);
         }
         break;
-      case 0x39:     /* pg up */
+      case KEY_PAGE_UP:     /* pg up */
         if(g_cfg_file_pathfield == 0) {
           listhdrptr->curent -= CFG_PG_SCROLL_AMT;
           cfg_fix_topent(listhdrptr);
         }
         break;
-      case 0x0d:          /* return */
+      case KEY_RETURN:          /* return */
         cfg_file_selected(0);
         break;
-      case 0x09:          /* tab */
+      case KEY_TAB:          /* tab */
         g_cfg_file_pathfield = !g_cfg_file_pathfield;
         break;
-      case 0x15:
+      case KEY_RIGHT_ARROW:
         glogf("You can't go right!"); /* eggs - DB */
         break;
-      case 0x08:          /* left arrow */
-      case 0x7f:          /* delete key */
+      case KEY_LEFT_ARROW:          /* left arrow */
+      case KEY_DELETE:          /* delete key */
         if(g_cfg_file_pathfield) {
           len = strlen(&g_cfg_file_curpath[0]) - 1;
           if(len >= 0) {
@@ -3127,7 +3128,7 @@ void cfg_file_handle_key(int key) {
           }
         }
         break;
-      case 0x20:     /* space -- selects file/directory */
+      case ' ':     /* space -- selects file/directory */
         cfg_file_selected(g_cfg_file_dir_only);
         break;
       default:
@@ -3136,18 +3137,57 @@ void cfg_file_handle_key(int key) {
   }
 }
 
-void config_control_panel()      {
-  void (*fn_ptr)();
+
+static int config_read_key(void) {
+    int key = -1;
+    int mods;
+    while(g_config_control_panel & !(halt_sim&HALT_WANTTOQUIT)) {
+      video_update();
+      key = adb_read_c000();
+      if(key & 0x80) {
+        key = key & 0x7f;
+        mods = adb_read_c025();
+        (void)adb_access_c010();
+        //printf("key: %02x modifiers: %02x\n", key, mods);
+        // Fkeys have the keypad bit set (but so do numbers) */
+        if ((mods & 0x10) && key > 0x3f) key |= 0x1000;
+        return key;
+      }
+      micro_sleep(1.0/60.0);
+      g_cfg_vbl_count++;
+    }
+    return -1;
+}
+
+void config_display_file_menu(void) {
+
+  int key;
+  cfg_file_init();
+  while (g_cfg_slotdrive >= 0) {
+    cfg_file_draw();
+
+    cfg_htab_vtab(0, 23);
+    cfg_printf("Move: \tJ\t \tK\t Change: \tH\t \tU\t \tM");
+    if (g_cfg_slotdrive < 0xfff) cfg_printf("\t   Eject: \bESC\b");
+
+    key = config_read_key();
+    if (key < 0) break;
+    cfg_file_handle_key(key);
+  }
+
+}
+
+void config_control_panel() {
   const char *str;
   Cfg_menu *menuptr;
   void    *ptr;
-  int print_eject_help;
+  void    *cookie;
   int line;
   int type;
-  int match_found;
   int menu_line;
   int menu_inc;
   int max_line;
+  int min_line;
   int key;
   int i, j;
   // First, save important text screen state
@@ -3188,10 +3228,38 @@ void config_control_panel()      {
     }
     cfg_home();
     line = 1;
-    max_line = 1;
-    match_found = 0;
-    print_eject_help = 0;
     cfg_printf("%s\n\n", menuptr[0].str);
+
+    /* calc max/min items */
+    max_line = 0;
+    min_line = 0;
+    for (i = 0;;++i) {
+      const char *cp = menuptr[i].str;
+      if (!cp) break;
+      if (!*cp) continue; /* place holder */
+      if (!min_line) min_line = i;
+      max_line = i;
+    }
+
+    /* menu advancement */
+    if (menu_inc > 0) {
+      if (menu_line > max_line) menu_line = max_line;
+      for( ; menu_line < max_line; ++menu_line) {
+        const char *cp = menuptr[menu_line].str;
+        if (*cp) break;
+      }
+      menu_inc = 0;
+    }
+
+    if (menu_inc < 0) {
+      if (menu_line < min_line) menu_line = min_line;
+      for( ; menu_line > min_line; --menu_line) {
+        const char *cp = menuptr[menu_line].str;
+        if (*cp) break;
+      }
+      menu_inc = 0;
+    }
+
     while(line < 24) {
       str = menuptr[line].str;
       type = menuptr[line].cfgtype;
@@ -3199,44 +3267,22 @@ void config_control_panel()      {
       if(str == 0) {
         break;
       }
-      if((type & 0xf) == CFGTYPE_DISK) {
-        print_eject_help = 1;
-      }
+
       cfg_parse_menu(menuptr, line, menu_line, 0);
-      if(line == menu_line) {
-        if(type != 0) {
-          match_found = 1;
-        } else if(menu_inc) {
-          menu_line++;
-        } else {
-          menu_line--;
-        }
-      }
-      if(line > max_line) {
-        max_line = line;
-      }
+
       cfg_printf("%s\n", g_cfg_opt_buf);
       line++;
     }
-    if((menu_line < 1) && !match_found) {
-      menu_line = 1;
-    }
-    if((menu_line >= max_line) && !match_found) {
-      menu_line = max_line;
-    }
+
     if(g_rom_version < 0) {
       cfg_htab_vtab(0, 21);
       cfg_printf("\bYOU MUST SELECT A VALID ROM FILE\b\n");
     }
     cfg_htab_vtab(0, 23);
-    cfg_printf("Move: \tJ\t \tK\t Change: \tH\t \tU\t \tM\t");
-    if(print_eject_help) {
-      cfg_printf("   Eject: ");
-      if(g_cfg_slotdrive >= 0) {
-        cfg_printf("\bESC\b");
-      } else {
-        cfg_printf("E");
-      }
+    cfg_printf("Move: \tJ\t \tK\t Change: \tH\t \tU\t \tM");
+    type = menuptr[menu_line].cfgtype;
+    if ((type & 0x0f) == CFGTYPE_DISK) {
+      cfg_printf("\t   Eject: E");
     }
 #if 0
     cfg_htab_vtab(0, 22);
@@ -3244,126 +3290,111 @@ void config_control_panel()      {
                menu_line, line, g_cfg_vbl_count, g_adb_repeat_vbl,
                g_key_down);
 #endif
-    if(g_cfg_slotdrive >= 0) {
-      cfg_file_draw();
-    }
-#ifdef HAVE_TFE
-    /*HACK eh, at least I think it is. Display the available ethernet interfaces
-       when in the ethernet control panel. This is the only way one can customize a menu pane.
-       Kent did it with the directory browser, so why not.*/
-    if(menuptr == g_cfg_ethernet_menu)
-    {
-      cfg_get_tfe_name();
-    }
+
+#ifdef HAVE_RAWNET
+
 #endif
+
+
+
+    key = config_read_key();
+    if (key < 0) break;
+
+    // Normal menu system
+    switch(key) {
+      case KEY_DOWN_ARROW:                 /* down arrow */
+        if (menu_line < max_line) menu_line++;
+        menu_inc = 1;
+        break;
+      case KEY_UP_ARROW:                 /* up arrow */
+        if (menu_line > 1) --menu_line;
+        menu_inc = -1;
+        break;
+      case KEY_PAGE_DOWN:                 /* pg dn */
+        menu_line += CFG_PG_SCROLL_AMT;
+        menu_inc = 1;
+        break;
+      case KEY_PAGE_UP:                 /* pg up */
+        menu_line -= CFG_PG_SCROLL_AMT;
+        menu_inc = -1;
+        break;
+      case KEY_RIGHT_ARROW:                 /* right arrow */
+        cfg_parse_menu(menuptr, menu_line,menu_line,1);
+        break;
+      case KEY_LEFT_ARROW:                 /* left arrow */
+        cfg_parse_menu(menuptr,menu_line,menu_line,-1);
+        break;
+      case KEY_RETURN:
+        type = menuptr[menu_line].cfgtype;
+        ptr = menuptr[menu_line].ptr;
+        str = menuptr[menu_line].str;
+        cookie = menuptr[menu_line].cookie;
+        switch(type & 0xf) {
+          case CFGTYPE_MENU:
+            menuptr = (Cfg_menu *)ptr;
+            menu_line = 1;
+
 #ifdef HAVE_SDL
-    /*If user enters the Virtual Imagewriter control panel, flag it so we can
-       automatically apply changes on exit.*/
-    if(menuptr == g_cfg_imagewriter_menu)
-    {
-      g_cfg_triggeriwreset = 1;
-    }
+            /*If user enters the Virtual Imagewriter control panel, flag it so we can
+               automatically apply changes on exit.*/
+            if(menuptr == g_cfg_imagewriter_menu) {
+              g_cfg_triggeriwreset = 1;
+            }
 #endif
-    key = -1;
-    while(g_config_control_panel & !(halt_sim&HALT_WANTTOQUIT)) {
-      video_update();
-      key = adb_read_c000();
-      if(key & 0x80) {
-        key = key & 0x7f;
-        (void)adb_access_c010();
+            break;
+
+          case CFGTYPE_FUNC: {
+            void (*fn)(void);
+            fn = (void (*)(void))cookie;
+            if (fn) fn();
+            adb_all_keys_up();                           //Needed otherwise menu function will continue to repeat until we move selection up or down
+            break;
+          }
+
+          case CFGTYPE_DISK:
+            g_cfg_slotdrive = type >> 4;
+            g_cfg_file_dir_only = 0;
+            config_display_file_menu();
+            break;
+          case CFGTYPE_FILE:
+            g_cfg_slotdrive = 0xfff;
+            g_cfg_file_def_name = str /* *((char **)ptr) */;                           // was ptr
+            g_cfg_file_strptr = (char **)ptr;
+            g_cfg_file_dir_only = 0;
+            config_display_file_menu();
+            break;
+          case CFGTYPE_DIR:
+            g_cfg_slotdrive = 0xfff;
+            g_cfg_file_def_name = str /* *((char **)ptr) */;                           // was ptr
+            g_cfg_file_strptr = (char **)ptr;
+            g_cfg_file_dir_only = 1;
+            config_display_file_menu();
+            break;
+
+          case CFGTYPE_STR_FUNC: {
+            void (*fn)(const char *, char **);
+            fn = (void (*)(const char *, char **))cookie;
+            if (fn) fn(str, (char **)ptr);
+            adb_all_keys_up();
+            break;
+          }
+
+        }
         break;
-      } else {
-        key = -1;
-      }
-      micro_sleep(1.0/60.0);
-      g_cfg_vbl_count++;
-      if(!match_found) {
+      case KEY_ESC:
+        // Jump to last menu entry
+        menu_line = max_line;
         break;
-      }
-    }
-    if((key >= 0) && (g_cfg_slotdrive < 0)) {
-      // Normal menu system
-      switch(key) {
-        case 0x0a:                 /* down arrow */
-          menu_line++;
-          menu_inc = 1;
-          break;
-        case 0x0b:                 /* up arrow */
-          menu_line--;
-          menu_inc = 0;
-          if(menu_line < 1) {
-            menu_line = 1;
-          }
-          break;
-        case 0x33:                 /* pg dn */
-          menu_line += CFG_PG_SCROLL_AMT;
-          menu_inc = 1;
-          break;
-        case 0x39:                 /* pg up */
-          menu_line -= CFG_PG_SCROLL_AMT;
-          menu_inc = 0;
-          if(menu_line < 1) {
-            menu_line = 1;
-          }
-          break;
-        case 0x15:                 /* right arrow */
-          cfg_parse_menu(menuptr, menu_line,menu_line,1);
-          break;
-        case 0x08:                 /* left arrow */
-          cfg_parse_menu(menuptr,menu_line,menu_line,-1);
-          break;
-        case 0x0d:
-          type = menuptr[menu_line].cfgtype;
-          ptr = menuptr[menu_line].ptr;
-          str = menuptr[menu_line].str;
-          switch(type & 0xf) {
-            case CFGTYPE_MENU:
-              menuptr = (Cfg_menu *)ptr;
-              menu_line = 1;
-              break;
-            case CFGTYPE_DISK:
-              g_cfg_slotdrive = type >> 4;
-              g_cfg_file_dir_only = 0;
-              cfg_file_init();
-              break;
-            case CFGTYPE_FUNC:
-              fn_ptr = (void (*)())ptr;
-              (*fn_ptr)();
-              adb_all_keys_up();                           //Needed otherwise menu function will continue to repeat until we move selection up or down
-              break;
-            case CFGTYPE_FILE:
-              g_cfg_slotdrive = 0xfff;
-              g_cfg_file_def_name = str /* *((char **)ptr) */;                           // was ptr
-              g_cfg_file_strptr = (char **)ptr;
-              g_cfg_file_dir_only = 0;
-              cfg_file_init();
-              break;
-            case CFGTYPE_DIR:
-              g_cfg_slotdrive = 0xfff;
-              g_cfg_file_def_name = str /* *((char **)ptr) */;                           // was ptr
-              g_cfg_file_strptr = (char **)ptr;
-              g_cfg_file_dir_only = 1;
-              cfg_file_init();
-              break;
-          }
-          break;
-        case 0x1b:
-          // Jump to last menu entry
-          menu_line = max_line;
-          break;
-        case 'e':
-        case 'E':
-          type = menuptr[menu_line].cfgtype;
-          if((type & 0xf) == CFGTYPE_DISK) {
-            eject_disk_by_num(type >> 12,
-                              (type >> 4) & 0xff);
-          }
-          break;
-        default:
-          glogf("Unhandled config key: 0x%02x", key);
-      }
-    } else if(key >= 0) {
-      cfg_file_handle_key(key);
+      case 'e':
+      case 'E':
+        type = menuptr[menu_line].cfgtype;
+        if((type & 0xf) == CFGTYPE_DISK) {
+          eject_disk_by_num(type >> 12,
+                            (type >> 4) & 0xff);
+        }
+        break;
+      default:
+        glogf("Unhandled config key: 0x%02x", key);
     }
   }
   for(i = 0; i < 0x400; i++) {
@@ -3391,3 +3422,113 @@ void x_clk_setup_bram_version() {
     g_bram_ptr = (&g_bram[1][0]);               // ROM 03
   }
 }
+
+
+#ifdef HAVE_RAWNET
+
+void display_rawnet_menu(const char *name, const char **value) {
+
+  char *entries[20];
+  int i;
+  int index = -1;
+  int count = 0;
+  char *ppname = NULL;
+  char *ppdes = NULL;
+
+  memset(entries, 0, sizeof(entries));
+
+  if (rawnet_enumadapter_open()) {
+    count = 0;
+    while(rawnet_enumadapter(&ppname,&ppdes)) {
+      entries[count] = ppname;
+      free(ppdes);
+
+      if (index < 0 && !strcmp(*value, ppname)) index = count;
+      ++count;
+      if (count == 20) break;
+    }
+    rawnet_enumadapter_close();
+  }
+
+  if (index < 0) index = 0;
+
+  for(;;) {
+    int key;
+
+    cfg_home();
+    cfg_puts(name, 1);
+    for (i = 0; i < 20; ++i) {
+      char *cp = entries[i];
+      if (!cp) break;
+
+      cfg_htab_vtab(4, i + 2);
+      if (i == index) cfg_putchar('\b'); /* inverse */
+      cfg_puts(cp, 1);
+      if (i == index) cfg_putchar('\b');
+    }
+
+    cfg_htab_vtab(0, 23);
+    cfg_puts("Move: \tJ\t \tK\t Change: \tM",1);
+
+    key = config_read_key();
+    switch(key) {
+      case KEY_UP_ARROW:
+        if (index) --index;
+        break;
+      case KEY_DOWN_ARROW:
+        if (index < count - 1) ++index;
+        break;
+      case KEY_PAGE_UP:
+        index -= CFG_PG_SCROLL_AMT;
+        if (index < 0) index = 0;
+        break;
+      case KEY_PAGE_DOWN:
+        index += CFG_PG_SCROLL_AMT;
+        if (index >= count) index = count - 1;
+        break;
+      case KEY_RETURN:
+        if (index < count) {
+          *value = strdup(entries[index]);
+        }
+        key = -1;
+        break;
+      case KEY_ESC:
+        key = -1;
+        break;
+    }
+    if (key < 0) break;
+  }
+
+  for (i = 0; i < 20; ++i) free(entries[i]);
+}
+
+
+void cfg_get_tfe_name()      {
+  int i = 0;
+  char *ppname = NULL;
+  char *ppdes = NULL;
+  cfg_htab_vtab(0,11);
+  if (rawnet_enumadapter_open())
+  {
+    cfg_printf("Interface List:\n---------------");
+    while(rawnet_enumadapter(&ppname,&ppdes))
+    {
+      cfg_htab_vtab(0, 13+i);
+      cfg_printf("%2d: %s",i,ppdes);
+      i++;
+      free(ppname);
+      free(ppdes);
+    }
+    rawnet_enumadapter_close();
+  }
+  else
+  {
+#if defined(_WIN32)
+    cfg_printf("ERROR: Install/Enable WinPcap for Ethernet Support!!");
+#else
+    cfg_printf("ERROR: Install/Enable LibPcap for Ethernet Support!!");
+#endif
+  }
+  return;
+}
+#endif

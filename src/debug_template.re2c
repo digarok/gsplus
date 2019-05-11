@@ -1,0 +1,577 @@
+/*
+ *
+ * Load and parse GSBug templates and Nifty List Data.
+ */
+
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
+
+#include "defc.h"
+
+
+#ifdef WIN32
+char *strndup(const char *s, size_t maxlen) {
+	char *cp;
+	size_t l = strlen(s);
+
+	if (l > maxlen) l = maxlen;
+	cp = malloc(l + 1);
+	if (cp) {
+		memcpy(cp, s, l);
+		cp[l] = 0;
+	}
+	return cp;
+}
+#endif
+
+/*!re2c
+	re2c:define:YYCTYPE = char;
+	re2c:define:YYCURSOR = cp;
+	re2c:yyfill:enable = 0;
+	eol = "\x00";
+	ws = [ \t\r\n];
+	x = [0-9a-fA-F];
+*/
+
+
+/* format
+  _START name
+  name [type [size]] *
+  _END
+ */
+
+
+struct field {
+	char *name;
+	int type;
+	int count;
+};
+
+struct record {
+	char *name;
+	int total_size; /* total size */
+	int field_count; /* # of fields */
+	int field_index; /* starting index into the fields array */
+};
+
+static struct record *records = NULL;
+static int record_count = 0;
+static int record_alloc = 0;
+
+static struct field *fields = NULL;
+static int field_count = 0;
+static int field_alloc = 0;
+
+static int record_compare(const void *a, const void *b) {
+	const struct record *aa = a;
+	const struct record *bb = b;
+	int rv;
+	rv = strcasecmp(aa->name, bb->name);
+	//if (rv == 0) return aa->total_size - bb->total_size;
+	return rv;
+}
+
+/* 192 records in the standard file... */
+static void add_record(struct record *r) {
+	/* calc size and count */
+	int i;
+
+	r->field_count = field_count - r->field_index;
+	for (i = r->field_index; i < field_count; ++i) {
+		int size = fields[i].type;
+		if (size > 4) size = 4;
+		r->total_size += size * fields[i].count;
+	}
+
+	if (record_count == record_alloc) {
+		size_t size = (record_alloc + 256) * sizeof(struct record);
+		void *tmp = realloc(records, size);
+		if (!tmp) return; /* oops */
+		records = tmp;
+		record_alloc += 256;
+	}
+	records[record_count++] = *r;
+}
+
+
+/* average ~14 fields per record */
+static void add_field(struct field *f) {
+	if (field_count == field_alloc) {
+		size_t size = (field_alloc + 512) * sizeof(struct field);
+		void *tmp = realloc(fields, size);
+		if (!tmp) return; /* oops */
+		fields = tmp;
+		field_alloc += 512;
+	}
+	fields[field_count++] = *f;
+}
+
+static char *rtrim(char *cp) {
+	int l = strlen(cp);
+	while (l && isspace(cp[l-1])) --l;
+	cp[l] = 0;
+	return cp;
+}
+
+static char *ltrim(char *cp) {
+	while (isspace(*cp)) ++cp;
+	return cp;
+}
+
+/* 0 - no field, 1 - ok, -1 - warning */
+static int parse_field(const char *cp, struct field *f) {
+	const char *start;
+	const char *end;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+	int type = 0;
+	int count = 0;
+
+	start = cp;
+	for(;;) {
+		/*!re2c
+			eol | ws { --cp; break; }
+			* { continue; }
+		*/
+	}
+	end = cp;
+	if (start == end) return 0;
+
+	f->name = strndup(start, end - start);
+	f->type = 0;
+	f->count = 0;
+
+	while (isspace(*cp)) ++cp;
+
+	/* optional type */
+	/*!re2c
+	"BYTE" / (ws | eol) { type = 1; goto next; }
+	"WORD" / (ws | eol) { type = 2; goto next; }
+	"LONG" / (ws | eol) { type = 4; goto next; }
+	"CSTRING" / (ws | eol) { type = 5; goto next; }
+	"PSTRING" / (ws | eol) { type = 6; goto next; }
+	"GSSTRING" / (ws | eol) { type = 7; goto next; }
+	"" { type = 0; goto next; }
+	*/
+
+next:
+	while (isspace(*cp)) ++cp;
+	if (type) {
+		count = 0;
+		while(isdigit(*cp)) {
+			count = count * 10 + *cp - '0';
+			++cp;
+		}
+		if (!count) count = 1;
+	}
+	while (isspace(*cp)) ++cp;
+	if (*cp != 0) {
+		return -1;
+	}
+	f->type = type;
+	f->count = count;
+	return 1;
+}
+
+
+void debug_load_templates(const char *path) {
+	FILE *f;
+	char buffer[1024];
+	int ok;
+	int in_struct = 0;
+	struct record record;
+	struct field field;
+	unsigned line = 0;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+
+	f = fopen(path, "r");
+	if (!f)  {
+		fprintf(stderr, "Unable to load %s: %s\n", path, strerror(errno));
+		return;
+	}
+	for (line = 1;;++line) {
+		const char *start = NULL;
+		const char *end = NULL;
+
+		const char *cp = fgets(buffer, sizeof(buffer), f);
+		if (!cp) break;
+		rtrim(buffer);
+
+		/*!re2c
+		"" { goto _field; }
+		";" { continue; }
+		ws* eol { continue; }
+		"_END" / (ws | eol) { goto _end; }
+		"_START" / (ws | eol) { goto _start; }
+		*/
+
+_field:
+		if (!in_struct) {
+			/* warn once */
+			fprintf(stderr, "%s:%d: Missing _START.\n", path, line);
+			memset(&record, 0, sizeof(record));
+			in_struct = -1;
+		}
+		if (in_struct < 0) continue;
+
+		memset(&field, 0, sizeof(field));
+		ok = parse_field(cp, &field);
+		if (ok == 0) continue;
+		if (ok < 1) {
+			/* warn but add */
+			fprintf(stderr, "%s:%d: Bad field line: %s\n", path, line, buffer);
+		}
+		add_field(&field);
+		continue;
+
+_start:
+		if (in_struct) {
+			/* warn and close it */
+			if (in_struct > 0) add_record(&record);
+		}
+		memset(&record, 0, sizeof(record));
+
+		while (isspace(*cp)) ++cp;
+		start = cp;
+		for(;;) {
+			/*!re2c
+				eol | ws { --cp; break; }
+				* { continue; }
+			*/
+		}
+		end = cp;
+		if (start == end) {
+			/* warning ... */
+			fprintf(stderr, "%s:%d: _START missing name.\n", path, line);
+			in_struct = -1;
+		} else {
+			in_struct = 1;
+			record.name = strndup(start, end - start);
+			record.field_index = field_count;
+		}
+
+		while (isspace(*cp)) ++cp;
+		if (*cp != 0) {
+			/* warning */
+			fprintf(stderr, "%s:%d: Bad _START line: %s\n", path, line, buffer);
+		}
+		continue;
+
+_end:
+		while (isspace(*cp)) ++cp;
+		if (*cp != 0) {
+			/* warning ... */
+			fprintf(stderr, "%s:%d: Bad _END line: %s\n", path, line, buffer);
+		}
+
+		if (in_struct) {
+			if (in_struct > 0) add_record(&record);
+		} else {
+			/* warning */
+			fprintf(stderr, "%s:%d: _END without _START.\n", path, line);
+		}
+		in_struct = 0;
+		memset(&record, 0, sizeof(record));
+
+		continue;
+	}
+
+	if (in_struct) {
+		/* warn & close */
+		fprintf(stderr, "%s:%d: Missing _END.\n", path, line);
+		if (in_struct > 0) add_record(&record);
+	}
+	fclose(f);
+
+	qsort(records, record_count, sizeof(struct record), record_compare);
+}
+
+static int record_search(const void *a, const void *b) {
+	const struct record *r = b;
+	return strcasecmp(a, r->name);
+}
+
+static void print_string(int type, word32 address) {
+
+	unsigned c;
+	unsigned length;
+	unsigned more = 0;
+	if (!address) return;
+	fputc('"', stdout);
+
+
+	switch(type) {
+		case 5:
+			length = 32;
+			break;
+		case 6:
+			length = get_memory_c(address, 0);
+			++address;
+			break;
+		case 7:
+			length = get_memory16_c(address, 0);
+			address += 2;
+			break;
+	}
+	if (length > 32) {
+		length = 32;
+		more = 1;
+	}
+
+	for (unsigned i = 0; i < length; ++i) {
+		c = get_memory_c(address++, 0);
+		if (type == 5 && c == 0) break;
+
+		if ((~c & 0x80) && isprint(c)) {
+			fputc(c, stdout);
+		} else fprintf(stdout, "\\x%02x", c);
+	}
+
+	if (type == 5 && c != 0) more = 1;
+	if (more) fputs("...", stdout);
+
+	fputc('"', stdout);
+	fputc(' ', stdout);
+
+}
+word32 debug_apply_template(word32 address, const char *name) {
+	/* 1 - lookup template */
+	struct record *r;
+	int i, j;
+	struct field *f;
+
+	r = bsearch(name, records, record_count, sizeof(struct record), record_search);
+	if (r == NULL) {
+		fprintf(stderr, "Invalid template: %s\n", name);
+		return address;
+	}
+	f = fields + r->field_index;
+	if (r->total_size == 0) {
+		/* just print the fields */
+		for (i = 0; i < r->field_count; ++i) {
+			fputs(f[i].name, stdout);
+			fputc('\n', stdout);
+		}
+		fputc('\n', stdout);
+		return address;
+	}
+
+	for (i = 0; i < r->field_count; ++i) {
+		word32 value;
+		unsigned type = f[i].type;
+		printf("%-16s", f[i].name);
+		for (j = 0; j < f[i].count; ++j) {
+			switch(type) {
+				case 1:
+					value = get_memory_c(address, 0);
+					address += 1;
+					printf("%02x ", value);
+					break;
+				case 2:
+					value = get_memory16_c(address, 0);
+					address += 2;
+					printf("%04x ", value);
+					break;
+				case 4:
+				case 5: /* cstring */
+				case 6: /* pstring */
+				case 7: /* gs/os string */
+					value = get_memory24_c(address, 0);
+					address += 4;
+					printf("%08x ", value);
+					if (type > 4) {
+						print_string(type, value);
+					}
+					break;
+			}
+			address &= 0xffffff;
+		}
+		fputc('\n', stdout);
+	}
+	fputc('\n', stdout);
+	return address;
+}
+
+
+
+struct tool {
+	char *name;
+	unsigned number;
+	unsigned vector;
+};
+
+struct tool *tools = NULL;
+int tool_count = 0;
+int tool_alloc = 0;
+
+static void add_tool(struct tool *t) {
+	if (tool_count == tool_alloc) {
+		size_t size = (tool_alloc + 1024) * sizeof(struct tool);
+		void *tmp = realloc(tools, size);
+		if (!tmp) return;
+		tools = tmp;
+		tool_alloc += 1024;
+	}
+	tools[tool_count++] = *t;
+}
+
+static word32 to_hex(const char *iter, const char *end) {
+	word32 rv = 0;
+	while(iter != end) {
+		char c = *iter++;
+		rv <<= 4;
+		if (isdigit(c)) rv |= c - '0';
+		else rv |= (c | 0x20) - 'a' + 10;
+	}
+	return rv;
+}
+
+static int tool_compare(const void *a, const void *b) {
+	const struct tool *aa = a;
+	const struct tool *bb = b;
+
+	int rv = (int)aa->vector - (int)bb->vector;
+	if (rv == 0)
+		rv = (int)aa->number - (int)bb->number;
+	return rv;
+}
+
+/* nifty list */
+/*
+ * format: 
+ * fffx ... header comments
+ * xxxx name ; p8 mli calls 
+ * *
+ * xxxx name ; p16/gsos calls
+ * *
+ * xxxx name ; tool calls
+ * *
+ * xxxx name ; user tool calls
+ * *
+ * xxxx name ; e1 vectors
+ * *
+ * xxxx name ; e0 vectors
+ * *
+ * xxxx name ; softswitch/f8 rom
+ * *
+ * xxxx name ; 01 vectors
+ * *
+ * xxxx name ; nifty list service calls
+ * *
+ * xxxx name ; resource types
+ * *
+ * xxxx name ; error codes
+ * *
+ * xxxx name ; HC IIgs callbacks 
+ * *
+ * xxxx name ; request codes
+ * *
+ *
+ */
+
+void debug_load_nifty(const char *path) {
+
+	FILE *f;
+	char buffer[1024];
+	unsigned line = 0;
+	const char *YYMARKER = NULL;
+	const char *YYCTXMARKER = NULL;
+
+	int section = 0;
+	unsigned vector = 0;
+	static unsigned vectors[] = {
+		0xbf00, 0xe100a8, 0xe10000, 0xe10008, 0xe1, 0xe0, 0xff, 0x01,
+		0x00, 0x00, 0x00, 0x00, 0x00
+	};
+
+
+	f = fopen(path, "r");
+	if (!f)  {
+		fprintf(stderr, "Unable to load %s: %s\n", path, strerror(errno));
+		return;
+	}
+	for (line = 1;;++line) {
+		const char *start;
+		const char *end;
+		struct tool tool = { 0, 0, vector };
+
+		const char *cp = fgets(buffer, sizeof(buffer), f);
+		if (!cp) break;
+		rtrim(buffer);
+
+		start = cp;
+		/*!re2c
+			[\r\n\x00] { continue; }
+			* {
+				fprintf(stderr, "%s:%d: Bad line: %s", path, line, buffer);
+				continue;
+			}
+			"*" {
+				++section;
+				vector = 0;
+				if (section < sizeof(vectors) / sizeof(vectors[0]))
+					vector = vectors[section];
+				continue;
+			}
+			x{4} / ws { goto ok; }
+		*/
+ok:
+		end = cp;
+		tool.number = to_hex(start, end);
+		if (section == 0 && tool.number >= 0xfff0) continue;
+		if (!vector) continue;
+
+		while (isspace(*cp)) ++cp;
+		/* skip p8/p16/ prefix */
+		/*!re2c
+			"P8:" | "P16:" | "Shell:" | "GS/OS:" { goto prefix; }
+			"" { goto prefix; }
+		*/
+prefix:
+		start = cp;
+		for(;;) {
+			/*!re2c
+			"" / eol { break; }
+			"(" | ws {
+				if (vector > 0x100 ) {
+					--cp;
+					break;
+				}
+				continue;
+			}
+			* { continue; }
+			*/
+		}
+		end = cp;
+		if (end > start) {
+			int l = end - start;
+
+			if (vector > 0x0100) {
+				/* add a leading _ */
+				tool.name = malloc(l + 2);
+				tool.name[0] = '_';
+				strncpy(tool.name + 1, start, l);
+				tool.name[l + 1] = 0;
+			}
+			else tool.name = strndup(start, l);
+			add_tool(&tool);
+		}
+
+
+	}
+
+	qsort(tools, tool_count, sizeof(struct tool), tool_compare);
+	fclose(f);
+}
+
+const char *debug_tool_name(unsigned number, unsigned vector) {
+	struct tool tmp = { 0, number, vector };
+	struct tool *t = bsearch(&tmp, tools, tool_count, sizeof(struct tool), tool_compare);
+	if (t) return t->name;
+	return NULL;
+}

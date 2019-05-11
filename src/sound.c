@@ -32,8 +32,7 @@ int g_queued_nonsamps = 0;
 int g_num_osc_interrupting = 0;
 int g_sound_play_depth = 0;
 
-/* Workaround - gcc in cygwin wasn't defining _WIN32, substituted WIN_SOUND instead */
-#if defined(HPUX) || defined(__linux__) || defined(WIN_SOUND) || defined(MAC) || defined(HAVE_SDL)
+#if defined(HPUX) || defined(__linux__) || defined(_WIN32) || defined(MAC) || defined(HAVE_SDL)
 int g_audio_enable = -1;
 #else
 # if defined(OSS)
@@ -243,8 +242,7 @@ void sound_init()      {
 
 void sound_init_general()      {
 
-/* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(HAVE_SDL)
+#if !defined(_WIN32) && !defined(MAC) && !defined(HAVE_SDL)
   int pid;
   int shmid;
   int tmp;
@@ -255,8 +253,7 @@ void sound_init_general()      {
   int size;
   int ret;
 
-/* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(HAVE_SDL)
+#if !defined(_WIN32) && !defined(MAC) && !defined(HAVE_SDL)
   if(!g_use_shmem) {
     if(g_audio_enable < 0) {
       printf("Defaulting audio off for slow X display\n");
@@ -273,8 +270,7 @@ void sound_init_general()      {
   }
 
   size = SOUND_SHM_SAMP_SIZE * SAMPLE_CHAN_SIZE;
-/* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(MAC) && !defined(HAVE_SDL)
+#if !defined(_WIN32) && !defined(MAC) && !defined(HAVE_SDL)
   shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0777);
   if(shmid < 0) {
     printf("sound_init: shmget ret: %d, errno: %d\n", shmid, errno);
@@ -303,8 +299,8 @@ void sound_init_general()      {
   g_sound_shm_addr = shmaddr;
 
   fflush(stdout);
-/* Workaround - gcc in cygwin wasn't defining _WIN32 */
-#if !defined(MAC) && !defined(WIN_SOUND) && !defined(__CYGWIN__) && !defined(HAVE_SDL)
+
+#if !defined(MAC) && !defined(_WIN32) && !defined(HAVE_SDL)
   /* prepare pipe so parent can signal child each other */
   /*  pipe[0] = read side, pipe[1] = write end */
   ret = pipe(&g_pipe_fd[0]);
@@ -356,9 +352,9 @@ void sound_init_general()      {
 #else
 # if defined (HAVE_SDL)
   sdlsnd_init(shmaddr);
-# elif defined (WIN_SOUND)
+# elif defined (_WIN32)
   win32snd_init(shmaddr);
-# elif defined (MAC) && !defined(HAVE_SDL)
+# elif defined (MAC)
   macsnd_init(shmaddr);
 # endif
 #endif
@@ -419,13 +415,14 @@ void sound_shutdown()      {
   // OG stop sound and free memory on sound_shutdown
   sound_reset(g_cur_dcycs);
 
-#ifdef WIN_SOUND        /* Workaround - gcc in cygwin wasn't defining _WIN32 */
-  win32snd_shutdown();
-#elif defined(HAVE_SDL)
+
+#if defined(HAVE_SDL)
   if((g_audio_enable != 0)) {
     //sdlsnd_shutdown();
     sound_shutdown_sdl();
   }
+#elif defined(_WIN32)
+  win32snd_shutdown();
 #else
   if((g_audio_enable != 0) && g_pipe_fd[1] != 0) {
     close(g_pipe_fd[1]);
@@ -607,11 +604,11 @@ void send_sound(int real_samps, int size)      {
   }
   DOC_LOG("send_sound", -1, g_last_sound_play_dsamp,
           (real_samps << 30) + size);
-// Workaround - gcc in cygwin wasn't defining _WIN32
-#if defined(WIN_SOUND) || defined(MAC) && !defined(HAVE_SDL)
-  child_sound_playit(tmp);
-#elif defined(HAVE_SDL)
+
+#if defined(HAVE_SDL)
   sound_write_sdl( real_samps,  size);
+#elif defined(_WIN32) || defined(MAC)
+  child_sound_playit(tmp);
 #else
   /* Although this looks like a big/little-endian issue, since the */
   /*  child is also reading an int, it just works with no byte swap */

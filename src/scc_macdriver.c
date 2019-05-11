@@ -7,17 +7,16 @@
 
 /* This file contains the Mac serial calls */
 
+#ifdef MAC
+
 #include "defc.h"
 #include "scc.h"
 
-#ifndef _WIN32
-# include <termios.h>
-#endif
+#include <termios.h>
 
 extern Scc scc_stat[2];
 extern word32 g_c025_val;
 
-#ifdef MAC
 int scc_serial_mac_init(int port)     {
   char str_buf[1024];
   Scc     *scc_ptr;

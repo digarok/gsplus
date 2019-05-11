@@ -11,6 +11,11 @@
 
 #include "host_common.h"
 
+#ifdef _MSC_VER
+#define strcasecmp stricmp
+#define strncasecmp strnicmp
+#endif
+
 
 
 void afp_init(struct AFP_Info *info, word16 file_type, word32 aux_type) {
@@ -66,7 +71,7 @@ void afp_synchronize(struct AFP_Info *info, int preference) {
 
 
 
-static DWORD root_file_id[3] = {};
+static DWORD root_file_id[3] = { 0 };
 
 unsigned host_startup(void) {
 
@@ -97,10 +102,8 @@ unsigned host_startup(void) {
 
   if (!(fbi.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
     fprintf(stderr, "%s is not a directory\n", host_root);
-    CloseHandle(h);
     return invalidFSTop;
   }
-  CloseHandle(h);
 
   return 0;
 }
@@ -231,8 +234,8 @@ FILETIME host_get_date_time(word32 ptr) {
 
 
   TzSpecificLocalTimeToSystemTime(NULL, &tmLocal, &tmUTC);
-  if (!SystemTimeToFileTime(&tmUTC, &utc)) utc =(FILETIME){0, 0};
-
+  if (!SystemTimeToFileTime(&tmUTC, &utc)) memset(&utc, 0, sizeof(utc));
+ 
   return utc;
 }
 
@@ -249,6 +252,7 @@ FILETIME host_get_date_time_rec(word32 ptr) {
   SYSTEMTIME tmUTC;
   memset(&tmLocal, 0, sizeof(tmLocal));
   memset(&tmUTC, 0, sizeof(tmUTC));
+  memset(&utc, 0, sizeof(utc));
 
   tmLocal.wSecond = buffer[0];
   tmLocal.wMinute = buffer[1];
@@ -258,7 +262,7 @@ FILETIME host_get_date_time_rec(word32 ptr) {
   tmLocal.wMonth = buffer[5] + 1;
 
   TzSpecificLocalTimeToSystemTime(NULL, &tmLocal, &tmUTC);
-  if (!SystemTimeToFileTime(&tmUTC, &utc)) utc =(FILETIME){0, 0};
+  if (!SystemTimeToFileTime(&tmUTC, &utc)) memset(&utc, 0, sizeof(utc));
 
   return utc;
 }

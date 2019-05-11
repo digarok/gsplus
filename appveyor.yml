@@ -1,0 +1,141 @@
+version: 1.0.{build}
+image:
+  - Visual Studio 2017
+  - Ubuntu1804
+configuration:
+- mingw32-sdl
+- mingw32-gdi
+- mingw64-gdi
+- msys-gdi
+- linux-sdl
+- linux-headless
+
+matrix:
+  exclude:
+    - configuration: linux-sdl
+      image: Visual Studio 2017
+    - configuration: linux-headless
+      image: Visual Studio 2017
+    - configuration: mingw32-sdl
+      image: Ubuntu1804
+    - configuration: mingw32-gdi
+      image: Ubuntu1804
+    - configuration: mingw64-gdi
+      image: Ubuntu1804
+    - configuration: msys-gdi
+      image: Ubuntu1804
+
+for:
+  - # mingw64/gdi
+    matrix:
+      only:
+        - image: Visual Studio 2017
+          configuration: mingw64-gdi
+    install:
+      - cmd: set MSYSTEM=MINGW64
+      - cmd: set MSYSTEM_PREFIX=/mingw64
+      - cmd: set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%
+      - cmd: pacman --noconfirm -Sy
+      - cmd: pacman --noconfirm -S re2c mingw-w64-x86_64-cmake
+    build_script:
+      - cmd: mkdir build
+      - cmd: cd build
+      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "MSYS Makefiles"
+      - cmd: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build\bin\GSplus.exe'
+        name: GSplus-64-gdi
+
+  - # mingw32/gdi
+    matrix:
+      only:
+        - image: Visual Studio 2017
+          configuration: mingw32-gdi
+    install:
+      - cmd: set MSYSTEM=MINGW32
+      - cmd: set MSYSTEM_PREFIX=/mingw32
+      - cmd: set PATH=C:\msys64\mingw32\bin;C:\msys64\usr\bin;%PATH%
+      - cmd: pacman --noconfirm -Sy
+      - cmd: pacman --noconfirm -S re2c mingw-w64-i686-cmake
+    build_script:
+      - cmd: mkdir build
+      - cmd: cd build
+      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "MSYS Makefiles"
+      - cmd: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build\bin\GSplus.exe'
+        name: GSplus-32-gdi
+
+  - # mingw32/sdl
+    matrix:
+      only:
+        - image: Visual Studio 2017
+          configuration: mingw32-sdl
+    install:
+      - cmd: set MSYSTEM=MINGW32
+      - cmd: set MSYSTEM_PREFIX=/mingw32
+      - cmd: set PATH=C:\msys64\mingw32\bin;C:\msys64\usr\bin;%PATH%
+      - cmd: pacman --noconfirm -Sy
+      - cmd: pacman --noconfirm -S re2c mingw-w64-i686-cmake mingw-w64-i686-SDL2 mingw-w64-i686-SDL2_image mingw-w64-i686-freetype
+    build_script:
+      - cmd: mkdir build
+      - cmd: cd build
+      - cmd: cmake ../ -DDRIVER=SDL2 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "MSYS Makefiles"
+      - cmd: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build\bin\GSplus.exe'
+        name: GSplus-32-sdl
+
+  - # msys2/gdi
+    matrix:
+      only:
+        - image: Visual Studio 2017
+          configuration: msys-gdi
+    install:
+      - cmd: set MSYSTEM=MSYS
+      - cmd: set MSYSTEM_PREFIX=/usr/
+      - cmd: set PATH=C:\msys64\bin;C:\msys64\usr\bin;%PATH%
+      - cmd: pacman --noconfirm -Sy
+      - cmd: pacman --noconfirm -S re2c
+    build_script:
+      - cmd: mkdir build
+      - cmd: cd build
+      - cmd: cmake ../ -DDRIVER=WIN32 -DWITH_DEBUGGER=OFF -DWITH_STATIC=ON -G "Unix Makefiles"
+      - cmd: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build\bin\GSplus.exe'
+        name: GSplus-cygwin-32-gdi
+
+  - # linux/sdl
+    matrix:
+      only:
+        - image: Ubuntu1804
+          configuration: linux-sdl
+    install:
+      - sh: sudo apt-get update
+      - sh: sudo apt-get install -y re2c libsdl2-dev libsdl2-image-dev libfreetype6-dev
+    build_script:
+      - sh: mkdir build
+      - sh: cd build
+      - sh: cmake ../ -DDRIVER=SDL2
+      - sh: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build/bin/GSplus'
+        name: GSplus-linux-sdl
+
+  - # linux/headless
+    matrix:
+      only:
+        - image: Ubuntu1804
+          configuration: linux-headless
+    install:
+      - sh: sudo apt-get update
+      - sh: sudo apt-get install -y re2c
+    build_script:
+      - sh: mkdir build
+      - sh: cd build
+      - sh: cmake ../ -DDRIVER=HEADLESS
+      - sh: make VERBOSE=1 GSplus
+    artifacts:
+      - path: 'build/bin/GSplus'
+        name: GSplus-linux-headless

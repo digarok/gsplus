@@ -20,23 +20,17 @@
 #include "glog.h"
 
 // DISASSEMBLER STUFF
-enum {
-  ABS = 1, ABSX, ABSY, ABSLONG, ABSIND, ABSXIND, IMPLY, ACCUM, IMMED, JUST8,
-  DLOC, DLOCX, DLOCY, LONG, LONGX, DLOCIND, DLOCINDY, DLOCXIND, DLOCBRAK,
-  DLOCBRAKY, DISP8, DISP8S, DISP8SINDY, DISP16, MVPMVN, REPVAL, SEPVAL
-};
-extern const char * const disas_opcodes[256];
-extern const word32 disas_types[256];
+#include "disasm.h"
 
 // STEPPING/ENGINE STUFF
 extern Engine_reg engine;
 extern int g_config_control_panel;
-extern int g_num_breakpoints;
-extern word32 g_breakpts[MAX_BREAK_POINTS];
 int g_dbg_enable_port = 0;
 int debug_pause = 0;
 int g_dbg_step = 0;
 int step_count = 0;
+
+extern int g_stepping;
 
 // emulator command stuff
 extern int g_limit_speed;
@@ -223,9 +217,11 @@ void debug_handle_event() {
         } else {
           g_dbg_step = -1; // first one just halts
         }
+        g_stepping = 1;
         break;
       case G_DBG_COMMAND_CONTINUE:  //4
         g_dbg_step = 0;
+        g_stepping = 0;
         step_count = 0;
         break;
       case G_DBG_COMMAND_GET_MEM:  //6
@@ -238,7 +234,7 @@ void debug_handle_event() {
         exit(0);  // HALT!
         break;
       case G_DBG_COMMAND_DEBUGGER:
-        do_debug_intfc();
+        //do_debug_intfc();
         break;
       case G_DBG_COMMAND_SET_CPU:
         event_set_cpu(&dbg_cmd_queue[0].cdata);
@@ -278,7 +274,7 @@ void push_api_msg(int size, char *msg_str) {
 
 void api_push_memack() {
   int size = snprintf(tmp_buffer_4k, sizeof(tmp_buffer_4k),"{\"type\":\"memack\"}");
-  char *msg = (char*)malloc(sizeof(char) * size);
+  char *msg = (char*)malloc(sizeof(char) * size + 1);
   strcpy(msg,tmp_buffer_4k);
   push_api_msg(size, msg);
 }
@@ -309,13 +305,16 @@ void api_push_cpu() {
 
 void api_push_brk() {
   int i;
+  extern int g_num_bp_breakpoints;
+  extern word32 g_bp_breakpoints[];
+
   // build our json array of breakpoints
   tmp_buffer2_4k[0] = '\0';   // start with empty string
   char *str_ptr = tmp_buffer2_4k;
-  for(i = 0; i < g_num_breakpoints; i++) {
+  for(i = 0; i < g_num_bp_breakpoints; i++) {
     //printf("{\"bp:%02x: %06x\n", i, g_breakpts[i]);
-    str_ptr += sprintf(str_ptr, "{\"trig\":\"addr\",\"match\":\"%06X\"}", g_breakpts[i]);
-    if (i < g_num_breakpoints-1) {
+    str_ptr += sprintf(str_ptr, "{\"trig\":\"addr\",\"match\":\"%06X\"}", g_bp_breakpoints[i]);
+    if (i < g_num_bp_breakpoints-1) {
       str_ptr += sprintf(str_ptr, ",");
     }
   }
@@ -352,7 +351,7 @@ void api_push_stack() {
   int size = snprintf(tmp_buffer_4k, sizeof(tmp_buffer_4k),"{\"type\":\"stack\",\"data\":{\"loc\":\"%06X\",\"S\":\"%04X\",\"bytes\":[%s]}}",
                       stack_loc,stack,str_ptr);
 
-  char *msg = (char*)malloc(sizeof(char) * size);
+  char *msg = (char*)malloc(sizeof(char) * size + 1);
   strcpy(msg,tmp_buffer_4k);
   push_api_msg(size, msg);
 }
@@ -360,7 +359,7 @@ void api_push_stack() {
 
 void api_push_disassembly_start() {
   int size = snprintf(tmp_buffer_4k, sizeof(tmp_buffer_4k),"{\"type\":\"dis0\"}");
-  char *msg = (char*)malloc(sizeof(char) * size);
+  char *msg = (char*)malloc(sizeof(char) * size + 1);
   strcpy(msg,tmp_buffer_4k);
   push_api_msg(size, msg);
 }
@@ -609,7 +608,7 @@ void event_add_brk(char *str) {
   int addr = 0;
   sscanf(str, "%06X", &addr);
   addr = addr & 0xFFFFFF;  // 24 bit KPC address for 65816
-  set_bp(addr);
+  set_bp('B', addr);
   api_push_brk();
   api_write_socket();
 
@@ -621,7 +620,7 @@ void event_del_brk(char *str) {
   int addr = 0;
   sscanf(str, "%06X", &addr);
   addr = addr & 0xFFFFFF;  // 24 bit KPC address for 65816
-  delete_bp(addr);
+  delete_bp('B', addr);
   api_push_brk();
   api_write_socket();
 
@@ -1217,8 +1216,8 @@ int do_dis_json(char *buf, word32 kpc, int accsize, int xsize, int op_provided, 
 
   kpc++;
 
-  dtype = disas_types[opcode];
-  out = disas_opcodes[opcode];
+  dtype = disasm_types[opcode];
+  out = disasm_opcodes[opcode];
   type = dtype & 0xff;
   args = dtype >> 8;
 
@@ -1292,6 +1291,12 @@ int do_dis_json(char *buf, word32 kpc, int accsize, int xsize, int op_provided, 
       }
       sprintf(buf_disasm,"%s   $%06x",out,val);
       break;
+    case ABSLONGX:
+      if(args != 3) {
+        printf("arg # mismatch for opcode %x\n", opcode);
+      }
+      sprintf(buf_disasm,"%s   $%06x,X",out,val);
+      break;
     case ABSIND:
       if(args != 2) {
         printf("arg # mismatch for opcode %x\n", opcode);
@@ -1348,18 +1353,6 @@ int do_dis_json(char *buf, word32 kpc, int accsize, int xsize, int op_provided, 
         printf("arg # mismatch for opcode %x\n", opcode);
       }
       sprintf(buf_disasm,"%s   $%02x,Y",out,val);
-      break;
-    case LONG:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%06x",out,val);
-      break;
-    case LONGX:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%06x,X",out,val);
       break;
     case DLOCIND:
       if(args != 1) {

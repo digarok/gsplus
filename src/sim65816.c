@@ -21,17 +21,30 @@ extern char g_config_gsplus_screenshot_dir[];
   #define vsnprintf _vsnprintf
 #endif
 
-#ifdef HAVE_TFE
-  #include "tfe/tfesupp.h"
-  #include "tfe/protos_tfe.h"
+#ifdef HAVE_RAWNET
+  #include "rawnet/rawnet.h"
+  #include "rawnet/cs8900.h"
 #endif
 
-#if defined (_WIN32) && !defined(WIN_SDL)|| defined(__CYGWIN__) && !defined(WIN_SDL)
+#if defined(_WIN32) && !defined(HAVE_SDL)
   #define WIN32_LEAN_AND_MEAN   /* Tell windows we want less header gunk */
   #define STRICT                        /* Tell Windows we want compile type checks */
   #include <windows.h>          /* Need a definition for LPTSTR in CYGWIN */
 extern void get_cwd(LPTSTR buffer, int size);
 #endif
+
+#ifndef GSPLUS_DEBUGGER
+int g_dbg_enable_port = 0;
+
+void debug_server_poll(void) { }
+int debug_events_waiting(void) { return 0; }
+void debug_handle_event(void) { }
+void debug_init(void) { }
+void do_go_debug(void) { }
+
+#endif
+
+
 
 #define PC_LOG_LEN      (8*1024)
 
@@ -69,7 +82,6 @@ const char *g_gsplus_default_paths[] = { // probably overkill on the paths
 #define EV_VID_UPD      7
 
 extern int g_stepping;
-extern int g_dbg_step;
 
 
 extern int g_c068_statereg;
@@ -142,7 +154,8 @@ int g_iw2_emul = 0;
 int g_serial_out_masking = 0;
 int g_serial_modem[2] = { 0, 1 };
 int g_ethernet = 0;
-int g_ethernet_interface = 0;
+char* g_ethernet_interface = "";
+int g_ethernet_enabled = 0;
 int g_parallel = 0;
 int g_parallel_out_masking = 0;
 int g_printer = 0;
@@ -306,6 +319,7 @@ void sim65816_initglobals() {
   g_mem_size_total = 256*1024;  /* Total contiguous RAM from 0 */
 }
 
+#if 0
 void show_pc_log() {
   FILE *pcfile;
   Pc_log  *log_pc_ptr;
@@ -399,7 +413,7 @@ void show_pc_log() {
 
   fclose(pcfile);
 }
-
+#endif
 
 #define TOOLBOX_LOG_LEN         64
 
@@ -469,30 +483,6 @@ void show_toolbox_log() {
   }
 }
 
-#if 0
-/* get_memory_c is not used, get_memory_asm is, but this does what the */
-/*  assembly language would do */
-word32 get_memory_c(word32 loc, int diff_cycles)        {
-  byte    *addr;
-  word32 result;
-  int index;
-
-#ifdef CHECK_BREAKPOINTS
-  check_breakpoints_c(loc);
-#endif
-
-  index = loc >> 8;
-  result = page_info[index].rd;
-  if(result & BANK_IO_BIT) {
-    return get_memory_io(loc, diff_cycles);
-  }
-
-  addr = (byte *)((result & 0xffffff00) + (loc & 0xff));
-
-  return *addr;
-}
-#endif
-
 
 word32 get_memory_io(word32 loc, double *cyc_ptr) {
   int tmp;
@@ -541,71 +531,6 @@ word32 get_memory_io(word32 loc, double *cyc_ptr) {
   return 0;
 }
 
-#if 0
-word32 get_memory16_pieces(word32 loc, int diff_cycles)        {
-  return(get_memory_c(loc, diff_cycles) +
-         (get_memory_c(loc+1, diff_cycles) << 8));
-}
-
-word32 get_memory24(word32 loc, int diff_cycles)        {
-  return(get_memory_c(loc, diff_cycles) +
-         (get_memory_c(loc+1, diff_cycles) << 8) +
-         (get_memory_c(loc+2, diff_cycles) << 16));
-}
-#endif
-
-#if 0
-void set_memory(word32 loc, int val, int diff_cycles)      {
-  byte *ptr;
-  word32 new_addr;
-  word32 tmp;
-  word32 or_val;
-  int or_pos;
-  int old_slow_val;
-
-#ifdef CHECK_BREAKPOINTS
-  check_breakpoints_c(loc);
-#endif
-
-  tmp = GET_PAGE_INFO_WR((loc>>8) & 0xffff);
-  if(tmp & BANK_IO) {
-    set_memory_io(loc, val, diff_cycles);
-    return;
-  }
-
-  if((loc & 0xfef000) == 0xe0c000) {
-    printf("set_memory_special: non-io for addr %08x, %02x, %d\n",
-           loc, val, diff_cycles);
-    halt_printf("tmp: %08x\n", tmp);
-  }
-
-  ptr = (byte *)(tmp & (~0xff));
-
-  new_addr = loc & 0xffff;
-  old_slow_val = val;
-
-  if(tmp & BANK_SHADOW) {
-    old_slow_val = g_slow_memory_ptr[new_addr];
-  } else if(tmp & BANK_SHADOW2) {
-    new_addr += 0x10000;
-    old_slow_val = g_slow_memory_ptr[new_addr];
-  }
-
-  if(old_slow_val != val) {
-    g_slow_memory_ptr[new_addr] = val;
-    or_pos = (new_addr >> SHIFT_PER_CHANGE) & 0x1f;
-    or_val = DEP1(1, or_pos, 0);
-    if((new_addr >> CHANGE_SHIFT) >= SLOW_MEM_CH_SIZE) {
-      printf("new_addr: %08x\n", new_addr);
-      exit(12);
-    }
-    slow_mem_changed[(new_addr & 0xffff) >> CHANGE_SHIFT] |= or_val;
-  }
-
-  ptr[loc & 0xff] = val;
-
-}
-#endif
 
 void set_memory_io(word32 loc, int val, double *cyc_ptr) {
   word32 tmp;
@@ -651,25 +576,6 @@ void set_memory_io(word32 loc, int val, double *cyc_ptr) {
 
   return;
 }
-
-
-#if 0
-void check_breakpoints_c(word32 loc)      {
-  int index;
-  int count;
-  int i;
-
-  index = (loc & (MAX_BP_INDEX-1));
-  count = breakpoints[index].count;
-  if(count) {
-    for(i = 0; i < count; i++) {
-      if(loc == breakpoints[index].addrs[i]) {
-        halt_printf("Write hit breakpoint %d!\n", i);
-      }
-    }
-  }
-}
-#endif
 
 
 void show_regs_act(Engine_reg *eptr)      {
@@ -760,7 +666,6 @@ void do_reset() {
   engine.kpc = get_memory16_c(0x00fffc, 0);
 
   g_stepping = 0;
-  g_dbg_step = 0;
 
   if (g_irq_pending)
     halt_printf("*** irq remainings...\n");
@@ -797,6 +702,7 @@ void check_engine_asm_defines() {
   CHECK(eptr, eptr->direct, ENGINE_REG_DIRECT, val1, val2);
   CHECK(eptr, eptr->psr, ENGINE_REG_PSR, val1, val2);
   CHECK(eptr, eptr->kpc, ENGINE_REG_KPC, val1, val2);
+  CHECK(eptr, eptr->flags, ENGINE_FLAGS, val1, val2);
 
   pcptr = &pclog;
   CHECK(pcptr, pcptr->dbank_kpc, LOG_PC_DBANK_KPC, val1, val2);
@@ -884,8 +790,6 @@ void banner() {
 
 int gsplusmain(int argc, char **argv) {
   int diff;
-  int skip_amt;
-  int i;
   char    *final_arg = 0;
 
 
@@ -944,31 +848,23 @@ int gsplusmain(int argc, char **argv) {
   }
   printer_init(g_printer_dpi,85,110,g_printer_output,g_printer_multipage != 0);
   //If ethernet is enabled in config.gsport, let's initialize it
-#ifdef HAVE_TFE
-  if (g_ethernet == 1)
+#ifdef HAVE_RAWNET
+  g_ethernet_enabled = 0;
+  /* todo - pass device name via cmd line? */
+  if (g_ethernet)
   {
-    int i = 0;
-    char *ppname = NULL;
-    char *ppdes = NULL;
-    if (tfe_enumadapter_open())
-    {
-      //Loop through the available adapters until we reach the interface number specified in config.gsport
-      while(tfe_enumadapter(&ppname,&ppdes))
-      {
-        if (i == g_ethernet_interface) break;
-        i++;
-      }
-      tfe_enumadapter_close();
-      printf("Using host ethernet interface: %s\nUthernet support is ON.\n",ppdes);
+    if (!g_ethernet_interface || !*g_ethernet_interface) {
+      g_ethernet_interface = rawnet_get_standard_interface();
     }
-    else
-    {
-      printf("No ethernet host adapters found. Do you have PCap installed/enabled?\nUthernet support is OFF.\n");
+
+    if (g_ethernet_interface && *g_ethernet_interface) {
+        if (cs8900_init() >= 0 && cs8900_activate(g_ethernet_interface) >= 0) {
+          g_ethernet_enabled = 1;
+        } else {
+          glogf("Unable to start ethernet (%s).\n", g_ethernet_interface);
+        }
     }
-    set_tfe_interface(ppname);     //Connect the emulated ethernet device with the selected host adapter
-    lib_free(ppname);
-    lib_free(ppdes);
-    tfe_init();
+
   }
 #endif
 
@@ -992,7 +888,6 @@ int gsplusmain(int argc, char **argv) {
 
   do_reset();
   g_stepping = 0;
-  g_dbg_step = 0;
 
   // OG Notify emulator has been initialized and ready to accept external events
   g_initialized = 1;
@@ -1003,8 +898,6 @@ int gsplusmain(int argc, char **argv) {
     do_go_debug();
   } else {
     do_go();
-    /* If we get here, we hit a breakpoint, call debug intfc */
-    do_debug_intfc();
   }
 
   // OG Notify emulator is being closed, and cannot accept events anymore
@@ -1019,6 +912,13 @@ int gsplusmain(int argc, char **argv) {
   fixed_memory_ptrs_shut();
   load_roms_shut_memory();
   clear_fatal_logs();
+
+#if HAVE_RAWNET
+  if (g_ethernet_enabled) {
+    cs8900_deactivate();
+    cs8900_shutdown();
+  }
+#endif
 
   // OG Not needed anymore : the emulator will quit gently
   //my_exit(0);
@@ -1095,7 +995,7 @@ void gsport_expand_path(char *out_ptr, const char *in_ptr, int maxlen)      {
         if(!strncmp("0", name_buf, 128)) {
           /* Replace ${0} with g_argv0_path */
           tmp_ptr = &(g_argv0_path[0]);
-#if defined (_WIN32) && !defined(WIN_SDL)|| defined(__CYGWIN__) && !defined(WIN_SDL)
+#if defined(_WIN32) && !defined(HAVE_SDL)
         } else if(!strncmp("PWD", name_buf, 128)) {
           /* Replace ${PWD} with cwd in Windows */
           get_cwd(out_ptr,128);
@@ -1464,7 +1364,7 @@ void setup_zip_speeds()      {
   }
 }
 
-void run_prog()      {
+int run_prog()      {
   Fplus   *fplus_ptr;
   Event   *this_event;
   Event   *db1;
@@ -1576,7 +1476,7 @@ void run_prog()      {
     engine.fcycles = prerun_fcycles;
     fcycles_stop = (g_event_start.next->dcycs - g_last_vbl_dcycs) +
                    0.001;
-    if(g_stepping || g_dbg_step < 0) {
+    if(g_stepping || engine.flags) {
       fcycles_stop = prerun_fcycles;
     }
     g_fcycles_stop = fcycles_stop;
@@ -1612,13 +1512,14 @@ void run_prog()      {
     if(ret != 0) {
       g_engine_action++;
       handle_action(ret);
+      ret >>= 28;
     }
 
-    if(halt_sim == HALT_EVENT) {
+    if(halt_sim & HALT_EVENT) {
       g_engine_halt_event++;
       /* if we needed to stop to check for interrupts, */
       /*  clear halt */
-      halt_sim = 0;
+      halt_sim &= ~HALT_EVENT;
     }
 
 #if 0
@@ -1635,10 +1536,10 @@ void run_prog()      {
 
     this_event = g_event_start.next;
     while(dcycs >= this_event->dcycs) {
-      if(halt_sim != 0 && halt_sim != HALT_EVENT) {
+      if(halt_sim & ~HALT_EVENT) {
         break;
       }
-      if(g_stepping || g_dbg_step != 0) {
+      if(g_stepping) {
         printf("HIT STEPPING BREAK!\n");
         break;
       }
@@ -1705,19 +1606,36 @@ void run_prog()      {
     }
 #endif
 
-    if(halt_sim != 0 && halt_sim != HALT_EVENT) {
+
+    if (ret == RET_MP) break;
+    if (ret == RET_BP) break;
+    if (ret == RET_BRK) break;
+    if (ret == RET_COP) break;
+    engine.flags &= ~(FLAG_IGNORE_BP | FLAG_IGNORE_MP | FLAG_IGNORE_BRK);
+    if(g_stepping) {
+      ret = 0;
       break;
     }
-    if(g_stepping || g_dbg_step != 0) {
+    if (halt_sim & ~HALT_EVENT) {
+      if(halt_sim & 0x07) {
+        /* halt_printf() */
+        halt_sim &= ~0x07;
+        ret = RET_HALT;
+      }
       break;
     }
+
   }
 
+#if 0
   if(!g_testing) {
     printf("leaving run_prog, halt_sim:%d\n", halt_sim);
   }
+#endif
 
   x_auto_repeat_on(0);
+
+  return ret;
 }
 
 void add_irq(word32 irq_mask)      {
@@ -2321,6 +2239,7 @@ void init_reg()      {
   engine.direct = 0;
   engine.psr = 0x134;
   engine.fplus_ptr = 0;
+  engine.flags = 0;
 
 }
 
@@ -2330,9 +2249,6 @@ void handle_action(word32 ret)      {
 
   type = EXTRU(ret,3,4);
   switch(type) {
-    case RET_BREAK:
-      do_break(ret & 0xff);
-      break;
     case RET_COP:
       do_cop(ret & 0xff);
       break;
@@ -2350,14 +2266,6 @@ void handle_action(word32 ret)      {
     case RET_C70D:
       do_c70d(ret);
       break;
-#if 0
-    case RET_ADD_DEC_8:
-      do_add_dec_8(ret);
-      break;
-    case RET_ADD_DEC_16:
-      do_add_dec_16(ret);
-      break;
-#endif
     case RET_IRQ:
       irq_printf("Special fast IRQ response.  irq_pending: %x\n",
                  g_irq_pending);
@@ -2367,6 +2275,12 @@ void handle_action(word32 ret)      {
       break;
     case RET_STP:
       do_stp();
+      break;
+    case RET_BP:
+    case RET_MP:
+    case RET_BRK:
+    case RET_HALT:
+      /* handled elsewhere */
       break;
     default:
       halt_printf("Unknown special action: %08x!\n", ret);
