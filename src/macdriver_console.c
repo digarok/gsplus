@@ -79,19 +79,15 @@ extern int g_screen_mdepth;
 Ptr g_mac_fullscreen_state = 0;
 Rect g_main_window_saved_rect;
 
-extern char *g_fatal_log_strs[];
-extern int g_fatal_log;
-
 int x_show_alert(int is_fatal, const char *str)     {
   DialogRef alert;
   DialogItemIndex out_item_hit;
-  CFStringRef cfstrref, cfstrref2;
+  CFStringRef cfstrref;
   CFStringRef okstrref;
   AlertStdCFStringAlertParamRec alert_param;
   OSStatus osstat;
-  char    *bufptr, *buf2ptr;
-  int sum, len;
-  int i;
+
+  if (!str || !*str) return 0;
 
   /* The dialog eats all events--including key-up events */
   /* Call adb_all_keys_up() to prevent annoying key-repeat problems */
@@ -100,36 +96,14 @@ int x_show_alert(int is_fatal, const char *str)     {
   /*  auto-repeat will repeat the key, and the dialog re-appears...*/
   adb_all_keys_up();
 
-  sum = 20;
-  for(i = 0; i < g_fatal_log; i++) {
-    sum += strlen(g_fatal_log_strs[i]);
-  }
-  bufptr = (char*)malloc(sum);
-  buf2ptr = bufptr;
-  for(i = 0; i < g_fatal_log; i++) {
-    len = strlen(g_fatal_log_strs[i]);
-    len = MIN(len, sum);
-    len = MAX(len, 0);
-    memcpy(bufptr, g_fatal_log_strs[i], MIN(len, sum));
-    bufptr += len;
-    bufptr[0] = 0;
-    sum = sum - len;
-  }
 
-  cfstrref = CFStringCreateWithCString(NULL, buf2ptr,
+  cfstrref = CFStringCreateWithCString(NULL, str,
                                        kCFStringEncodingMacRoman);
 
-  printf("buf2ptr: :%s:\n", buf2ptr);
 
   osstat = GetStandardAlertDefaultParams(&alert_param,
                                          kStdCFStringAlertVersionOne);
 
-  if(str) {
-    // Provide an extra option--create a file
-    cfstrref2 = CFStringCreateWithFormat(kCFAllocatorDefault, NULL,
-                                         CFSTR("Create ./%s"), str);
-    alert_param.otherText = cfstrref2;
-  }
   okstrref = CFSTR("Click OK to continue");
   if(is_fatal) {
     okstrref = CFSTR("Click OK to exit GSplus");
@@ -138,12 +112,9 @@ int x_show_alert(int is_fatal, const char *str)     {
                       &alert_param, &alert);
   out_item_hit = -1;
   RunStandardAlert(alert, NULL, &out_item_hit);
-  printf("out_item_hit: %d\n", out_item_hit);
-  free(buf2ptr);
 
-  clear_fatal_logs();                   /* free the fatal_log string memory */
+  CFRelease(cfstrref);
   return (out_item_hit >= 3);
-
 }
 
 
@@ -159,28 +130,18 @@ pascal OSStatus quit_event_handler(EventHandlerCallRef call_ref, EventRef event,
 }
 
 void show_simple_alert(char *str1, char *str2, char *str3, int num)      {
-  char buf[256];
+  char buf[4096];
 
-  g_fatal_log_strs[0] = gsplus_malloc_str(str1);
-  g_fatal_log_strs[1] = gsplus_malloc_str(str2);
-  g_fatal_log_strs[2] = gsplus_malloc_str(str3);
-  g_fatal_log = 3;
-  if(num != 0) {
-    snprintf(buf, 250, ": %d", num);
-    g_fatal_log_strs[g_fatal_log++] = gsplus_malloc_str(buf);
+  if (num) {
+    snprintf(buffer, sizeof(buffer), "%s%s%s: %d", str1, str2, str3, num);
+  } else {
+    snprintf(buffer, sizeof(buffer), "%s%s%s", str1, str2, str3);
   }
-  x_show_alert(0, 0);
+  x_show_alert(0, buf);
 }
 
 void x_dialog_create_gsport_conf(const char *str)      {
-  char    *path;
-  char tmp_buf[512];
-  int ret;
-
-  ret = x_show_alert(1, str);
-  if(ret) {
-    config_write_config_gsplus_file();
-  }
+  config_write_config_gsplus_file();
 }
 
 
@@ -698,11 +659,6 @@ CantGetNibRef:
 
 void xdriver_end()      {
 
-  printf("xdriver_end\n");
-
-  if(g_fatal_log >= 0) {
-    x_show_alert(1, 0);
-  }
 }
 
 

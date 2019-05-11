@@ -60,7 +60,12 @@ void x_dialog_create_gsport_conf(const char *str)      {
   config_write_config_gsplus_file();
 }
 
-int x_show_alert(int is_fatal, const char *str)     {
+int x_show_alert(int is_fatal, const char *str) {
+
+  if (str && *str) {
+    adb_all_keys_up();
+    MessageBox(NULL, str, "GS+", is_fatal ? MB_ICONERROR : MB_ICONWARNING);
+  }
   return 0;
 }
 
@@ -333,10 +338,6 @@ int main(int argc, char **argv) {
                              size.cx, size.cy,
                              NULL, NULL, GetModuleHandle(NULL), NULL);
 
-  printf("g_hwnd_main = %p, height = %d\n", hwnd, size.cx);
-  GetWindowRect(hwnd, &rect);
-  printf("...rect is: %ld, %ld, %ld, %ld\n", rect.left, rect.top,
-         rect.right, rect.bottom);
 
 #if 0
   // Enable non-blocking, character-at-a-time console I/O.
