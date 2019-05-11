@@ -8,8 +8,6 @@
 #include "defcomm.h"
 #include <stdint.h>
 
-#include <stdint.h>
-
 // OG redirect printf to console
 #ifdef ACTIVEGS
 #include <stdio.h>
@@ -231,6 +229,7 @@ STRUCT(Emustate_word32list) {
 								const char *str;
 								word32 *wptr;
 };
+
 
 
 #define ALTZP (g_c068_statereg & 0x80)

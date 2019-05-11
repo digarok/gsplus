@@ -349,6 +349,8 @@ int main(int argc, char **argv) {
 
   hook = SetWindowsHookEx(WH_KEYBOARD_LL, win_ll_keyboard, NULL, 0);
 
+  hook = SetWindowsHookEx(WH_KEYBOARD_LL, win_ll_keyboard, NULL, 0);
+
   gsportinit(hwnd);
   int ret =  gsplusmain(argc, argv);
 
