@@ -1,6 +1,6 @@
-# GS+ Pro Xtreme HD Developer Edition
+# GS+ 
 
-My personal fork of GSplus which is a fork of GSport which is fork of KEGS. Replaces the edbugger facilities with something more suitable for my tastes.
+An Apple IIgs emulator based on KEGS
 
 # Build instructions
 
