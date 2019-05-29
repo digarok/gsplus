@@ -389,7 +389,9 @@ extern char *x_readline(const char *prompt);
 
 
 uint32_t sweet16_asm_shell(uint32_t addr) {
-	
+
+	printf("%02x/%04x:\n", addr >> 16, addr & 0xffff);
+
 	for(;;) {
 		const char *cp = x_readline("!!");
 		if (!cp || !*cp) return addr;
