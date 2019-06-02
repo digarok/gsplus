@@ -1267,163 +1267,75 @@ int do_dis_json(char *buf, word32 kpc, int accsize, int xsize, int op_provided, 
   }
 
   switch(type) {
-    case ABS:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%04x",out,val);
-      break;
-    case ABSX:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%04x,X",out,val);
-      break;
-    case ABSY:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%04x,Y",out,val);
-      break;
-    case ABSLONG:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%06x",out,val);
-      break;
-    case ABSLONGX:
-      if(args != 3) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%06x,X",out,val);
-      break;
-    case ABSIND:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%04x)",out,val);
-      break;
-    case ABSXIND:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%04x,X)",out,val);
-      break;
-    case IMPLY:
-      if(args != 0) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
+    case IMPLIED:
       sprintf(buf_disasm,"%s",out);
       break;
-    case ACCUM:
-      if(args != 0) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s",out);
-      break;
-    case IMMED:
-      if(args == 1) {
-        sprintf(buf_disasm,"%s   #$%02x",out,val);
-      } else if(args == 2) {
-        sprintf(buf_disasm,"%s   #$%04x",out,val);
-      } else {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      break;
-    case JUST8:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
+    case DP:
+    case INTERRUPT:
       sprintf(buf_disasm,"%s   $%02x",out,val);
       break;
-    case DLOC:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%02x",out,val);
-      break;
-    case DLOCX:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
+    case DP_X:
       sprintf(buf_disasm,"%s   $%02x,X",out,val);
       break;
-    case DLOCY:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
+    case DP_Y:
       sprintf(buf_disasm,"%s   $%02x,Y",out,val);
       break;
-    case DLOCIND:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%02x)",out,val);
+    case ABS:
+      sprintf(buf_disasm,"%s   $%04x",out,val);
       break;
-    case DLOCINDY:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%02x),Y",out,val);
+    case ABS_X:
+      sprintf(buf_disasm,"%s   $%04x,X",out,val);
       break;
-    case DLOCXIND:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%02x,X)",out,val);
+    case ABS_Y:
+      sprintf(buf_disasm,"%s   $%04x,Y",out,val);
       break;
-    case DLOCBRAK:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   [$%02x]",out,val);
+    case ABS_LONG:
+      sprintf(buf_disasm,"%s   $%06x",out,val);
       break;
-    case DLOCBRAKY:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   [$%02x],y",out,val);
+    case ABS_LONG_X:
+      sprintf(buf_disasm,"%s   $%06x,X",out,val);
       break;
-    case DISP8:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      signed_val = (signed char)val;
+
+    case INDIR:
+      sprintf(buf_disasm,"%s   ($%0*x)",out,args*2,val);
+      break;
+    case INDIR_X:
+      sprintf(buf_disasm,"%s   ($%0*x,X)",out,args*2,val);
+      break;
+    case INDIR_Y:
+      sprintf(buf_disasm,"%s   ($%0*x),Y",out,args*2,val);
+      break;
+
+    case INDIR_LONG:
+      sprintf(buf_disasm,"%s   [$%0*x]",out,args*2,val);
+      break;
+    case INDIR_LONG_Y:
+      sprintf(buf_disasm,"%s   [$%0*x],Y",out,args*2,val);
+      break;
+
+    case IMMED:
+      sprintf(buf_disasm,"%s   #$%0*x",out, args*2, val);
+      break;
+
+    case SR:
+      sprintf(buf_disasm,"%s   $%02x,S",out,val);
+      break;
+
+    case SR_Y:
+      sprintf(buf_disasm,"%s   ($%02x,S),Y",out,val);
+      break;
+
+    case RELATIVE:
+      signed_val = args == 1 ? (signed char)val : (signed short)val;
+
       sprintf(buf_disasm,"%s   $%04x",out,
               (word32)(kpc+(signed_val)) & 0xffff);
       break;
-    case DISP8S:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%02x,S",out,(word32)(byte)(val));
+
+    case BLOCK:
+      sprintf(buf_disasm,"%s   $%02x,$%02x",out,val>>8, val&0xff);
       break;
-    case DISP8SINDY:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   ($%02x,S),Y",out,(word32)(byte)(val));
-      break;
-    case DISP16:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%04x", out,
-              (word32)(kpc+(signed)(word16)(val)) & 0xffff);
-      break;
-    case MVPMVN:
-      if(args != 2) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   $%02x,$%02x",out,val&0xff,val>>8);
-      break;
-    case SEPVAL:
-    case REPVAL:
-      if(args != 1) {
-        printf("arg # mismatch for opcode %x\n", opcode);
-      }
-      sprintf(buf_disasm,"%s   #$%02x",out,val);
-      break;
+
     default:
       printf("argument type: %d unexpected\n", type);
       break;

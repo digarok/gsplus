@@ -1,0 +1,877 @@
+
+#include <stdio.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+
+#include "defc.h"
+
+extern int g_disasm_psr;
+
+
+static uint32_t to_hex(const char *iter, const char *end) {
+  uint32_t rv = 0;
+  while(iter != end) {
+    char c = *iter++;
+    rv <<= 4;
+    if (isdigit(c)) rv |= c - '0';
+    else rv |= (c | 0x20) - 'a' + 10;
+  }
+  return rv;
+}
+
+static const char *ltrim(const char *cp) {
+  while (isspace(*cp)) ++cp;
+  return cp;
+}
+
+/*!re2c
+  re2c:define:YYCTYPE = char;
+  re2c:yyfill:enable = 0;
+  eol = "\x00";
+  ws = [ \t];
+  x = [A-Fa-f0-9];
+*/
+
+
+/* address modes */
+/* INDIR_LONG_X present for +1/+2 symmetry */
+#define _x 1
+#define _y 2
+enum {
+	IMPLIED,
+	DP, DP_X, DP_Y,
+	ABS, ABS_X, ABS_Y,
+	ABS_LONG, ABS_LONG_X, ABS_LONG_Y,
+	INDIR, INDIR_X, INDIR_Y,
+	INDIR_LONG, INDIR_LONG_X, INDIR_LONG_Y,
+	SR, SR_Y,
+	IMMEDIATE,
+	RELATIVE,
+	INTERRUPT,
+	BLOCK,
+};
+
+
+enum {
+	MNEMONIC_NONE,
+	#define x(a, b) a,
+	#include "mnemonics.x"
+	#undef x
+	MNEMONIC_LAST
+};
+
+enum {
+  TOOL_CALL = MNEMONIC_LAST,
+  GSOS_CALL,
+  MLI_CALL,
+  LONG_SHORT,
+};
+
+struct mnemonic_entry {
+	const char *name;
+	int value;
+	unsigned mnemonic;
+};
+struct mnemonic_entry mnemonic_table[] = {
+	{ NULL, 0 },
+	#define x(a, b) { #a, b, a },
+	#include "mnemonics.x"
+	#undef x
+};
+
+
+
+struct cookie {
+	unsigned mnemonic;
+	unsigned mode;
+	unsigned size;
+	unsigned opcode;
+	unsigned operand;
+	unsigned pc;
+	unsigned extra;
+};
+
+
+
+struct opcode_entry {
+	unsigned mnemonic;
+	unsigned mode;
+	unsigned opcode;
+	unsigned size; /* of operand */
+};
+
+/* 4 = 1/2 depending on M. 5 = 1/2 depending on X */
+struct opcode_entry opcode_table[] = {
+
+  { ADC, INDIR_X     , 0x61, 1 },
+  { ADC, SR          , 0x63, 1 },
+  { ADC, DP          , 0x65, 1 },
+  { ADC, INDIR_LONG  , 0x67, 1 },
+  { ADC, IMMEDIATE   , 0x69, 4 },
+  { ADC, ABS         , 0x6d, 2 },
+  { ADC, ABS_LONG    , 0x6f, 3 },
+  { ADC, INDIR_Y     , 0x71, 1 },
+  { ADC, INDIR       , 0x72, 1 },
+  { ADC, SR_Y        , 0x73, 1 },
+  { ADC, DP_X        , 0x75, 1 },
+  { ADC, INDIR_LONG_Y, 0x77, 1 },
+  { ADC, ABS_Y       , 0x79, 2 },
+  { ADC, ABS_X       , 0x7d, 2 },
+  { ADC, ABS_LONG_X  , 0x7f, 3 },
+  { AND, INDIR_X     , 0x21, 1 },
+  { AND, SR          , 0x23, 1 },
+  { AND, DP          , 0x25, 1 },
+  { AND, INDIR_LONG  , 0x27, 1 },
+  { AND, IMMEDIATE   , 0x29, 4 },
+  { AND, ABS         , 0x2d, 2 },
+  { AND, ABS_LONG    , 0x2f, 3 },
+  { AND, INDIR_Y     , 0x31, 1 },
+  { AND, INDIR       , 0x32, 1 },
+  { AND, SR_Y        , 0x33, 1 },
+  { AND, DP_X        , 0x35, 1 },
+  { AND, INDIR_LONG_Y, 0x37, 1 },
+  { AND, ABS_Y       , 0x39, 2 },
+  { AND, ABS_X       , 0x3d, 2 },
+  { AND, ABS_LONG_X  , 0x3f, 3 },
+  { ASL, DP          , 0x06, 1 },
+  { ASL, IMPLIED     , 0x0a, 0 },
+  { ASL, ABS         , 0x0e, 2 },
+  { ASL, DP_X        , 0x16, 1 },
+  { ASL, ABS_X       , 0x1e, 2 },
+  { BCC, RELATIVE    , 0x90, 1 },
+  { BCS, RELATIVE    , 0xb0, 1 },
+  { BEQ, RELATIVE    , 0xf0, 1 },
+  { BIT, DP          , 0x24, 1 },
+  { BIT, ABS         , 0x2c, 2 },
+  { BIT, DP_X        , 0x34, 1 },
+  { BIT, ABS_X       , 0x3c, 2 },
+  { BIT, IMMEDIATE   , 0x89, 4 },
+  { BMI, RELATIVE    , 0x30, 1 },
+  { BNE, RELATIVE    , 0xd0, 1 },
+  { BPL, RELATIVE    , 0x10, 1 },
+  { BRA, RELATIVE    , 0x80, 1 },
+  /* brk dp, #imm */
+  { BRK, INTERRUPT   , 0x00, 1 }, { BRK, DP          , 0x00, 1 }, { BRK, IMMEDIATE   , 0x00, 1 },
+  { BRL, RELATIVE    , 0x82, 2 },
+  { BVC, RELATIVE    , 0x50, 1 },
+  { BVS, RELATIVE    , 0x70, 1 },
+  { CLC, IMPLIED     , 0x18, 0 },
+  { CLD, IMPLIED     , 0xd8, 0 },
+  { CLI, IMPLIED     , 0x58, 0 },
+  { CLV, IMPLIED     , 0xb8, 0 },
+  { CMP, INDIR_X     , 0xc1, 1 },
+  { CMP, SR          , 0xc3, 1 },
+  { CMP, DP          , 0xc5, 1 },
+  { CMP, INDIR_LONG  , 0xc7, 1 },
+  { CMP, IMMEDIATE   , 0xc9, 4 },
+  { CMP, ABS         , 0xcd, 2 },
+  { CMP, ABS_LONG    , 0xcf, 3 },
+  { CMP, INDIR_Y     , 0xd1, 1 },
+  { CMP, INDIR       , 0xd2, 1 },
+  { CMP, SR_Y        , 0xd3, 1 },
+  { CMP, DP_X        , 0xd5, 1 },
+  { CMP, INDIR_LONG_Y, 0xd7, 1 },
+  { CMP, ABS_Y       , 0xd9, 2 },
+  { CMP, ABS_X       , 0xdd, 2 },
+  { CMP, ABS_LONG_X  , 0xdf, 3 },
+  /* COP dp, #imm */
+  { COP, INTERRUPT   , 0x02, 1 }, { COP, DP          , 0x02, 1 }, { COP, IMMEDIATE   , 0x02, 1 },
+  { CPX, IMMEDIATE   , 0xe0, 5 },
+  { CPX, DP          , 0xe4, 1 },
+  { CPX, ABS         , 0xec, 2 },
+  { CPY, IMMEDIATE   , 0xc0, 5 },
+  { CPY, DP          , 0xc4, 1 },
+  { CPY, ABS         , 0xcc, 2 },
+  { DEC, IMPLIED     , 0x3a, 0 },
+  { DEC, DP          , 0xc6, 1 },
+  { DEC, ABS         , 0xce, 2 },
+  { DEC, DP_X        , 0xd6, 1 },
+  { DEC, ABS_X       , 0xde, 2 },
+  { DEX, IMPLIED     , 0xca, 0 },
+  { DEY, IMPLIED     , 0x88, 0 },
+  { EOR, INDIR_X     , 0x41, 1 },
+  { EOR, SR          , 0x43, 1 },
+  { EOR, DP          , 0x45, 1 },
+  { EOR, INDIR_LONG  , 0x47, 1 },
+  { EOR, IMMEDIATE   , 0x49, 4 },
+  { EOR, ABS         , 0x4d, 2 },
+  { EOR, ABS_LONG    , 0x4f, 3 },
+  { EOR, INDIR_Y     , 0x51, 1 },
+  { EOR, INDIR       , 0x52, 1 },
+  { EOR, SR_Y        , 0x53, 1 },
+  { EOR, DP_X        , 0x55, 1 },
+  { EOR, INDIR_LONG_Y, 0x57, 1 },
+  { EOR, ABS_Y       , 0x59, 2 },
+  { EOR, ABS_X       , 0x5d, 2 },
+  { EOR, ABS_LONG_X  , 0x5f, 3 },
+  { INC, IMPLIED     , 0x1a, 0 },
+  { INC, DP          , 0xe6, 1 },
+  { INC, ABS         , 0xee, 2 },
+  { INC, DP_X        , 0xf6, 1 },
+  { INC, ABS_X       , 0xfe, 2 },
+  { INX, IMPLIED     , 0xe8, 0 },
+  { INY, IMPLIED     , 0xc8, 0 },
+  { JML, ABS_LONG    , 0x5c, 3 }, { JML, ABS         , 0x5c, 3 }, { JML, DP          , 0x5c, 3 },
+  { JML, INDIR_LONG  , 0xdc, 2 },
+  { JMP, ABS         , 0x4c, 2 }, { JMP, DP          , 0x4c, 2 },
+  { JMP, INDIR       , 0x6c, 2 },
+  { JMP, INDIR_X     , 0x7c, 2 },
+  { JMP, INDIR_LONG  , 0xdc, 2 }, /* jml */
+  { JSL, ABS_LONG    , 0x22, 3 }, { JSL, ABS         , 0x22, 3 }, { JSL, DP          , 0x22, 3 },
+  { JSR, ABS         , 0x20, 2 }, { JSR, DP          , 0x20, 2 },
+  { JSR, INDIR_X     , 0xfc, 2 },
+  { LDA, INDIR_X     , 0xa1, 1 },
+  { LDA, SR          , 0xa3, 1 },
+  { LDA, DP          , 0xa5, 1 },
+  { LDA, INDIR_LONG  , 0xa7, 1 },
+  { LDA, IMMEDIATE   , 0xa9, 4 },
+  { LDA, ABS         , 0xad, 2 },
+  { LDA, ABS_LONG    , 0xaf, 3 },
+  { LDA, INDIR_Y     , 0xb1, 1 },
+  { LDA, INDIR       , 0xb2, 1 },
+  { LDA, SR_Y        , 0xb3, 1 },
+  { LDA, DP_X        , 0xb5, 1 },
+  { LDA, INDIR_LONG_Y, 0xb7, 1 },
+  { LDA, ABS_Y       , 0xb9, 2 },
+  { LDA, ABS_X       , 0xbd, 2 },
+  { LDA, ABS_LONG_X  , 0xbf, 3 },
+  { LDX, IMMEDIATE   , 0xa2, 5 },
+  { LDX, DP          , 0xa6, 1 },
+  { LDX, ABS         , 0xae, 2 },
+  { LDX, DP_Y        , 0xb6, 1 },
+  { LDX, ABS_Y       , 0xbe, 2 },
+  { LDY, IMMEDIATE   , 0xa0, 5 },
+  { LDY, DP          , 0xa4, 1 },
+  { LDY, ABS         , 0xac, 2 },
+  { LDY, DP_X        , 0xb4, 1 },
+  { LDY, ABS_X       , 0xbc, 2 },
+  { LSR, DP          , 0x46, 1 },
+  { LSR, IMPLIED     , 0x4a, 0 },
+  { LSR, ABS         , 0x4e, 2 },
+  { LSR, DP_X        , 0x56, 1 },
+  { LSR, ABS_X       , 0x5e, 2 },
+  { MVN, BLOCK       , 0x54, 2 },
+  { MVP, BLOCK       , 0x44, 2 },
+  { NOP, IMPLIED     , 0xea, 0 },
+  { ORA, INDIR_X     , 0x01, 1 },
+  { ORA, SR          , 0x03, 1 },
+  { ORA, DP          , 0x05, 1 },
+  { ORA, INDIR_LONG  , 0x07, 1 },
+  { ORA, IMMEDIATE   , 0x09, 4 },
+  { ORA, ABS         , 0x0d, 2 },
+  { ORA, ABS_LONG    , 0x0f, 3 },
+  { ORA, INDIR_Y     , 0x11, 1 },
+  { ORA, INDIR       , 0x12, 1 },
+  { ORA, SR_Y        , 0x13, 1 },
+  { ORA, DP_X        , 0x15, 1 },
+  { ORA, INDIR_LONG_Y, 0x17, 1 },
+  { ORA, ABS_Y       , 0x19, 2 },
+  { ORA, ABS_X       , 0x1d, 2 },
+  { ORA, ABS_LONG_X  , 0x1f, 3 },
+  /* pea abs or pea #imm */
+  { PEA, ABS         , 0xf4, 2 }, { PEA, DP          , 0xf4, 2 }, { PEA, IMMEDIATE   , 0xf4, 2 },
+  /* pei (dp) or pei dp */
+  { PEI, INDIR       , 0xd4, 1 }, { PEI, DP          , 0xd4, 1 },
+  { PER, RELATIVE    , 0x62, 2 },
+  { PHA, IMPLIED     , 0x48, 0 },
+  { PHB, IMPLIED     , 0x8b, 0 },
+  { PHD, IMPLIED     , 0x0b, 0 },
+  { PHK, IMPLIED     , 0x4b, 0 },
+  { PHP, IMPLIED     , 0x08, 0 },
+  { PHX, IMPLIED     , 0xda, 0 },
+  { PHY, IMPLIED     , 0x5a, 0 },
+  { PLA, IMPLIED     , 0x68, 0 },
+  { PLB, IMPLIED     , 0xab, 0 },
+  { PLD, IMPLIED     , 0x2b, 0 },
+  { PLP, IMPLIED     , 0x28, 0 },
+  { PLX, IMPLIED     , 0xfa, 0 },
+  { PLY, IMPLIED     , 0x7a, 0 },
+  { REP, IMMEDIATE   , 0xc2, 1 },
+  { ROL, DP          , 0x26, 1 },
+  { ROL, IMPLIED     , 0x2a, 0 },
+  { ROL, ABS         , 0x2e, 2 },
+  { ROL, DP_X        , 0x36, 1 },
+  { ROL, ABS_X       , 0x3e, 2 },
+  { ROR, DP          , 0x66, 1 },
+  { ROR, IMPLIED     , 0x6a, 0 },
+  { ROR, ABS         , 0x6e, 2 },
+  { ROR, DP_X        , 0x76, 1 },
+  { ROR, ABS_X       , 0x7e, 2 },
+  { RTI, IMPLIED     , 0x40, 0 },
+  { RTL, IMPLIED     , 0x6b, 0 },
+  { RTS, IMPLIED     , 0x60, 0 },
+  { SBC, INDIR_X     , 0xe1, 1 },
+  { SBC, SR          , 0xe3, 1 },
+  { SBC, DP          , 0xe5, 1 },
+  { SBC, INDIR_LONG  , 0xe7, 1 },
+  { SBC, IMMEDIATE   , 0xe9, 4 },
+  { SBC, ABS         , 0xed, 2 },
+  { SBC, ABS_LONG    , 0xef, 3 },
+  { SBC, INDIR_Y     , 0xf1, 1 },
+  { SBC, INDIR       , 0xf2, 1 },
+  { SBC, SR_Y        , 0xf3, 1 },
+  { SBC, DP_X        , 0xf5, 1 },
+  { SBC, INDIR_LONG_Y, 0xf7, 1 },
+  { SBC, ABS_Y       , 0xf9, 2 },
+  { SBC, ABS_X       , 0xfd, 2 },
+  { SBC, ABS_LONG_X  , 0xff, 3 },
+  { SEC, IMPLIED     , 0x38, 0 },
+  { SED, IMPLIED     , 0xf8, 0 },
+  { SEI, IMPLIED     , 0x78, 0 },
+  { SEP, IMMEDIATE   , 0xe2, 1 },
+  { STA, INDIR_X     , 0x81, 1 },
+  { STA, SR          , 0x83, 1 },
+  { STA, DP          , 0x85, 1 },
+  { STA, INDIR_LONG  , 0x87, 1 },
+  { STA, ABS         , 0x8d, 2 },
+  { STA, ABS_LONG    , 0x8f, 3 },
+  { STA, INDIR_Y     , 0x91, 1 },
+  { STA, INDIR       , 0x92, 1 },
+  { STA, SR_Y        , 0x93, 1 },
+  { STA, DP_X        , 0x95, 1 },
+  { STA, INDIR_LONG_Y, 0x97, 1 },
+  { STA, ABS_Y       , 0x99, 2 },
+  { STA, ABS_X       , 0x9d, 2 },
+  { STA, ABS_LONG_X  , 0x9f, 3 },
+  { STP, IMPLIED     , 0xdb, 0 },
+  { STX, DP          , 0x86, 1 },
+  { STX, ABS         , 0x8e, 2 },
+  { STX, DP_Y        , 0x96, 1 },
+  { STY, DP          , 0x84, 1 },
+  { STY, ABS         , 0x8c, 2 },
+  { STY, DP_X        , 0x94, 1 },
+  { STZ, DP          , 0x64, 1 },
+  { STZ, DP_X        , 0x74, 1 },
+  { STZ, ABS         , 0x9c, 2 },
+  { STZ, ABS_X       , 0x9e, 2 },
+  { TAX, IMPLIED     , 0xaa, 0 },
+  { TAY, IMPLIED     , 0xa8, 0 },
+  { TCD, IMPLIED     , 0x5b, 0 },
+  { TCS, IMPLIED     , 0x1b, 0 },
+  { TDC, IMPLIED     , 0x7b, 0 },
+  { TRB, DP          , 0x14, 1 },
+  { TRB, ABS         , 0x1c, 2 },
+  { TSB, DP          , 0x04, 1 },
+  { TSB, ABS         , 0x0c, 2 },
+  { TSC, IMPLIED     , 0x3b, 0 },
+  { TSX, IMPLIED     , 0xba, 0 },
+  { TXA, IMPLIED     , 0x8a, 0 },
+  { TXS, IMPLIED     , 0x9a, 0 },
+  { TXY, IMPLIED     , 0x9b, 0 },
+  { TYA, IMPLIED     , 0x98, 0 },
+  { TYX, IMPLIED     , 0xbb, 0 },
+  { WAI, IMPLIED     , 0xcb, 0 },
+  { WDM, INTERRUPT   , 0x42, 1 },
+  { XBA, IMPLIED     , 0xeb, 0 },
+  { XCE, IMPLIED     , 0xfb, 0 },
+
+};
+
+
+/* generate an index of mnemonics to opcodes in the opcode_table */
+struct opcode_entry *opcode_table_index[MNEMONIC_LAST+1] = { 0 };
+static void init_table_index(void) {
+	unsigned i;
+	unsigned prev = 0;
+
+	opcode_table_index[0] = &opcode_table[0];
+	for (i = 1; i < sizeof(opcode_table) / sizeof(opcode_table[0]); ++i) {
+		if (opcode_table[i].mnemonic != prev) {
+			prev = opcode_table[i].mnemonic;
+			opcode_table_index[prev] = &opcode_table[i];
+		}
+	}
+	opcode_table_index[++prev] = &opcode_table[i];
+}
+
+
+static int find_opcode(struct cookie *cookie) {
+
+
+	unsigned mode = cookie->mode;
+
+  if (cookie->mnemonic >= MNEMONIC_LAST) return -1;
+
+	const struct opcode_entry *iter = opcode_table_index[cookie->mnemonic];
+	const struct opcode_entry *end = opcode_table_index[cookie->mnemonic + 1];
+
+	/* special case for relative */
+	if (iter->mode == RELATIVE) {
+
+		if (mode == DP || mode == ABS) {
+			cookie->mode = RELATIVE;
+			cookie->size = iter->size;
+			return cookie->opcode = iter->opcode;
+		}
+		return -1;
+	}
+
+	for ( ; iter != end; ++iter) {
+		if (mode == iter->mode) break;
+	}
+	if (iter == end) return -1;
+
+	cookie->size = iter->size;
+	if (iter->size == 4) {
+		cookie->size = g_disasm_psr & 0x20 ? 1 : 2;
+	}
+	if (iter->size == 5) {
+		cookie->size = g_disasm_psr & 0x10 ? 1 : 2;
+	}
+
+	return cookie->opcode = iter->opcode;
+}
+
+
+/* long m,x | mx | ai | i | a, etc */
+static const char *parse_mx(const char *cp, struct cookie *cookie) {
+  unsigned rv = 0;
+  char c;
+  for( ; (c = *cp); ++cp) {
+    if (isspace(c)) break;
+    if (c == ',') continue;
+    c = toupper(c);
+    if (c == 'M' || c == 'A') rv |= 0x20;
+    else if (c == 'X' || c == 'I') rv |= 0x10;
+    else return NULL;
+  }
+
+  if (rv == 0) rv = 0x30;
+  cookie->operand = rv;
+  return ltrim(cp);
+}
+
+static const char *parse_expr(const char *cp, struct cookie *cookie) {
+
+  const char *YYCURSOR = cp;
+  const char *YYMARKER = NULL;
+  const char *YYCTXMARKER = NULL;
+  unsigned mask = 0xffffff;
+	if (!cp) return NULL;
+
+	cookie->size = 0;
+	switch(*cp) {
+    case '<': ++cp; cookie->size = 1; mask = 0xff; break;
+		case '|': ++cp; cookie->size = 2; mask = 0xffff; break;
+		case '>': ++cp; cookie->size = 3; mask = 0xffffff; break;
+	}
+  YYCURSOR = cp;
+
+	/*!re2c
+	* { return NULL; }
+	'*' {
+		cookie->operand = cookie->pc;
+		if (!cookie->size) cookie->size = 2;
+		return YYCURSOR;
+	}
+	'*' [+-] x{1,4} {
+		int tmp = to_hex(cp + 2, YYCURSOR);
+		if (cp[1] == '-') tmp = -tmp;
+		cookie->operand = cookie->pc + tmp;
+		if (!cookie->size) cookie->size = 2;
+		return YYCURSOR;
+	}
+
+	x{1,6} {
+		cookie->operand = to_hex(cp, YYCURSOR) & mask;
+		if (!cookie->size) cookie->size = ((YYCURSOR - cp + 1) & ~1)>>1;
+    return YYCURSOR;
+	}
+
+	*/
+
+}
+
+static const char *parse_tail(const char *cp, struct cookie *cookie) {
+
+  const char *YYCURSOR = cp;
+  const char *YYMARKER = NULL;
+  const char *YYCTXMARKER = NULL;
+
+	if (!cp) return cp;
+	/*!re2c
+	"" { return cp; }
+	',s' { cookie->mode = SR; return YYCURSOR; }
+	',x' { cookie->mode += _x; return YYCURSOR; }
+	',y' { cookie->mode += _y; return YYCURSOR; }
+	*/
+}
+static const char *parse_paren_tail(const char *cp, struct cookie *cookie) {
+
+  const char *YYCURSOR = cp;
+  const char *YYMARKER = NULL;
+  const char *YYCTXMARKER = NULL;
+
+	if (!cp) return cp;
+	/*!re2c
+	* { return NULL; }
+	')' { return YYCURSOR; }
+	'),y' { cookie->mode += _y; return YYCURSOR; }
+	',x)' { cookie->mode += _x; return YYCURSOR; }
+	',s),y' { cookie->mode = SR_Y; return YYCURSOR; }
+	*/
+
+}
+
+static const char *parse_bracket_tail(const char *cp, struct cookie *cookie) {
+
+  const char *YYCURSOR = cp;
+  const char *YYMARKER = NULL;
+  const char *YYCTXMARKER = NULL;
+
+	if (!cp) return cp;
+	/*!re2c
+	* { return NULL; }
+	']' { return YYCURSOR; }
+	'],y' { cookie->mode += _y; return YYCURSOR; }
+	*/
+}
+
+static int mnemonic_cmp(const void *a, const void *b) {
+	int key = (unsigned)(uintptr_t)a;
+	const struct mnemonic_entry *e = b;
+	return key - e->value;
+}
+
+#define kBLT 0x424c54
+#define kBGE 0x424745
+static const char *parse_opcode(const char *cp, struct cookie *cookie) {
+
+  const char *YYCURSOR = cp;
+  const char *YYMARKER = NULL;
+  const char *YYCTXMARKER = NULL;
+
+	/*!re2c
+	* { return NULL; }
+
+  '_' [A-Za-z] {0,16} / (ws|eol) {
+
+    extern int lookup_tool_number(const char *name, unsigned vector);
+
+    char name[20];
+    int i;
+
+    memcpy(name, cp, YYCURSOR - cp);
+    name[YYCURSOR - cp] = 0;
+
+    for (i = 0; i < 3; ++i) {
+      static unsigned vectors[] = { 0xe10000, 0xe100a8, 0xbf00 };
+      static unsigned types[] = { TOOL_CALL, GSOS_CALL, MLI_CALL };
+
+      int tool = lookup_tool_number(name, vectors[i]);
+      if (tool <= 0) continue;
+      cookie->mnemonic = types[i];
+      cookie->extra = tool;
+      return ltrim(YYCURSOR);
+    }
+    return NULL;
+  }
+
+  'long' / (ws|eol) {
+    cookie->mnemonic = LONG_SHORT;
+    cookie->mode = 0;
+    return ltrim(YYCURSOR);
+  }
+  'short' / (ws|eol) {
+    cookie->mnemonic = LONG_SHORT;
+    cookie->mode = 1;
+    return ltrim(YYCURSOR);
+  }
+
+
+	[A-Za-z]{3} / (ws|eol) {
+
+		uint32_t tmp = 0;
+		struct mnemonic_entry *e;
+    unsigned i;
+
+		for (i = 0; i < 3; ++i) { tmp <<= 8; tmp |= (cp[i] & ~0x20); }
+		e = bsearch((void *)(uintptr_t)tmp, mnemonic_table,
+      sizeof(mnemonic_table) / sizeof(mnemonic_table[0]),
+      sizeof(mnemonic_table[0]), mnemonic_cmp);
+    if (e == NULL) {
+      if (tmp == kBLT) e = &mnemonic_table[BCC];
+      if (tmp == kBGE) e = &mnemonic_table[BCS];
+    }
+		if (!e) return NULL;
+		cookie->mnemonic = e->mnemonic;
+		cookie->mode = IMPLIED;
+		cookie->operand = 0;
+		cookie->size = 0;
+		return ltrim(YYCURSOR);
+	}
+	*/
+
+}
+
+
+
+static const char *parse_operand(const char *cp, struct cookie *cookie) {
+
+  if (!cp) return NULL;
+
+
+  /* special case for MVN/MVP */
+  if (cookie->mnemonic == MVN || cookie->mnemonic == MVP) {
+
+    unsigned tmp;
+    cp = parse_expr(cp, cookie);
+    if (!cp) return NULL;
+    if (*cp++ != ',') return NULL;
+    tmp = cookie->operand & 0xff;
+
+    cp = parse_expr(cp, cookie);
+    if (*cp && !isspace(*cp)) return NULL;
+
+    cookie->mode = BLOCK;
+    cookie->operand &= 0xff;
+    cookie->operand |= tmp << 8;
+    cookie->size = 2;
+    return ltrim(cp);
+  }
+  /* special case for mli/gsos calls [?] */
+  switch (*cp) {
+
+    case '#':
+      cookie->mode = IMMEDIATE;
+      cp = parse_expr(cp + 1, cookie);
+      break;
+    case '(':
+      cookie->mode = INDIR;
+      cp = parse_expr(cp+1, cookie);
+      cp = parse_paren_tail(cp, cookie);
+      break;
+    case '[':
+      cookie->mode = INDIR_LONG;
+      cp = parse_expr(cp + 1, cookie);
+      cp = parse_bracket_tail(cp, cookie);
+      break;
+    default:
+      cookie->mode = ABS;
+      cp = parse_expr(cp, cookie);
+      switch(cookie->size) {
+        case 1: cookie->mode = DP; break;
+        case 3: cookie->mode = ABS_LONG; break;
+      }
+      cp = parse_tail(cp, cookie);
+      break;
+  }
+  if (!cp) return NULL;
+  if (*cp && !isspace(*cp)) return NULL;
+  return ltrim(cp);
+}
+
+extern uint32_t do_list(uint32_t address, int lines);
+extern char *x_readline(const char *prompt);
+
+static int error(int offset, const char *msg) {
+	while (offset > 0) { fputc(' ', stderr); --offset; }
+	fputs(" ^", stderr);
+	fputs(msg, stderr);
+	fputc('\n', stderr);
+	return -1;
+}
+
+
+static const char *parse_pc(const char *cp, uint32_t *pc) {
+  
+  const char *YYCURSOR = cp;
+  const char *YYMARKER = NULL;
+  const char *YYCTXMARKER = NULL;
+
+  if (isspace(*cp)) return ltrim(cp);
+
+  /*!re2c
+  * { return NULL; }
+  x{4} ':' {
+    *pc &= 0xff0000;
+    *pc |= to_hex(cp, YYCURSOR - 1);
+    goto next;
+  }
+  x{6} ':' {
+    *pc = to_hex(cp, YYCURSOR - 1);
+    goto next;
+  }
+
+  x{2} '/' x{4} ':' {
+    uint32_t tmp = to_hex(cp, cp + 2) << 16;
+    tmp |= to_hex(cp + 3, YYCURSOR - 1);
+    *pc = tmp;
+    goto next;
+  }
+
+  */
+
+next:
+  return ltrim(YYCURSOR);
+}
+
+
+static int parse_line(const char *cp, uint32_t *pc) {
+
+	struct cookie cookie = { 0 };
+	unsigned offset = 0;
+	uint32_t addr = *pc;
+	const char *start = cp;
+  unsigned i;
+
+
+
+  cp = parse_pc(cp, &addr);
+  if (!cp) return error(0, "error");
+  offset = cp - start;
+
+  /* label only? */
+  if (!*cp) {
+    *pc = addr;
+    return 0;
+  }
+
+	cookie.pc = addr;
+
+
+	cp = parse_opcode(cp, &cookie);
+	if (!cp) return error(offset, "bad opcode");
+  offset = cp - start;
+
+
+  if (cookie.mnemonic == LONG_SHORT) {
+
+    cp = parse_mx(cp, &cookie);
+    if (!cp || *cp) return error(offset, "bad operand");
+
+    if (cookie.mode == 0) {
+      g_disasm_psr &= ~cookie.operand;
+      g_disasm_psr &= ~0x0100; /* disable e */
+    } else {
+      g_disasm_psr |= cookie.operand;
+    }
+
+    fputs("\r\x1b[A\x1b[K", stdout);
+    printf("%02x/%04x: ; e=%d m=%d x=%d\n",
+      addr >> 16, addr & 0xffff,
+      g_disasm_psr & 0x0100 ? 1 : 0,
+      g_disasm_psr & 0x0020 ? 1 : 0,
+      g_disasm_psr & 0x0010 ? 1 : 0
+    );
+    return 1;
+  }
+
+	if (*cp) {
+		cp = parse_operand(cp, &cookie);
+		if (!cp) return error(offset, "bad operand");
+		//offset = cp - start;
+	}
+
+	if (*cp) return error(offset, "bad operand");
+
+  if (cookie.mnemonic == TOOL_CALL) {
+    if (cookie.mode != IMPLIED) return error(offset, "invalid address mode");
+    if (g_disasm_psr & 0x30) return error(0, "8-bit m/x");
+
+    set_memory_c(addr++, 0xa2, 0);
+    set_memory_c(addr++, cookie.extra >> 0, 0);
+    set_memory_c(addr++, cookie.extra >> 8, 0);
+    set_memory_c(addr++, 0x22, 0);
+    set_memory_c(addr++, 0x00, 0);
+    set_memory_c(addr++, 0x00, 0);
+    set_memory_c(addr++, 0xe1, 0);
+    goto out;
+  }
+
+
+
+  if (cookie.mnemonic == GSOS_CALL) {
+    if (cookie.mode != DP && cookie.mode != ABS && cookie.mode != ABS_LONG)
+      return error(offset, "invalid address mode");
+    if (g_disasm_psr & 0x30) return error(0, "8-bit m/x");
+
+    set_memory_c(addr++, 0x22, 0);
+    set_memory_c(addr++, 0xa8, 0);
+    set_memory_c(addr++, 0x00, 0);
+    set_memory_c(addr++, 0xe1, 0);
+    set_memory_c(addr++, cookie.extra >> 0, 0);
+    set_memory_c(addr++, cookie.extra >> 8, 0);
+    set_memory_c(addr++, cookie.operand >> 0, 0);
+    set_memory_c(addr++, cookie.operand >> 8, 0);
+    set_memory_c(addr++, cookie.operand >> 16, 0);
+    set_memory_c(addr++, cookie.operand >> 24, 0);
+
+    goto out;
+  }
+
+  if (cookie.mnemonic == MLI_CALL) {
+    if (cookie.mode != DP && cookie.mode != ABS)
+      return error(offset, "invalid address mode");
+    if ((g_disasm_psr & 0x30) != 0x30) return error(0, "16-bit m/x");
+    if (addr >> 16) return error(0, "invalid bank");
+
+    set_memory_c(addr++, 0x20, 0);
+    set_memory_c(addr++, 0xbf, 0);
+    set_memory_c(addr++, 0x00, 0);
+    set_memory_c(addr++, cookie.extra >> 0, 0);
+    set_memory_c(addr++, cookie.operand >> 0, 0);
+    set_memory_c(addr++, cookie.operand >> 8, 0);
+
+    goto out;
+  }
+
+
+	if (find_opcode(&cookie) < 0) return error(offset, "invalid address mode");
+
+	/* clean up relative */
+	if (cookie.mode == RELATIVE) {
+		int pc = (addr + 1 + cookie.size) & 0xffff;
+		int tmp = cookie.operand & 0xffff;
+		int offset = tmp - pc; 
+		if (cookie.size == 1) {
+			if (offset < -128 || offset > 127) return error(offset, "out of range");
+			offset &= 0xff;
+		}
+		else offset &= 0xffff;
+		cookie.operand = offset;
+	}
+
+
+	set_memory_c(addr++, cookie.opcode, 0);
+  unsigned operand = cookie.operand;
+	for (i = 0; i < cookie.size; ++i) {
+		set_memory_c(addr++, operand & 0xff, 0);
+		operand >>= 8;
+	}
+
+
+out:
+	fputs("\r\x1b[A\x1b[K", stdout);
+	do_list(cookie.pc, 1);
+	*pc = addr;
+	return 1;
+}
+
+
+
+
+uint32_t mini_asm_shell(uint32_t addr) {
+	static int init = 0;
+	if (!init) {
+		init_table_index();
+		init = 1;
+	}
+
+  printf("%02x/%04x: ; e=%d m=%d x=%d\n",
+    addr >> 16, addr & 0xffff,
+    g_disasm_psr & 0x0100 ? 1 : 0,
+    g_disasm_psr & 0x0020 ? 1 : 0,
+    g_disasm_psr & 0x0010 ? 1 : 0
+  );
+	for(;;) {
+		const char *cp = x_readline("!");
+		if (!cp || !*cp) return addr;
+
+		parse_line(cp, &addr);
+
+	}
+}
+
