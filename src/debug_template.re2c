@@ -401,6 +401,7 @@ word32 debug_apply_template(word32 address, const char *name) {
 
 struct tool {
 	char *name;
+	char *fullname;
 	unsigned number;
 	unsigned vector;
 };
@@ -425,6 +426,7 @@ static void add_tool(struct tool *t) {
 	}
 	tools[tool_count++] = *t;
 }
+
 
 static word32 to_hex(const char *iter, const char *end) {
 	word32 rv = 0;
@@ -513,7 +515,7 @@ void debug_load_nifty(const char *path) {
 	for (line = 1;;++line) {
 		const char *start;
 		const char *end;
-		struct tool tool = { 0, 0, vector };
+		struct tool tool = { 0, 0, 0, vector };
 
 		const char *cp = fgets(buffer, sizeof(buffer), f);
 		if (!cp) break;
@@ -566,12 +568,15 @@ prefix:
 		if (end > start) {
 			int l = end - start;
 
+
+			tool.fullname = NULL; 
 			if (vector > 0x0100) {
 				/* add a leading _ */
 				tool.name = malloc(l + 2);
 				tool.name[0] = '_';
 				strncpy(tool.name + 1, start, l);
 				tool.name[l + 1] = 0;
+				tool.fullname = strdup(start);
 			}
 			else tool.name = strndup(start, l);
 			add_tool(&tool);
@@ -606,14 +611,15 @@ prefix:
 	qsort(tool_names, tool_name_count, sizeof(struct tool), tool_name_compare);
 }
 
-const char *debug_tool_name(unsigned number, unsigned vector) {
+const char *debug_tool_name(unsigned number, unsigned vector, unsigned full) {
 
 	if (!tool_count) return NULL;
 
-	struct tool tmp = { 0, number, vector };
+	struct tool tmp = { 0, 0, number, vector };
 	struct tool *t = bsearch(&tmp, tools, tool_count, sizeof(struct tool), tool_compare);
-	if (t) return t->name;
-	return NULL;
+	if (!t) return NULL;
+	if (full && t->fullname) return t->fullname;
+	return t->name;
 }
 
 
@@ -621,9 +627,8 @@ int lookup_tool_number(const char *name, unsigned vector) {
 
 	if (!tool_name_count) return 0;
 
-	struct tool tmp = { (char *)name, 0, vector};
+	struct tool tmp = { (char *)name, 0, 0, vector};
 	struct tool *t = bsearch(&tmp, tool_names, tool_name_count, sizeof(struct tool), tool_name_compare);
 	if (!t) return 0;
 	return t->number;
 }
-

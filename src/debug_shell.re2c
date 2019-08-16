@@ -50,7 +50,7 @@ static int g_templates_loaded = 0;
 extern void debug_load_templates(const char *path);
 extern word32 debug_apply_template(word32 address, const char *name);
 extern void debug_load_nifty(const char *path);
-extern const char *debug_tool_name(unsigned, unsigned vector);
+extern const char *debug_tool_name(unsigned number, unsigned vector, unsigned full);
 
 
 
@@ -239,6 +239,57 @@ static void do_handle(word32 value, int action) {
 
 }
 
+
+word32 tool_lookup(unsigned tool) {
+	enum {
+		TPtr = 0xe103c0,
+		UTPtr = 0xe103c4,
+	};
+
+	unsigned tn = tool & 0xff;
+	unsigned ix = (tool >> 8) & 0xff;
+	word32 ptr;
+	word32 count;
+
+	ptr = get_memory32_c(TPtr, 0);
+	if (ptr == 0 || ptr > 0xffffff) return 0;
+
+	count = get_memory32_c(ptr, 0);
+	if (count == 0 || count > 255 || count < tn) return 0;
+	ptr = get_memory32_c(ptr + tn * 4, 0);
+	if (ptr == 0 || ptr > 0xffffff) return 0;
+
+	count = get_memory32_c(ptr, 0);
+	if (count == 0 || count > 255) return 0;
+	if (ix && ix > count) return 0;
+
+	/* if ix == 0, list all tool calls in the set */
+	/* otherwise, just the specific tool call */
+
+	/* todo -- also lookup tool name */
+	word32 addr = 0;
+	const char *cp;
+	if (ix) {
+		unsigned n = tn + (ix << 8);
+		addr = get_memory24_c(ptr + ix * 4, 0);
+		if (addr) ++addr;
+		cp = debug_tool_name(n, 0xe10000, 1);
+		if (!cp) cp = "---unknown---";
+		printf("%04x  (%06x)  %s\n", n, addr, cp);
+	} else {
+		for(ix = 1; ix < count; ++ix) {
+			unsigned n = tn + (ix << 8);
+
+			addr = get_memory24_c(ptr + ix * 4, 0);
+			if (addr) ++addr;
+			cp = debug_tool_name(n, 0xe10000, 1);
+			if (!cp) cp = "---unknown---";
+			printf("%04x  (%06x)  %s\n", n, addr, cp);
+		}
+	}
+
+	return addr;
+}
 
 word32 do_hexdump(word32 address, int lines) {
 	static char hex[] = "0123456789abcdef";
@@ -624,7 +675,7 @@ word32 do_list(word32 address, int lines) {
 		if (!comment) {
 			bank = pc >> 16;
 			if (bank == 0xe0 || bank == 0xe1 || bank == 0x01 || bank == 0xff)
-				comment = debug_tool_name(pc & 0xffff, bank);
+				comment = debug_tool_name(pc & 0xffff, bank, 1);
 		}
 
 		switch (opcode) {
@@ -640,7 +691,7 @@ word32 do_list(word32 address, int lines) {
 			case 0xa2: /* ldx # */
 				if (is_jsl_e10000(address)) {
 					/* tool call ... */
-					const char *name = debug_tool_name(operand, 0xe10000);
+					const char *name = debug_tool_name(operand, 0xe10000, 0);
 					if (name) {
 						opcode_string = name;
 						buffer[0] = 0;
@@ -668,7 +719,7 @@ word32 do_list(word32 address, int lines) {
 				if (operand == 0xe100a8) {
 					/* inline GS/OS call? */
 					unsigned num = get_memory16_c(address, 0);
-					const char *name = debug_tool_name(num, operand);
+					const char *name = debug_tool_name(num, operand, 0);
 					if (name) {
 						comment = NULL;
 						opcode_string = name;
@@ -685,7 +736,7 @@ word32 do_list(word32 address, int lines) {
 				ea = (operand | (address & 0xff0000));
 				if (ea == 0x00bf00) {
 					unsigned num = get_memory_c(address, 0);
-					const char *name = debug_tool_name(num, operand);
+					const char *name = debug_tool_name(num, operand, 0);
 					if (name) {
 						opcode_string = name;
 						unsigned parms = get_memory16_c(address + 1, 0);
@@ -1663,6 +1714,11 @@ command:
 		"w" eol {
 			g_prev_address = addr;
 			do_handle(addr, 'w');
+			return 0;
+		}
+
+		"t" {
+			g_prev_address = tool_lookup(addr & 0xffff);
 			return 0;
 		}
 
