@@ -420,7 +420,7 @@ static int is_jsr_bf00(word32 address) {
 		get_memory16_c(address + 1, 0) == 0xbf00;
 }
 
-static int g_disasm_psr;
+int g_disasm_psr;
 
 static const char *get_inline_debug_name(word32 address) {
 	static char buffer[256];
@@ -479,13 +479,14 @@ static const char *get_inline_debug_name(word32 address) {
 word32 do_list(word32 address, int lines) {
 
 	unsigned char buffer2[32];
+	char buffer3[32];
 	char buffer[32];
 
 	const char *opcode_string;
 	const char *comment;
 
 	unsigned opcode;
-	unsigned dtype;
+	unsigned mode;
 	unsigned operand;
 
 	word32 pc;
@@ -500,8 +501,8 @@ word32 do_list(word32 address, int lines) {
 		pc = address;
 
 		opcode = get_memory_c(address++, 0);
-		dtype = disasm_types[opcode];
-		args = dtype >> 8;
+		mode = disasm_types[opcode];
+		args = mode >> 8;
 
 		buffer2[bsize++] = opcode;
 		opcode_string = disasm_opcodes[opcode];
@@ -536,89 +537,87 @@ word32 do_list(word32 address, int lines) {
 		address += args;
 		buffer[0] = 0;
 
-		switch(dtype & 0xff) {
+		uint32_t ea = 0;
+		switch(mode & 0xff) {
 			case ABS:
 				sprintf(buffer, "$%04x", operand);
 				break;
-			case ABSX:
+			case ABS_X:
 				sprintf(buffer, "$%04x,x", operand);
 				break;
-			case ABSY:
+			case ABS_Y:
 				sprintf(buffer, "$%04x,y", operand);
 				break;
 
-			case ABSIND:
-				sprintf(buffer,"($%04x)",operand );
-				break;
-			case ABSXIND:
-				sprintf(buffer,"($%04x,x)",operand );
-				break;
-			case IMPLY:
-				break;
-			case ACCUM:
-				break;
-			case IMMED:
-				sprintf(buffer,"#$%0*x",args * 2, operand);
-				break;
-			case JUST8:
+			case DP:
 				sprintf(buffer,"$%02x",operand);
 				break;
-			case DLOC:
-				sprintf(buffer,"$%02x",operand);
-				break;
-			case DLOCX:
+			case DP_X:
 				sprintf(buffer,"$%02x,x",operand);
 				break;
-			case DLOCY:
+			case DP_Y:
 				sprintf(buffer,"$%02x,y",operand);
 				break;
-			case ABSLONG:
-				sprintf(buffer,"$%06x",operand);
-				bank = operand >> 16;
-				if (bank == 0xe0 || bank == 0xe1 || bank == 0x01 || bank == 0xff)
-					comment = debug_tool_name(operand & 0xffff, bank);
+
+			case ABS_LONG:
+				sprintf(buffer, "$%06x", operand);
 				break;
-			case ABSLONGX:
-				sprintf(buffer,"$%06x,x",operand);
-				bank = operand >> 16;
-				if (bank == 0xe0 || bank == 0xe1 || bank == 0x01 || bank == 0xff)
-					comment = debug_tool_name(operand & 0xffff, bank);
+			case ABS_LONG_X:
+				sprintf(buffer, "$%06x,x", operand);
 				break;
-			case DLOCIND:
-				sprintf(buffer,"($%02x)",operand);
+			case ABS_LONG_Y:
+				sprintf(buffer, "$%06x,y", operand);
 				break;
-			case DLOCINDY:
-				sprintf(buffer,"($%02x),y",operand);
+
+
+			case INDIR:
+				sprintf(buffer,"($%0*x)", args * 2, operand );
 				break;
-			case DLOCXIND:
-				sprintf(buffer,"($%02x,x)",operand);
+			case INDIR_X:
+				sprintf(buffer,"($%0*x,x)", args * 2, operand );
 				break;
-			case DLOCBRAK:
-				sprintf(buffer,"[$%02x]",operand);
+			case INDIR_Y:
+				sprintf(buffer,"($%0*x),y", args * 2, operand );
 				break;
-			case DLOCBRAKY:
-				sprintf(buffer,"[$%02x],y",operand);
+
+			case INDIR_LONG:
+				sprintf(buffer,"[$%0*x]", args * 2, operand );
 				break;
-			case DISP8:
-				sprintf(buffer,"$%04x",
-				      (address+(int8_t)operand) & 0xffff);
+			case INDIR_LONG_X:
+				sprintf(buffer,"[$%0*x,x]", args * 2, operand );
 				break;
-			case DISP8S:
-				sprintf(buffer,"$%02x,s",operand);
+			case INDIR_LONG_Y:
+				sprintf(buffer,"[$%0*x],y", args * 2, operand );
 				break;
-			case DISP8SINDY:
-				sprintf(buffer,"($%02x,s),y",operand);
+
+			case SR:
+				sprintf(buffer,"$%02x,s", operand );
 				break;
-			case DISP16:
-				sprintf(buffer,"$%04x",
-				      (address+(int16_t)(operand)) & 0xffff);
+
+			case SR_Y:
+				sprintf(buffer,"($%02x,s),y", operand );
 				break;
-			case MVPMVN:
+
+			case IMMEDIATE:
+				sprintf(buffer,"#$%0*x",args * 2, operand);
+				break;
+
+			case INTERRUPT:
+				sprintf(buffer,"$%02x",operand);
+				break;
+
+			case BLOCK:
 				sprintf(buffer,"$%02x,$%02x",operand >> 8, operand & 0xff);
 				break;
-			case SEPVAL:
-			case REPVAL:
-				sprintf(buffer,"#$%02x",operand);
+
+			case RELATIVE:
+				ea = address;
+				if (args == 1) ea += (int8_t)operand;
+				else ea += (int16_t)operand;
+				ea &= 0xffff;
+				sprintf(buffer,"$%04x", ea);
+				if (opcode == 0x62) ea = 0; /* per */
+				else ea |= pc & 0xff0000;
 				break;
 		}
 
@@ -628,7 +627,6 @@ word32 do_list(word32 address, int lines) {
 				comment = debug_tool_name(pc & 0xffff, bank);
 		}
 
-		uint32_t ea = 0;
 		switch (opcode) {
 			case 0xe2: /* sep */
 				g_disasm_psr|= operand;
@@ -666,6 +664,7 @@ word32 do_list(word32 address, int lines) {
 				break;
 #endif
 			case 0x22: /* jsl */
+				ea = operand;
 				if (operand == 0xe100a8) {
 					/* inline GS/OS call? */
 					unsigned num = get_memory16_c(address, 0);
@@ -680,12 +679,11 @@ word32 do_list(word32 address, int lines) {
 							buffer2[bsize++] = get_memory_c(address++, 0);
 						}
 					}
-				} else {
-					ea = operand;
 				}
 				break;
 			case 0x20: /* jsr */
-				if (operand == 0xbf00) {
+				ea = (operand | (address & 0xff0000));
+				if (ea == 0x00bf00) {
 					unsigned num = get_memory_c(address, 0);
 					const char *name = debug_tool_name(num, operand);
 					if (name) {
@@ -697,34 +695,10 @@ word32 do_list(word32 address, int lines) {
 							buffer2[bsize++] = get_memory_c(address++, 0);
 						}
 					}
-				} else {
-					ea = (operand | (address & 0xff0000));
 				}
 				break;
+			/* relative ops have ea set above */
 			case 0x82: {
-				ea = address + (int16_t)operand;
-				ea &= 0xffff;
-				ea |= pc & 0xff0000;
-
-				const char *name = get_inline_debug_name(pc);
-				/* start of an inline debug name? */
-				if (name) {
-					opcode_string = name;
-					buffer[0] = 0;
-
-					/* include the 0x77 71 magic bytes */
-					for (i = 0; i < 2; ++i) {
-						buffer2[bsize++] = get_memory_c(address++, 0);
-					}
-					address = ea;
-					ea = 0;
-				}
-				break;
-			}
-			case 0x80: {
-				ea = address + (int8_t)operand;
-				ea &= 0xffff;
-				ea |= pc & 0xff0000;
 
 				const char *name = get_inline_debug_name(pc);
 				/* start of an inline debug name? */
@@ -743,41 +717,24 @@ word32 do_list(word32 address, int lines) {
 			}
 
 
-			case 0x10:
-			case 0x30:
-			case 0x50:
-			case 0x70:
-			case 0x90:
-			case 0xb0:
-			case 0xd0:
-			case 0xf0: {
-				ea = address + (int8_t)operand;
-				ea &= 0xffff;
-				ea |= pc & 0xff0000;
-				break;
-			}
+		}
 
+		if (opcode == 0xc2 || opcode == 0xe2) {
+			if (!comment) {
+				comment = buffer3;
+				snprintf(buffer3, sizeof(buffer3), "e=%d m=%d x=%d",
+					g_disasm_psr & 0x0100 ? 1 : 0,
+					g_disasm_psr & 0x0020 ? 1 : 0,
+					g_disasm_psr & 0x0010 ? 1 : 0
+				);
+			}
 		}
 
 		if (ea && !comment) {
 			comment = get_inline_debug_name(ea);
 		}
 
-#if 0
 
-		n = printf("%02x/%04x: %s %s",
-			pc >> 16, pc & 0xffff,
-			opcode_string, buffer);
-		for(; n < 40; ++n) putchar(' ');
-
-		for(i = 0; i < bsize; ++i) {
-			n += printf(" %02x", buffer2[i]);
-		}
-		if (comment) {
-			printf("%*s; %s", 60 - n, "", comment);
-		}
-
-#else
 		/* 12/3456: 01 23 45      LDA #1     ; comment */ 
 		n = printf("%02x/%04x:",
 			pc >> 16, pc & 0xffff);
@@ -791,7 +748,7 @@ word32 do_list(word32 address, int lines) {
 			while (n < 65) { fputc(' ', stdout); ++n; }
 			printf("; %s", comment);
 		}
-#endif
+
 		fputc('\n', stdout);
 
 	}
@@ -820,8 +777,8 @@ word32 next_pc(void) {
 	unsigned opcode = get_memory_c(pc++, 0);
 	unsigned operand = 0;
 
-	unsigned dtype = disasm_types[opcode];
-	unsigned args = dtype >> 8;
+	unsigned mode = disasm_types[opcode];
+	unsigned args = mode >> 8;
 
 	switch (args) {
 		case 4:
@@ -1434,7 +1391,12 @@ static int parse_command(const char *cp) {
 
 		"!!" eol {
 			extern uint32_t sweet16_asm_shell(uint32_t addr);
-			sweet16_asm_shell(0x300);
+			g_prev_address = sweet16_asm_shell(g_prev_address);
+			return 0;
+		}
+		"!" eol {
+			extern uint32_t mini_asm_shell(uint32_t addr);
+			g_prev_address = mini_asm_shell(g_prev_address);
 			return 0;
 		}
 
@@ -1446,8 +1408,8 @@ static int parse_command(const char *cp) {
 		"%pc++" eol {
 			/* todo */
 			unsigned opcode = get_memory_c(engine.kpc, 0);
-			unsigned dtype = disasm_types[opcode];
-			unsigned args = dtype >> 8;
+			unsigned mode = disasm_types[opcode];
+			unsigned args = mode >> 8;
 			word32 tmp;
 
 			switch (args) {
