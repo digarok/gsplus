@@ -181,7 +181,7 @@ int g_imagewriter_paper = 0;
 int g_imagewriter_banner = 0;
 
 int g_config_iwm_vbl_count = 0;
-const char g_gsplus_version_str[] = "0.14";
+const char g_gsplus_version_str[] = "0.15a";
 int g_pause=0;  // OG Added pause
 
 #define START_DCYCS     (0.0)

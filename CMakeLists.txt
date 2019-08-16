@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1)
-project(gsplus VERSION 0.14)
+project(gsplus VERSION 0.15)
 
 
 if(CYGWIN OR MSYS)

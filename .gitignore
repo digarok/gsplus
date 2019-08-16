@@ -24,5 +24,8 @@ images/
 # Screenshot dir
 screens/
 
+# Builds dir
+build/
+
 # build tools that are often kept/tested locally as well as on the ci machines
 yoursway-create-dmg/

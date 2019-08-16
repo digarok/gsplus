@@ -25,9 +25,9 @@ rsync -a SDL2_image-2.0.3/i686-w64-mingw32/ /cygdrive/c/mingw/i686-w64-mingw32/
 
 # Build.
 git clone git@github.com:digarok/gsplus.git
-cd gsplus/src
-ln -s vars_win32_sdl2 vars
-make clean ; make
+md build ; cd build
+cmake ..
+make
 
 
 # if you want to make a machine that can also deploy to s3 (gitlabci):
