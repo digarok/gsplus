@@ -193,7 +193,7 @@ build-win32-gdi:
   only:
     - master
     - /^win.*/
-    - /^ks.*/
+    - /^next.*/
 
 package-win32-gdi:
   tags:
@@ -225,7 +225,7 @@ package-win32-gdi:
   only:
     - master
     - /^win.*/
-    - /^ks.*/
+    - /^next.*/
 
 deploy-win32-gdi:
   tags:
@@ -238,7 +238,7 @@ deploy-win32-gdi:
   only:
     - master
     - /^win.*/
-    - /^ks.*/
+    - /^next.*/
 
 # TARGET SYSTEM: MSYS2 MINGW32 SDL2
 build-win32-sdl2:
@@ -259,7 +259,7 @@ build-win32-sdl2:
   only:
     - master
     - /^win.*/
-    - /^ks.*/
+    - /^next.*/
 
 
 package-win32-sdl2:
