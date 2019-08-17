@@ -1,7 +1,7 @@
 DEXTRAS=gsplus-osx/
 DDIR=$DEXTRAS/GSplus.app
 ADIR=assets
-mkdir -p $DEXTRAS/license
+
 mkdir -p $DDIR/Contents/MacOS
 mkdir -p $DDIR/Contents/Resources
 
@@ -13,7 +13,5 @@ dylibbundler -od -b -x $DDIR/Contents/MacOS/gsplus -d $DDIR/Contents/libs/
 
 # files to include in dmg
 cp doc/gsplusmanual.pdf $DEXTRAS
-cp LICENSE.txt $DEXTRAS/license
-cp COPYRIGHT.txt $DEXTRAS/license
 
 # packaging now in DMG script
