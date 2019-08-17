@@ -26,6 +26,9 @@ screens/
 
 # Builds dir
 build/
+# Gitlab CI Builds dir
+builds/
+
 
 # build tools that are often kept/tested locally as well as on the ci machines
 yoursway-create-dmg/

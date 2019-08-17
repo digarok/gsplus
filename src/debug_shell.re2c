@@ -93,6 +93,7 @@ static char *get_resource_path(const char *leaf) {
 #elif defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#undef RELATIVE /* Go fuck your self wingdi */
 /* todo -- something clever like find the home directory */
 static char *get_resource_path(const char *leaf) {
 	DWORD size;
