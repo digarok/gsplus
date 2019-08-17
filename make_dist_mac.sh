@@ -13,5 +13,7 @@ dylibbundler -od -b -x $DDIR/Contents/MacOS/gsplus -d $DDIR/Contents/libs/
 
 # files to include in dmg
 cp doc/gsplusmanual.pdf $DEXTRAS
+cp LICENSE.txt $DEXTRAS
+cp COPYRIGHT.txt $DEXTRAS
 
 # packaging now in DMG script
