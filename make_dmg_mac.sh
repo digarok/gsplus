@@ -13,7 +13,6 @@ test -f GSplus-Install.dmg && rm GSplus-Install.dmg
   --icon GSplus.app 250 210 \
   --hide-extension GSplus.app \
   --app-drop-link 440 210 \
-  --icon README.txt  225 350 \
   --icon gsplusmanual.pdf  350 350 \
   --icon license  470 350 \
   GSplus-Install.dmg \

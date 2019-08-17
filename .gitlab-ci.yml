@@ -92,7 +92,6 @@ package-ubuntu-sdl2:
     - cp src/parallel.rom %PACKAGE_DIR%
     - cp LICENSE.txt $PACKAGE_DIR/doc/
     - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
-    - cp doc/README.txt %PACKAGE_DIR%
     - tar -cvjf gsplus-ubuntu-sdl.tar.bz2 $PACKAGE_DIR
   artifacts:
     paths:
@@ -213,7 +212,6 @@ package-win32-gdi:
     - cp src/config.txt %PACKAGE_DIR%
     - cp src/parallel.rom %PACKAGE_DIR%
     - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
-    - cp doc/README.txt %PACKAGE_DIR%
     - cp /mingw32/bin/libgcc_s_dw2-1.dll %PACKAGE_DIR%
     - cp /mingw32/bin/libstdc++-6.dll %PACKAGE_DIR%
     - cp /mingw32/bin/libwinpthread-1.dll %PACKAGE_DIR%
@@ -277,7 +275,6 @@ package-win32-sdl2:
     - cp src/config.txt %PACKAGE_DIR%
     - cp src/parallel.rom %PACKAGE_DIR%
     - cp doc/gsplusmanual.pdf %PACKAGE_DIR%
-    - cp doc/README.txt %PACKAGE_DIR%
     - cp /mingw32/bin/libbz2-1.dll %PACKAGE_DIR%
     - cp /mingw32/bin/libfreetype-6.dll %PACKAGE_DIR%
     - cp /mingw32/bin/libgcc_s_dw2-1.dll %PACKAGE_DIR%
