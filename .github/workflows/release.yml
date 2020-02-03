@@ -1,0 +1,143 @@
+name: Create Release
+
+on: push
+
+jobs:
+  # Maybe this should go after the successful build :P
+  create-release:
+    name: Create Release Job
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}-testing
+        draft: true
+        prerelease: true
+    # Workaround to preserve the release_url generated above for our next job
+    - name: Store Release URL
+      env:
+        UPLOAD_URL: ${{ toJson( steps.create_release.outputs.upload_url )}}
+      run: |
+        echo "$UPLOAD_URL" > release_url.txt
+        echo "UPLOAD_URL= $UPLOAD_URL"
+    - name: Upload URL for later use
+      uses: actions/upload-artifact@v1
+      with:
+        name: data
+        path: release_url.txt
+
+  build-and-upload:
+    name: Build
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ macos-latest, ubuntu-latest ]
+    steps:
+    - name: Download Release Data
+      uses: actions/download-artifact@v1
+      with:
+        name: data
+    - name: Get Tag Name
+      id: get_data
+      shell: bash
+      run: |
+        URL=`cat data/release_url.txt | tr -d '"'`
+        echo ::set-output name=SOURCE_TAG::${GITHUB_REF#refs/tags/}
+        echo ::set-output name=RELEASE_URL::$URL
+        echo "URL = $URL"
+        echo name=SOURCE_TAG::${GITHUB_REF#refs/tags/}
+    - uses: actions/checkout@v1
+    - uses: ilammy/msvc-dev-cmd@v1
+    - name: Prep MacOSX
+      if: matrix.os == 'macos-latest'
+      shell: bash
+      run: |
+        export MACOSX_DEPLOYMENT_TARGET=10.14
+        # see: https://gist.github.com/fabianfett/fd811d7921eb856bb100c5c15565077f
+        sudo xcode-select -s /Applications/Xcode_11.app/Contents/Developer
+        xcode-select -p
+        brew update
+
+        # BREW PACKAGES - Note we only seem to need to get the ones we link against for Mojave
+        #   dylibbundler--0.4.5.mojave.bottle.1.tar.gz
+        #   sdl2--2.0.10.mojave.bottle.1.tar.gz      <--
+        #   freetype--2.10.1.mojave.bottle.1.tar.gz  <--
+        #	  sdl2_image--2.0.5.mojave.bottle.1.tar.gz <--
+        #   pkg-config--0.29.2.mojave.bottle.tar.gz
+
+        brew install dylibbundler
+        brew install pkg-config
+
+        curl -L https://bintray.com/homebrew/bottles/download_file?file_path=sdl2-2.0.10.mojave.bottle.tar.gz -o sdl2-2.0.10.mojave.bottle.tar.gz
+        brew install -f sdl2-2.0.10.mojave.bottle.tar.gz
+        curl -L https://bintray.com/homebrew/bottles/download_file?file_path=sdl2_image-2.0.5.mojave.bottle.tar.gz -o sdl2_image-2.0.5.mojave.bottle.tar.gz
+        brew install -f sdl2_image-2.0.5.mojave.bottle.tar.gz
+        curl -L https://bintray.com/homebrew/bottles/download_file?file_path=freetype-2.10.1.mojave.bottle.tar.gz -o freetype-2.10.1.mojave.bottle.tar.gz
+        brew install -f freetype-2.10.1.mojave.bottle.tar.gz
+    - name: Prep Ubuntu
+      if: matrix.os == 'ubuntu-latest'
+      shell: bash
+      run: |
+        sudo apt-get -y update
+        #sudo apt-get -y upgrade
+        sudo apt-get -y install libpcap0.8-dev libfreetype6-dev libsdl2-dev libsdl2-image-dev
+
+    - name: Build MacOS/Ubuntu
+      if: matrix.os != 'windows-latest'
+      #working-directory: ./
+      run: |
+        echo "${{ matrix.os }} BUILD"
+        mkdir build ; cd build
+        cmake ..
+        make
+        pwd ; ls -al
+      shell: bash
+    # - name: Package NonWindows
+    #   if: matrix.os != 'windows-latest'
+    #   run: |
+    #     zip --junk-paths merlin32.zip Source/merlin32 README.md
+    - name: Package MacOS
+      if: matrix.os == 'macos-latest'
+      run: cd build ; chmod +x ../scripts/package-osx.sh ; ../scripts/package-osx.sh
+    - name: Package Ubuntu
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        PACKAGE_DIR=gsplus-ubuntu-sdl
+        mkdir $PACKAGE_DIR
+        mkdir $PACKAGE_DIR/doc
+        cp build/src/GSplus $PACKAGE_DIR/gsplus
+        cp build/src/to_pro $PACKAGE_DIR/to_pro
+        cp src/assets/config.txt $PACKAGE_DIR
+        cp LICENSE.txt $PACKAGE_DIR/doc/
+        cp doc/gsplusmanual.pdf $PACKAGE_DIR/doc/
+        cp doc/README.txt $PACKAGE_DIR/doc/
+        tar -cvjf gsplus-ubuntu-sdl.tar.bz2 $PACKAGE_DIR
+    - name: Upload Release Asset MacOSX
+      if: matrix.os == 'macos-latest'
+      #id: upload-release-asset
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.get_data.outputs.RELEASE_URL }}
+        asset_path: ./build/GSplus-Install.dmg
+        asset_name: ${{ format('GSplus-Install-{0}-{1}.dmg', matrix.os, steps.get_data.outputs.SOURCE_TAG ) }}
+        asset_content_type: application/x-apple-diskimage
+    - name: Upload Release Asset Ubuntu
+      if: matrix.os == 'ubuntu-latest'
+      #id: upload-release-asset
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.get_data.outputs.RELEASE_URL }}
+        asset_path: ./gsplus-ubuntu-sdl.tar.bz2
+        asset_name: ${{ format('gsplus-ubuntu-sdl2-{0}.tar.bz2', steps.get_data.outputs.SOURCE_TAG ) }}
+        asset_content_type: application/x-bzip2

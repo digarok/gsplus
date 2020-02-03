@@ -1,0 +1,1 @@
+#define GSPLUS_VERSION_STRING "@gsplus_VERSION_MAJOR@.@gsplus_VERSION_MINOR@"

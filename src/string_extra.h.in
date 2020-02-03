@@ -1,0 +1,20 @@
+#ifndef STRING_EXTRA_H
+#define STRING_EXTRA_H
+
+#cmakedefine HAVE_STRCASECMP
+#cmakedefine HAVE_STRNCASECMP
+#cmakedefine HAVE_STRCASESTR
+
+#ifndef HAVE_STRCASECMP
+extern int strcasecmp(const char *, const char *);
+#endif
+
+#ifdef HAVE_STRNCASESTR
+extern int strncasecmp(const char *, const char *, size_t);
+#endif
+
+#ifndef HAVE_STRCASESTR
+extern char *strcasestr(const char *, const char *);
+#endif
+
+#endif

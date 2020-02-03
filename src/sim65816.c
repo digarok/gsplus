@@ -14,6 +14,7 @@
 #include "debug.h"
 #include "glog.h"
 #include "options.h"
+#include "version.h"
 
 extern const char *g_config_gsplus_name_list[];
 extern char g_config_gsplus_screenshot_dir[];
@@ -168,7 +169,7 @@ int g_imagewriter_paper = 0;
 int g_imagewriter_banner = 0;
 
 int g_config_iwm_vbl_count = 0;
-const char g_gsplus_version_str[] = "0.14";
+const char g_gsplus_version_str[] = GSPLUS_VERSION_STRING;
 int g_pause=0;  // OG Added pause
 
 #define START_DCYCS     (0.0)

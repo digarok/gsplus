@@ -23,3 +23,7 @@ git clone git@github.com:digarok/gsplus.git
 cd gsplus/src
 ln -s vars_osx_sdl2 vars
 make clean ; make
+
+
+# Packaging
+brew install dylibbundler

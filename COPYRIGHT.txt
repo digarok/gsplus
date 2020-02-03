@@ -1,6 +1,6 @@
 GSPLUS - Advanced Apple IIGS Emulator Environment
 Based on the KEGS emulator written by Kent Dickey
-Copyright (C) 2016 - 2018  Dagen Brock
+Copyright (C) 2016 - 2020  Dagen Brock
 Copyright (C) 2010 - 2014  GSport contributors
 Copyright (C) 2003 Kent Dickey
 
