@@ -82,6 +82,7 @@ check_function_exists(strcasestr HAVE_STRCASESTR)
 configure_file(string_extra.h.in string_extra.h)
 configure_file(version.h.in version.h)
 configure_file(version.txt.in version.txt)
+configure_file(assets/control.in assets/control)
 
 set(generated_headers 8inst_c.h 16inst_c.h 8inst_s.h 16inst_s.h size_c.h size_s.h 8size_s.h 16size_s.h)
 add_custom_command(
