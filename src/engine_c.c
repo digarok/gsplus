@@ -353,11 +353,8 @@ extern word32 slow_mem_changed[];
   }
 
 void check_breakpoints(word32 addr)      {
-  int count;
   int i;
-
-  count = g_num_breakpoints;
-  for(i = 0; i < count; i++) {
+  for(i = 0; i < g_num_breakpoints; i++) {
     if((g_breakpts[i] & 0xffffff) == addr) {
       g_dbg_step = -2;
       halt2_printf("Hit breakpoint at %06x\n", addr);
