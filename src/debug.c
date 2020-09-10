@@ -1027,7 +1027,7 @@ void debug_server_poll() {
           /* failure occurs, we will close the                 */
           /* connection.                                       */
           /*****************************************************/
-          rc = recv(fds[i].fd, buffer, sizeof(buffer), 0);
+          rc = recv(fds[i].fd, buffer, sizeof(buffer), MSG_DONTWAIT);
           if (rc < 0) {
             if (errno != EWOULDBLOCK) {
               perror("recv() failed");
