@@ -64,7 +64,7 @@ jobs:
       run: |
         export MACOSX_DEPLOYMENT_TARGET=10.14
         # see: https://gist.github.com/fabianfett/fd811d7921eb856bb100c5c15565077f
-        sudo xcode-select -s /Applications/Xcode_11.app/Contents/Developer
+        #sudo xcode-select -s /Applications/Xcode_11.app/Contents/Developer
         xcode-select -p
         brew update
 
