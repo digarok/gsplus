@@ -1,0 +1,232 @@
+// $Id: INTERNALS.iwm.txt,v 1.3 2021/10/03 19:44:15 kentd Exp $
+
+KEGS's Apple IIgs IWM emulation routines.
+
+The IWM code does 5.25" and 3.5" reads & writes, and updates the Unix disk
+image on writes.  All 5.25" and 3.5" disks are always emulated internally in a
+low-level format that is compatible with WOZ disk images.  Support for
+WOZ images is very good, but it's not complete yet.
+
+How the disk emulation works: The routines have a nibblized image of each
+track of each drive (two 5.25" and two 3.5" drives are supported) in memory.
+
+Each track's data is stored as an array of bytes of the raw disk bits.
+This is basically the raw data from WOZ images for that track.  A second
+array for the track, of the same length, is allocated to calculate the sync
+bit positions.  For each byte, the sync byte indicates the nearest
+synchronized MSB from the LSB of the same disk byte.
+
+With this encoding, if a disk read is done, and then 1000 cycles pass,
+the code can quickly index to the proper disk byte, and then use the sync
+information to return the correct data.  It is just as much work for 4 cycles
+to pass as 5000 cycles.
+
+Several levels of emulation accuracy are provided.  By default, KEGS
+defaults to Fast Disk Emulation, where the following changes are done:
+
+- KEGS does not slow down to 1MHz (or 2.8MHz for 3.5" accesses) for reads.
+- However, KEGS always slows down to 1MHz for 5.25" writes.
+- Each read of IWM data from $C0EC will return the next aligned disk nibble.
+- No matter how much time passes, the read position does not move.
+
+When accessing a WOZ image, or if Fast Disk Emulation is toggled off
+(using Shift-F6), or if a write is being done, then:
+
+- KEGS slows to 1MHz (2.8MHz for 3.5" accesses) when the drive motor is on.
+- Exact timing is maintained--a valid disk nibble is held in the read latch
+	for 7 clock cycles plus the amount of time for the next sync bit to
+	shift in, just like the hardware works.
+
+The arm stepping code is pretty dumb, it does not support 1/4 tracks since
+I have no mechanism to test them.  I'll look for a WOZ image with 1/4 tracks
+and then implement it properly.
+
+Smartport support is sufficient to claim that there are no smartport
+devices.  This is necessary since the ROM tries to see if there are
+smartport devices at power-on.
+
+I used Copy II+ to nibble copy some disks, and it worked fine.  Note:
+KEGS does not support writing to "empty" WOZ images.  This is on the TO-DO
+list.
+
+IWM description:
+
+The IWM in the IIgs supports 3.5" and 5.25" disks, as well as Smartport
+devices (KEGS does not support real Smartport devices, but it does cheat
+and make large images available on slot 7).
+
+The IWM has several modes:
+
+- Motor off.  Accesses go to internal Mode register and Status register.
+- Motor on ($C0E9 is on; touch $C0E8 to turn motor off).
+	- $C031 enables 3.5" if bit 6 is set
+		- The disk phases $C0E0-$C0E7 + $C031 bit 7 provide a 4-bit
+			command code to the 3.5" controller, and can be used
+			to move the disk arm, eject a disk, etc.
+			The action is triggered by phase 3 going on.
+			Note the actual 3.5" motor is not controlled by $C0E9,
+			but a special command must be given through this
+			phase-3-latch mechanism to turn the motor on and off.
+		- Phases 0,1,2 and $C031 bit 7 select a status bit to return
+			when Q7=0,Q6=1 is read (the Status Register).
+		-If phase 0 and 2 are enabled, this resets the IWM.
+		-If phase 1 and 3 are enabled, this enables accessing the
+			Smartport Bus.  KEGS supports this enough to indicate
+			that there are no Smartport devices.
+			This is called ENABLE2 mode.
+	- $C031 disables 3.5" if bit 6 is clear:
+		- The disk phases $C0E0-$C0E7 move the 5.25" disk arm.
+		- Reading any even address returns:
+			Q7=0,Q6=0: The data register (byte from the drive)
+			Q7=0,Q6=1: Status register (write protect)
+			Q7=1,Q6=0: Handshake register (not used by software)
+
+The 3.5" IWM modes provide for much faster emulation--the controller returns
+a status when the head has stepped a track, when the motor is up to speed,
+etc., and KEGS returns "it's ready now" always to make the accesses faster.
+With Fast Disk Emulation, an entire 800K disk can be read in under 2 seconds,
+and an entire 140K disk can be read in well under a second.
+
+
+Code description:
+
+Most code is in iwm.c, with some defines in iwm.h.  Each track is stored in
+raw data form--so a 10-bit 0xff, 10-bit 0xff, 0xd5, 0xaa, 0x96 would be
+stored as: 0x3f, 0xcf, 0xfd, 0x5a, 0xa9, 0x6X.  To remember the bit position
+on the track with sufficient accuracy, the head position on the track is in
+"quarter-bits", or "qbits".  There are 32-qbits to an 8-bit byte.  For 5.25"
+disks, a qbit is exactly one 1MHz cycle.
+
+Iwm state is encoded in the Iwm structure.
+
+	drive525[2]: Disk structure for each 5.25" disk in slot 6
+	drive35[2]: Disk structure for each 3.5" disk in slot 5
+	smarport[32]: Disk structure for each "smartport" device emulated
+		via slot 7 (see smartport.c)
+	motor_on:  True if IWM motor_on signal (c0e9) is asserted.  Some
+		drive is on.
+	motor_off: True if motor has been turned off in software, but the
+			1 second timeout has not expired yet.
+	motor_on35: True if 3.5" motor is on (controlled differently than
+			5.25" c0e9).
+	motor_off_vbl_count:  VBL count to turn motor off.
+	head35, step_direction35: 3.5" controls.
+	iwm_phase[4]: Has '1' for each 5.25" phase that is on.
+	iwm_mode:	IWM mode register.
+	drive_select: 0 = drive 1, 1 = drive 2.
+	q6, q7:	IWM q6, q7 registers.
+	enable2:	Smartport /ENABLE2 asserted.
+	reset:		Smartport /RESET asserted.
+	write_val: Value written to the disk data latch, will be written
+		after 8 bit times has passed.
+	qbit_wr_start: Qbit position when writes started, a large value if
+		not doing a write currently.
+	qbit_wr_last: Qbit position where write_val should go.
+	forced_sync_qbit: Overrides the calculated sync_bits temporarily, and
+		forces this to be the qbit of the next sync byte.
+
+Each disk (3.5" and 5.25") is encoded in the Disk struct:
+	dycs_last_read: Time (in 1MHz cycles) when last access occurred.
+	fd:	Unix file descriptor.  If < 0, no disk.
+	raw_data: For an image from a .zip file, this is a pointer to the
+		raw disk data.  fd will be 0 when this is valid.
+	name_ptr: Unix file name for this disk.
+	partition_name: .zip file name.
+	raw_dsize: size of raw_data
+	dimage_start: offset from beginning of file for this partition (0 if
+			not a partition or zip file entry).
+	dimage_size: size of this partition.
+	smartport: 1 if this is a smartport image, 0 if it is 5.25" or 3.5"
+	disk_525: 1 if this is a 5.25" image, 0 if it is 3.5"
+	drive: 0 = drive 1, 1 = drive 2.
+	cur_qtr_track:	Current qtr track.  So track 1 == qtr_track 4.
+		For 3.5", there are no half-tracks or quarter tracks, so
+		cur_qtr_track encodes the (track << 1) + side.
+	vol_num:	DOS 3.3 volume number to use.  Generally 254.
+	write_prot:	True if disk is write protected.
+	write_through_to_unix: True if writes should be passed through to
+			the unix image.  If this is false, you can write
+			to the image in memory, but it won't get reflected
+			into the Unix file.  
+	disk_dirty:	Some track has dirty data that need to be flushed.
+	just_ejected:	Ejection flag.
+	last_phase:	Phase number last accessed.
+	cur_qbit_pos:	Qbit position for reading.
+	cur_track_qbits: Number of qbits on this track.
+	num_tracks:	Number of tracks: 140 for 5.25" (it counts quarter-
+			tracks) and 160 for 3.5" (80 tracks on 2 sides)
+	*trks: pointer to array of raw Track data
+	*cur_trk_ptr:  Pointer to the current track
+
+Each track is represented by the Trk structure:
+	*raw_bptr:	Pointer to the raw disk data.
+	*sync_ptr:	Pointer to the sync values for each byte.
+	dunix_pos:	Offset into disk image for this track data.
+	unix_len:	always 4096 for 5.25" disks, variable for 3.5" disks
+	track_qbits:	Length of raw_bptr in qbits.
+
+
+Externally callable routines:
+iwm_init():	Init various data structures at simulation start.
+iwm_reset():	Called at Apple IIgs reset time.
+iwm_vbl_update():	Called every VBL (60 Hz) period.  Used to turn motor
+			off, and flush out dirty data.
+			g_vbl_count is the count of VBL ticks (so it counts
+			at 60 times a second).
+iwm_touch_switches(int loc, double dcycs): Handles all accesses to $C0E0-$C0EF,
+		changing state as needed.
+read_iwm(loc, dcycs):
+		Read from 0xc0e0 + loc.  Loc is between 0x0 and 0xf.
+		Dcycs is a double holding the number of Apple IIgs cycles since
+		the emulator started.  Dcycs always counts at 1.024MHz.  If
+		you are running at 2.8MHz, it increments by ~0.4 every
+		"cycle".  Reading from even addresses with the drive on will
+		read the current disk data if q6=0,q7=0.
+write_iwm(int loc, int val, double dcycs):
+	Write to 0xc0e0 + loc.  Just like read_iwm, but write "val" into
+	loc.  If q6=1 and q7=1, and the motor is on, writes data to the track.
+
+
+Tricky routines:
+
+iwm_read_data():	called by read_iwm() if q6,q7 = 0,0.
+		dsk->cur_qbit_pos is the current head position, the code
+		returns the data to be returned at this position.
+		16.0 dcycs need to pass for an 8 bit nibble for 3.5"
+		accesses, and 32.0 dcycs for an 8 bit nibble for 5.25".
+		g_fast_disk_emul == 1 says don't mess around with accuracy,
+		and always return the next fully-formed nibble.
+		There is a lot of complexity in this routine.  For 5.25",
+		it looks backwards to see where the most recent MSB of a disk
+		byte would have occurred using sync_info, and then forms:
+			- That byte, if that MSB was 8 bits ago, plus 7
+				cycles, plus any time for 0 sync bits that
+				may be after it.
+			- The current effective IWM shift register value--if
+				it is determined we are 4 bits into 0xaa, then
+				it will return the first 4 bits only as 0x0a.
+		For 3.5", it uses iwm_read_data_latch(), which re-uses
+			g_iwm.qbit_wr_last to remember if the latch is valid.
+
+iwm_write_data():	called by write_iwm() if q6,q7 = 1,1.
+		Similar to above.  Handles async and sync mode writes.
+		Handles partial writes.
+		Routine disk_nib_out_raw(dsk, val, bits, qbit_pos, dcycs) does
+		the actual work of merging the bits into the track image.
+
+disk_nib_out_raw(): called by iwm_write_data() and iwm_nibblize_track_*().
+		Writes byte into cur_trk_ptr->raw_bptr[].
+
+
+In iwm_nibblize_track_35(), the comments with hex numbers correspond
+to the ROM 01 addresses which I disassembled to determine the checksum
+algorithm.  The code is not well written--it's basically hand-translated
+65816 assembly code.  I'll clean it up someday.
+
+To avoid special casing reading and writing data at the end of the track,
+trk_ptr->raw_bptr[] has the actual track data start at byte 2, and there
+are at least 2 bytes spare at the end.  The iwm.c code keeps the raw_bptr[0]
+and raw_bptr[1] always equal to the last 16 bits on the track--so that most
+code can look at raw_bptr[-1] and raw_ptr[-2] to peer backwards to the previous
+track data, without worrying about wraparound.
+

@@ -1,0 +1,9 @@
+
+TARGET = kegsmac
+OBJECTS1 = macsnd_driver.o
+CCOPTS = -Wall -O2 -DMAC
+SUFFIX =
+NAME = kegsmac
+
+XOPTS =
+

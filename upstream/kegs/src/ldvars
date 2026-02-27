@@ -1,0 +1,2 @@
+OBJECTS = adb.o engine_c.o clock.o config.o debugger.o scc.o scc_socket_driver.o scc_windriver.o scc_unixdriver.o iwm.o joystick_driver.o moremem.o paddles.o mockingboard.o sim65816.o smartport.o doc.o sound.o sound_driver.o woz.o unshk.o undeflate.o dynapro.o dyna_type.o dyna_filt.o dyna_validate.o applesingle.o video.o voc.o
+PROJROOT = ..
