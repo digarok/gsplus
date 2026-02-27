@@ -1,0 +1,55 @@
+
+The video.c code in KEGS is responsible for handling the Apple IIgs video
+modes.
+
+A detailed description of how Apple II video works is in Understanding
+the Apple //e by Jim Sather.  This is a carefully researched book (I'm in awe
+of the amount of time that went into writing it) with a great deal of
+details in chapters 3, 5, and 8 on how Apple II video works.
+
+KEGS video overview:
+-------------------
+
+KEGS' emulates one screen draw period per call to run_16ms().  The screen
+shown by a monitor starts at the top left of the screen, and is the top border
+lines.  Then the Apple II graphics modes are shown as lines 0 through 199
+(or 191 for non-Super-Hires modes), with a left border and right border,
+then the bottom border lines are shown.
+
+                      Top Border Lines....
+                      Top Border Lines....
+        |-----------------------------------------------| <- Time 0
+Line0   |                                               |
+Line1   |                                               |
+...
+Line198 |                                               |
+Line199 |                                               |
+        |-----------------------------------------------|
+                      Bottom Border Lines...
+                      Bottom Border Lines...
+
+A screen draw period is exactly 17030 1MHz cycles, which is 262 lines of
+65 cycles each.  KEGS calls the start of its screen Time 0, and it is
+just at what would be the start of the right border for Line -1 (so just
+before Line 0, the first Apple II video mode line).  KEGS time 0 corresponds
+to when the $C019 VBL signal transitions from 1 to 0 (this sense is inverted
+when KEGS is in //e mode).  Time 0 corresponds to $C02E=0x80 (vertical
+line count / 2, encoded) and $C02F=00 (horizontal count, encoded).
+$C02E counts from 0x80 until 0xe0 (lines 0 to 192) when $C019 VBL will be
+set again.  $C02E counts through $FF, then wraps to $7D, then counts through
+$7F.  $C02F's has a high order bit which is the low bit of the line counter,
+so if $C02E=0x90 and $C02F=0x80, then the current line is $21.  The
+horizontal counter in the low 7 bits of $C02F counts as follows: $00,
+$40-$7f, and then repeating.  The rightmost pixel of each Apple II video
+mode is fetched from memory when $C02f bits 6:0 = $7f.  The rightmost border
+pixel is drawn whtn $C02F bits 6:0 = $00.  The leftmost pixel of each
+Apple II video mode is fetched from memory with $C02F bits 6:0 = $58.  So
+the 40 cycles drawing data are when $C02F = $58 through $7f = 40 values.
+
+KEGS currently draws each line of the screen at the moment when $C02F=$58.
+KEGS uses the memory in banks $E0 (and $E1) for the line being drawn,
+but does track the mode changes to handle changes within a line.  Toggling
+the mode ($C050-$C057, for example) in the middle of a line will be drawn
+roughly correctly (it's complex when changing from 80-column to hires,
+for example, one cycle of data may not be shown like the real hardware).
+
