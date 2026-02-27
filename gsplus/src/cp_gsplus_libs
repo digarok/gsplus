@@ -1,0 +1,39 @@
+#!/usr/bin/perl -w
+# $KmKId: cp_kegs_libs,v 1.2 2021-02-09 00:35:48+00 kentd Exp $
+
+use strict;
+use English;
+
+if($#ARGV < 2) {
+	die "Usage: executable srclib_dir destlib_dir";
+}
+
+# Runs objdump on the executable, finds all unresolved dependencies, and
+#  then copies each of those libraries from srclib_dir to destlib_dir
+# destlib_dir should be APPLICATION/Contents/Frameworks/
+
+my $exe = shift;
+my $srcdir = shift;
+my $destdir = shift;
+if(! -f $exe || ! -d $srcdir || ! -d $destdir) {
+	die "$exe is not a file, or $srcdir or $destdir are not a dir";
+}
+
+my $do_swiftos = 0;
+open(RPATHS, "objdump -macho -dylibs-used $exe|") or die "Open failed: $!";
+my $line;
+my $lib;
+foreach $line (<RPATHS>) {
+	chomp($line);
+	if($line =~ m:\@rpath/([^ ]*) :) {
+		$lib = $1;
+		print "lib: $lib\n";
+		`cp $srcdir/$lib $destdir/`;
+	}
+	$do_swiftos = 1;
+}
+
+# And copy libswiftos.dylib if we copied any files
+if($do_swiftos) {
+	`cp $srcdir/libswiftos.dylib $destdir/`;
+}

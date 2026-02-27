@@ -1,0 +1,147 @@
+#!/usr/bin/perl -w
+# $KmKId: style_check,v 1.1 2020-06-14 02:52:13+00 kentd Exp $
+
+# Perl script to check for coding conventions
+use English;
+
+$some_bad = 0;
+
+while($#ARGV >= 0) {
+	$file = shift;
+	$check_spaces = 0;
+	if($file =~ /\.c$/) {
+		$check_spaces = 1;
+	} elsif($file =~ /\.s$/) {
+		$check_spaces = 1;
+	} elsif($file =~ /\.k$/) {
+		$check_spaces = 1;
+	} elsif($file =~ /\.h$/) {
+		$check_spaces = 1;
+		if($file =~ /^protos.*.h$/) {
+			next;			# skip global_names.h
+		}
+		if($file =~ /^global_names.h$/) {
+			next;			# skip global_names.h
+		}
+		if($file =~ /^knobs.h$/) {
+			next;			# skip global_names.h
+		}
+	} else {
+		next;		# skip this file
+	}
+	print "Style check: $file\n";
+	if(-x $file) {
+		print "File mode is executable\n";
+		$some_bad++;
+	}
+	open(FILE, "<$file") || die "Open: $file: $1\n";
+	$line_num = 1;
+	foreach $line (<FILE>) {
+		chomp($line);
+		$ign_tab_space = 0;
+		if($line =~ m:^[/\t]+{.*}:) {
+			$ign_tab_space = 1;
+		}
+		$len = 0;
+		$prev = 0;
+		$pprev = 0;
+		$bad = 0;
+		$last_tab = -10;
+		if($check_spaces) {
+			if($line =~ / $/ || $line =~ /	$/) {
+				print "Line ends in tab or space\n";
+				$bad++;
+			}
+		}
+		if($line =~ /\r$/) {		# Line ends with Ctrl-M
+			print "Windows linebreak detected\n";
+			$bad = 101;
+		}
+		while($line =~ m/^([^"]*)("[^"]*")(.*)$/) {
+			# Convert text in strings to '-' to avoid space checks
+			$prev = $1;
+			$post = $3;
+			$quot = &dotify($2);
+			$line = $prev . $quot . $post;
+		}
+		while($line =~ m:^(.*)//(.*)$:) {
+			# Convert text in comments to '-' to avoid space checks
+			$prev = $1;
+			$quot = &dotify($2);
+			$line = $prev . "::" . $quot;
+		}
+		@chars = split(//, $line);
+		foreach $char (@chars) {
+			$len++;
+			if(!$check_spaces) {
+				# do nothing
+			} elsif($char eq "\t") {
+				$len = (($len + 7) >> 3) * 8;
+				if($prev eq ' ') {
+					print "Space followed by tab\n";
+					$bad++;
+				}
+				$last_tab = $len;
+			} elsif($char eq " ") {
+				if($prev eq "\t" && !$ign_tab_space) {
+					print "Tab followed by space\n";
+					$bad++;
+				}
+				if($prev eq " " && $pprev eq " " &&
+						(($len - $last_tab) > 4)) {
+					print "Too many spaces\n";
+					$bad++;
+					last;
+				}
+			}
+			$pprev = $prev;
+			$prev = $char
+		}
+		if($check_spaces) {
+			if(($len > 80) && ($line_num > 2)) {
+				print "Line more than 80 columns\n";
+				$bad++;
+			}
+			#print "line $line has len $len\n";
+		}
+		if($bad) {
+			$some_bad++;
+			print "...at line $line_num in file $file\n";
+			if($some_bad > 20) {
+				die "Too many style errors\n";
+			}
+			if($bad >= 100) {
+				next;		# Skip to next file
+			}
+		}
+		$line_num++;
+	}
+}
+
+if($some_bad) {
+	die "Style errors\n";
+}
+
+exit 0;
+
+sub
+dotify
+{
+	my ($str) = @_;
+	my @chars = ();
+	my @outchars = ();
+	my ($char, $result);
+
+	@chars = split(//, $str);
+	@outchars = ();
+	foreach $char (@chars) {
+		if($char ne "\t") {
+			$char = "-";
+		}
+		push(@outchars, $char);
+	}
+	$result = join('', @outchars);
+	#print "Old quote :$str:\n";
+	#print "New quote :$result:\n";
+	return $result;
+}

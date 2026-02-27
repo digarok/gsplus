@@ -1,0 +1,11 @@
+
+TARGET = gsplus
+OBJECTS1 = pulseaudio_driver.o xdriver.o
+CCOPTS = -O2 -Wall -fomit-frame-pointer -DPULSE_AUDIO
+NAME = gsplus
+LD = $(CC)
+EXTRA_LIBS = -lXext -lpulse
+EXTRA_SPECIALS =
+
+XOPTS = -I/usr/X11R6/include
+
