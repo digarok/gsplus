@@ -1,4 +1,3 @@
-
 TARGET = gsplus
 OBJECTS1 = pulseaudio_driver.o xdriver.o
 CCOPTS = -O2 -Wall -fomit-frame-pointer -DPULSE_AUDIO

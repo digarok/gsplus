@@ -1,4 +1,3 @@
-
 TARGET = gsplus
 OBJECTS1 = macsnd_driver.o xdriver.o
 CCOPTS = -O2 -DMAC -Wall -I/usr/X11/include

@@ -1,4 +1,3 @@
-
 /**********************************************************************/
 /*                    GSplus - Apple //gs Emulator                    */
 /*                    Based on KEGS by Kent Dickey                    */
