@@ -1,0 +1,31 @@
+adb.o: adb.c defc.h defcomm.h iwm.h protos.h protos_base.h
+engine_c.o: engine_c.c defc.h defcomm.h iwm.h protos.h protos_base.h size_c.h op_routs.h engine.h defs_instr.h instable.h
+clock.o: clock.c defc.h defcomm.h iwm.h protos.h protos_base.h
+compile_time.o: compile_time.c
+config.o: config.c defc.h defcomm.h iwm.h protos.h protos_base.h config.h win_dirent.h
+debugger.o: debugger.c defc.h defcomm.h iwm.h protos.h protos_base.h disas.h
+scc.o: scc.c defc.h defcomm.h iwm.h protos.h protos_base.h scc.h
+scc_socket_driver.o: scc_socket_driver.c defc.h defcomm.h iwm.h protos.h protos_base.h scc.h
+scc_windriver.o: scc_windriver.c defc.h defcomm.h iwm.h protos.h protos_base.h scc.h
+scc_unixdriver.o: scc_unixdriver.c defc.h defcomm.h iwm.h protos.h protos_base.h scc.h
+iwm.o: iwm.c defc.h defcomm.h iwm.h protos.h protos_base.h
+joystick_driver.o: joystick_driver.c defc.h defcomm.h iwm.h protos.h protos_base.h
+moremem.o: moremem.c defc.h defcomm.h iwm.h protos.h protos_base.h
+paddles.o: paddles.c defc.h defcomm.h iwm.h protos.h protos_base.h
+mockingboard.o: mockingboard.c defc.h defcomm.h iwm.h protos.h protos_base.h sound.h
+sim65816.o: sim65816.c defc.h defcomm.h iwm.h protos.h protos_base.h
+smartport.o: smartport.c defc.h defcomm.h iwm.h protos.h protos_base.h
+doc.o: doc.c defc.h defcomm.h iwm.h protos.h protos_base.h sound.h
+sound.o: sound.c defc.h defcomm.h iwm.h protos.h protos_base.h sound.h
+sound_driver.o: sound_driver.c defc.h defcomm.h iwm.h protos.h protos_base.h sound.h
+woz.o: woz.c defc.h defcomm.h iwm.h protos.h protos_base.h
+unshk.o: unshk.c defc.h defcomm.h iwm.h protos.h protos_base.h
+undeflate.o: undeflate.c defc.h defcomm.h iwm.h protos.h protos_base.h
+dynapro.o: dynapro.c defc.h defcomm.h iwm.h protos.h protos_base.h win_dirent.h
+dyna_type.o: dyna_type.c defc.h defcomm.h iwm.h protos.h protos_base.h
+dyna_filt.o: dyna_filt.c defc.h defcomm.h iwm.h protos.h protos_base.h
+dyna_validate.o: dyna_validate.c defc.h defcomm.h iwm.h protos.h protos_base.h
+applesingle.o: applesingle.c defc.h defcomm.h iwm.h protos.h protos_base.h
+video.o: video.c defc.h defcomm.h iwm.h protos.h protos_base.h kegsfont.h
+voc.o: voc.c defc.h defcomm.h iwm.h protos.h protos_base.h
+macsnd_driver.o: macsnd_driver.c defc.h defcomm.h iwm.h protos.h protos_base.h sound.h

@@ -1,0 +1,57 @@
+#!/usr/bin/perl -w
+
+# Based on https://gist.github.com/ansarizafar/6fa64f44aa933794c4d6638eec32b9aa
+# and https://github.com/retifrav/generate-iconset
+# We need to create a directory of the icon in several scaled sizes,
+#  (the Mac command "sips" can do this), then run iconutil to form the
+#  .icns file.
+# kegsicon.png created by Alex Lee
+
+my $icondir;
+my $img_file = "";
+my $ext = ".png";
+my $scale;
+my $sz;
+my $pixels;
+my $scale_str;
+
+if($#ARGV == 0) {
+	$img_file = shift;
+	if($img_file =~ /^.*\.(^\.*)$/) {
+		$ext = $1;
+		print "Set ext to $ext\n";
+	}
+} else {
+	die "Usage: $0 image_file.jpg/.png"
+}
+
+$icondir = "./icon.iconset";	# Must have .iconset extension
+if(-d $icondir) {
+	`rm -rf $icondir`;
+}
+
+`mkdir $icondir`;
+for($scale = 1; $scale <= 2; $scale++) {
+	for($sz = 16; $sz <= 512; $sz = $sz * 2) {
+		if($sz == 64) {
+			next;
+		}
+		$pixels = $sz * $scale;
+		$scale_str = "";
+		if($scale == 2) {
+			$scale_str = '@2x';
+		}
+		@cmd = ("sips", "-z", $pixels, $pixels, $img_file,
+			"--matchTo",
+			"/System/Library/ColorSync/Profiles/sRGB\\ Profile.icc",
+			"--out", $icondir . "/" .  "icon_" . $sz . "x" . $sz .
+			$scale_str . $ext);
+		print "cmd: @cmd\n";
+		`@cmd`;
+	}
+}
+
+print "Calling: iconutil -o kegs.icns -c icns $icondir";
+`iconutil -o kegs.icns -c icns $icondir`;
+`rm -rf $icondir`;
+

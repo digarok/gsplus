@@ -1,0 +1,8 @@
+TARGET = gsplus
+OBJECTS1 = macsnd_driver.o
+CCOPTS = -Wall -O2 -DMAC
+SUFFIX =
+NAME = gsplus
+
+XOPTS =
+

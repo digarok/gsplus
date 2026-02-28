@@ -1,0 +1,13 @@
+#!/bin/bash
+# $KmKId: comp_swift,v 1.2 2020-12-11 22:58:32+00 kentd Exp $
+
+echo "args are: " "$@"
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift -frontend -c \
+	-enable-objc-interop \
+	-sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk \
+	-swift-version 4 -Onone \
+	-serialize-debugging-options \
+	-import-objc-header Kegs-Bridging-Header.h \
+	-module-name Kegs \
+	"$@"
+
