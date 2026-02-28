@@ -168,7 +168,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 				"CFBundleShortVersionString"] as? String {
 			NSApplication.shared.orderFrontStandardAboutPanel(
 				options: [.applicationVersion: ver_str,
-					.version: "", .applicationName: "GSplus"])
+					.version: "", .applicationName: "GS+"])
 		}
 	}
 	func applicationDidFinishLaunching(_ aNotification: Notification) {
