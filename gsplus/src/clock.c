@@ -84,6 +84,34 @@ get_dtime()
 	return dtime;
 }
 
+#ifdef _WIN32
+/* By default the Windows scheduler tick is ~15.6ms, so Sleep(16) rounds up to
+ * the next tick and actually blocks 15.6 or 31.2ms -- jitter of nearly a whole
+ * frame. That jitter is what starves the audio queue and makes Windows playback
+ * stutter. timeBeginPeriod(1) raises the resolution to 1ms so Sleep(n) is
+ * accurate to ~1ms and the per-frame pacing (and thus the audio feed) is smooth.
+ * Called once, lazily; restored at exit so we don't leave the system clock
+ * running hot. */
+static void
+win32_restore_timer_period(void)
+{
+	timeEndPeriod(1);
+}
+
+static void
+win32_raise_timer_resolution(void)
+{
+	static int	done = 0;
+
+	if(!done) {
+		done = 1;
+		if(timeBeginPeriod(1) == TIMERR_NOERROR) {
+			atexit(win32_restore_timer_period);
+		}
+	}
+}
+#endif
+
 int
 micro_sleep(double dtime)
 {
@@ -105,7 +133,8 @@ micro_sleep(double dtime)
 #endif
 
 #ifdef _WIN32
-	Sleep((word32)(dtime * 1000));
+	win32_raise_timer_resolution();
+	Sleep((word32)(dtime * 1000.0 + 0.5));	/* round to nearest ms */
 #else
 	Timer.tv_sec = 0;
 	Timer.tv_usec = (dtime * 1000000.0);
