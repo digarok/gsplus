@@ -34,11 +34,19 @@ it up automatically. You can also select one at runtime: press **F4 → ROM File
 Selection → ROM File** and browse to it. A handful of other common names
 (`APPLE2GS.ROM`, `APPLE2GS.ROM2`, `xgs.rom`, `342-0077-b`, …) are recognized too.
 
-**Getting one legally:** if you own a real Apple IIgs you can dump its ROM — the
-step-by-step BASIC program is in
-[`upstream/kegs/doc/README.ROM.files.txt`](upstream/kegs/doc/README.ROM.files.txt),
-which also documents which downloadable ROM files are known to work and how to
-convert MAME-format dumps.
+**Finding one:** the cleanest option is to dump the ROM from a real Apple IIgs you
+own — KEGS includes a short BASIC program that does it, in
+[`upstream/kegs/doc/README.ROM.files.txt`](upstream/kegs/doc/README.ROM.files.txt).
+Otherwise, the IIgs ROM is long-unsupported software that's widely circulated
+online: a web search for *"Apple IIgs ROM 03"* (or ROM 01) generally turns one
+up, and the Internet Archive hosts MAME sets that contain a usable ROM. That same
+`README.ROM.files.txt` lists the exact filenames KEGS accepts and how to extract
+or convert a MAME-format dump.
+
+**Did it work?** A valid ROM 01 file is exactly **128 KB** and a ROM 03 is **256
+KB**. If GSplus boots to the "Check startup device" screen, the ROM loaded fine —
+it just needs a disk. Press **F4** to mount a disk image, or drag one onto the
+window.
 
 ## Downloads
 
