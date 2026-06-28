@@ -24,6 +24,21 @@
 # need for the SDL3 + macOS bundle work coming later.
 cmake_minimum_required(VERSION 3.20)
 
+# ----------------------------------------------------------------------------
+# macOS minimum deployment target. MUST be set BEFORE project()/enable_language
+# so the compiler stamps the binary's minimum-OS load command (LC_BUILD_VERSION
+# minos) and CMake fills the generated bundle Info.plist's LSMinimumSystemVersion
+# with this value. If left unset, the toolchain defaults to the BUILD MACHINE's
+# SDK version -- on the macos-latest CI runner that is a newer macOS than many
+# users run, so dyld rejects the downloaded app with "You can't use this version
+# of the application with this version of macOS". 11.0 is a safe, modern floor
+# (first arm64 release) that still runs on older Intel/Apple-Silicon Macs.
+# Only meaningful on Apple; harmless elsewhere.
+if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING
+        "Minimum macOS version the built app will run on")
+endif()
+
 # Declare the project: a name, a version, and which languages are used.
 # (We'll add Swift here in the next milestone; C is all the core needs.)
 project(gsplus
