@@ -149,7 +149,18 @@ message(STATUS "GSplus: configured core library (build type: ${CMAKE_BUILD_TYPE}
 #  Swift runtime linking / rpaths automatically, which is the fragile part the
 #  Makefile does by hand.
 # ----------------------------------------------------------------------------
-if(APPLE)
+# CMake's Swift support can't build a universal (multi-arch) binary -- it errors
+# with "multiple values for CMAKE_OSX_ARCHITECTURES not supported with Swift".
+# The native Cocoa app is legacy/secondary and excluded from the default build,
+# so when a universal build is requested (the CI macos-universal job passes
+# arm64;x86_64) we simply skip it; the shipped SDL app (gsplus-sdl, plain C) has
+# no such restriction and still builds universal.
+list(LENGTH CMAKE_OSX_ARCHITECTURES _gsplus_narch)
+if(APPLE AND _gsplus_narch GREATER 1)
+    message(STATUS "GSplus: universal build -- skipping the Swift Cocoa app (Swift can't do multi-arch)")
+endif()
+
+if(APPLE AND _gsplus_narch LESS 2)
     # Turn on CMake's Swift language support. This makes CMake able to compile
     # .swift files and, when it links a target that contains Swift, pull in the
     # Swift runtime and set rpaths for us.
@@ -258,6 +269,11 @@ target_link_libraries(gsplus-sdl PRIVATE gsplus_core_sdl SDL3::SDL3)
 if(APPLE)
     # macOS-only: retune SDL's default menu bar so ⌘ combos pass through to the
     # emulated IIgs and GSplus quits on ⌥⌘Q. The Objective-C source needs Cocoa.
+    # Explicitly enable the OBJC language so CMake has a proper compile rule for
+    # the .m file. A single-arch build tolerates compiling it via the C rule, but
+    # a universal build (CMAKE_OSX_ARCHITECTURES=arm64;x86_64) errors with
+    # "CMAKE_OBJC_COMPILE_OBJECT not set" unless OBJC is enabled.
+    enable_language(OBJC)
     target_sources(gsplus-sdl PRIVATE sdl_mac_menu.m)
     target_link_libraries(gsplus-sdl PRIVATE "-framework Cocoa")
 endif()
@@ -346,12 +362,18 @@ if(APPLE)
     # bundle. We then re-sign ad-hoc ("-"): editing a binary invalidates its
     # code signature, and arm64 macOS refuses to launch a broken-signature app.
     install(TARGETS gsplus-sdl BUNDLE DESTINATION .)
-    install(CODE [[
+    # Tell fixup_bundle which directory to search for @rpath-named dylibs. A
+    # Homebrew SDL3 records an absolute/resolvable install name, but a
+    # FetchContent-built SDL3 (the universal job, and any host without system
+    # SDL3) names itself @rpath/libSDL3.0.dylib -- fixup_bundle can't find that
+    # unless we hand it the directory containing the built dylib. The genex
+    # resolves to Homebrew's libdir or the FetchContent build dir as appropriate.
+    install(CODE "
         include(BundleUtilities)
-        fixup_bundle("${CMAKE_INSTALL_PREFIX}/GSplus.app" "" "")
+        fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/GSplus.app\" \"\" \"$<TARGET_FILE_DIR:SDL3::SDL3>\")
         execute_process(COMMAND codesign --force --deep --sign -
-            "${CMAKE_INSTALL_PREFIX}/GSplus.app")
-    ]])
+            \"\${CMAKE_INSTALL_PREFIX}/GSplus.app\")
+    ")
     set(CPACK_GENERATOR "DragNDrop")          # -> a .dmg
     set(CPACK_DMG_VOLUME_NAME "GSplus")
 else()

@@ -37,6 +37,42 @@ jobs:
           name: gsplus-macos
           path: build/*.dmg
 
+  macos-universal:
+    # Second macOS build producing a UNIVERSAL (arm64 + x86_64) app, alongside
+    # the arm64-only `macos` job above. Key difference: we do NOT install
+    # Homebrew's SDL3 (it ships a single-arch arm64 dylib you can't link into a
+    # universal binary). With no system SDL3, CMake's FetchContent path builds
+    # SDL3 from source, and CMAKE_OSX_ARCHITECTURES makes that build -- and ours
+    # -- universal. fixup_bundle then embeds the universal SDL3 into the .app.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        # NB: intentionally no `sdl3` here -- see the comment above.
+        run: brew install cmake ninja
+      - name: Configure (universal, SDL3 built from source)
+        run: |
+          ARGS=""
+          case "$GITHUB_REF" in
+            refs/tags/v*) ARGS="-DGSPLUS_VERSION=${GITHUB_REF_NAME#v}" ;;
+          esac
+          cmake -G Ninja -B build -S gsplus/src \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" $ARGS
+      - name: Build
+        run: cmake --build build --target gsplus-sdl
+      - name: Package (.dmg) and label universal
+        run: |
+          cd build && cpack
+          # CPack names it GSplus-<ver>-Darwin.dmg; rename so it doesn't collide
+          # with the arm64-only dmg when both attach to the same Release.
+          for f in GSplus-*-Darwin.dmg; do
+            mv "$f" "${f/-Darwin.dmg/-macOS-universal.dmg}"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gsplus-macos-universal
+          path: build/*.dmg
+
   linux:
     runs-on: ubuntu-latest
     steps:
@@ -105,7 +141,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [ macos, linux, windows ]
+    needs: [ macos, macos-universal, linux, windows ]
     runs-on: ubuntu-latest
     permissions:
       contents: write          # required for the token to create a Release
