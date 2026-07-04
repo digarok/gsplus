@@ -487,6 +487,43 @@ extern int g_use_bw_hires;
 char g_display_env[512];
 int	g_screen_depth = 8;
 
+void
+print_usage(const char *argv0)
+{
+	printf("KEGS/GSplus v%s - Apple IIgs emulator\n\n",
+						&g_kegs_version_str[0]);
+	printf("Usage: %s [options]\n\n", argv0);
+	printf("Options:\n");
+	printf("  -h, --help       Show this help and exit\n");
+	printf("  -badrd           Halt on bad memory reads\n");
+	printf("  -noignbadacc     Do not ignore bad memory accesses\n");
+	printf("  -noignhalt       Do not ignore code-red halts\n");
+#ifndef SDL_INPUT
+	/* X11-only display flags; xdriver.c is the only reader, so these are
+	 * dead no-ops in SDL builds and omitted from that help text. */
+	printf("  -24              Force 24-bit visual\n");
+	printf("  -16              Force 16-bit visual\n");
+	printf("  -15              Force 15-bit visual\n");
+#endif
+	printf("  -mem <size>      Set memory size (bytes, masked to banks)\n");
+	printf("  -skip <n>        Set screen redraw skip amount\n");
+	printf("  -audio <n>       Set audio enable value (0=off, 1=on)\n");
+	printf("  -arate <rate>    Set preferred audio sample rate\n");
+	printf("  -v <hex>         Set verbose flags bitmask\n");
+#ifndef SDL_INPUT
+	printf("  -display <disp>  Set X11 DISPLAY to use\n");
+	printf("  -noshm           Do not use X11 shared memory\n");
+#endif
+	printf("  -joystick        (ignored)\n");
+	printf("  -dhr140          Use simple double-hires color map\n");
+	printf("  -bw              Force black-and-white hires modes\n");
+	printf("  -logpc           Force PC logging on at startup\n");
+	printf("  -cfg <file>      Use <file> as the config file\n");
+	printf("\n");
+	printf("Any other -<name> <value> is applied as a config variable "
+							"override.\n");
+}
+
 int
 parse_argv(int argc, char **argv, int slashes_to_find)
 {
@@ -537,7 +574,10 @@ parse_argv(int argc, char **argv, int slashes_to_find)
 	i = 0;
 	while(++i < argc) {
 		printf("argv[%d] = %s\n", i, argv[i]);
-		if(!strcmp("-badrd", argv[i])) {
+		if(!strcmp("-h", argv[i]) || !strcmp("--help", argv[i])) {
+			print_usage(argv[0]);
+			exit(0);
+		} else if(!strcmp("-badrd", argv[i])) {
 			printf("Halting on bad reads\n");
 			g_halt_on_bad_read = 2;
 		} else if(!strcmp("-noignbadacc", argv[i])) {
