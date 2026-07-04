@@ -1471,13 +1471,28 @@ config_parse_config_kegs_file()
 	printf("CWD is now: %s\n", &g_cfg_cwd_str[0]);
 
 	fd = open(g_config_kegs_name, O_RDONLY | O_BINARY);
+	if((fd < 0) && (errno == ENOENT)) {
+		// File doesn't exist (e.g. a -cfg name that isn't there yet).
+		//  Create it, matching the auto-create behavior for the
+		//  default config.kegs.  It's populated with defaults on save.
+		printf("Config file %s not found, creating it\n",
+							g_config_kegs_name);
+		fd = open(g_config_kegs_name,
+				O_CREAT | O_TRUNC | O_RDWR, 0x1b6);
+	}
 	dsize = 0;
 	if(fd >= 0) {
 		dsize = cfg_get_fd_size(fd);
 	}
-	if((fd < 0) || (dsize >= (1 << 30))) {
-		fatal_printf("cannot open config.kegs at %s, or it is too "
-			"large!  Stopping!\n", g_config_kegs_name);
+	if(fd < 0) {
+		fatal_printf("cannot open config file %s, errno:%d!  "
+			"Stopping!\n", g_config_kegs_name, errno);
+		my_exit(3);
+		return;
+	}
+	if(dsize >= (1 << 30)) {
+		fatal_printf("config file %s is too large!  Stopping!\n",
+							g_config_kegs_name);
 		my_exit(3);
 		return;
 	}
