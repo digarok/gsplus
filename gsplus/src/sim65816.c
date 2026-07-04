@@ -518,7 +518,8 @@ print_usage(const char *argv0)
 	printf("  -dhr140          Use simple double-hires color map\n");
 	printf("  -bw              Force black-and-white hires modes\n");
 	printf("  -logpc           Force PC logging on at startup\n");
-	printf("  -cfg <file>      Use <file> as the config file\n");
+	printf("  -cfg <file>      Use <file> as the config file "
+						"(created if absent)\n");
 	printf("\n");
 	printf("Any other -<name> <value> is applied as a config variable "
 							"override.\n");
