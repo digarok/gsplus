@@ -54,7 +54,8 @@ typedef struct {
 	/* CRT effect resources (built lazily by sdl_create_texture when on). */
 	SDL_Texture	*crt_target;		/* composited screen (fb+mask) */
 	SDL_Texture	*glow_target;		/* downscaled crt_target, used for bloom */
-	SDL_Texture	*mask;			/* RGB aperture-grille phosphor mask (MUL) */
+	SDL_Texture	*mask;			/* 1-row R/G/B phosphor-mask tile (MUL),
+						 * tiled over the output in host pixels */
 	int		mask_for;		/* g_crt_mask the mask was filled for */
 	SDL_Vertex	*crt_verts;		/* warped curvature mesh vertices */
 	int		*crt_idx;		/* mesh triangle indices */
@@ -100,12 +101,17 @@ static int g_screenshot_requested = 0;	/* set by Shift+F12, serviced at frame en
 #define CRT_MASK_MIN	60		/* off-channel level at full mask strength
 					 * (0-255); g_crt_mask scales 255 (off)
 					 * down toward this floor */
+#define CRT_MASK_STRIPE_PX 2		/* target phosphor stripe width in device
+					 * (physical screen) pixels */
 #define CRT_GLOW_DIV	3		/* glow downsample factor (blur radius) */
 #define CRT_GLOW_LEVEL	90		/* additive bloom strength, 0-255 */
 
-/* Width of the 2-row scanline tile. Any width works (it's tiled across the
- * output); wider just means fewer tiles for backends without WRAP support. */
+/* Widths of the 2-row scanline tile and the 1-row phosphor-mask tile. Any
+ * width works (they're tiled across the output; the mask just needs a multiple
+ * of its 3-column R/G/B period); wider means fewer tiles for backends without
+ * WRAP support. */
 #define SCAN_TILE_W	64
+#define MASK_TILE_W	63
 
 /* Version string (set by the build from the git tag; see CMakeLists.txt). */
 #ifndef GSPLUS_VERSION_STR
@@ -166,6 +172,22 @@ sdl_create_texture(Window_info *win, int w, int h)
 		win->overlay_for = -1;		/* force a fill */
 	}
 
+	/* Same idea for the phosphor mask: one row of R/G/B stripe columns,
+	 * tiled across the output in host pixels so the grille pitch stays a
+	 * fixed couple of device pixels at any window size. MUL blend so each
+	 * column lets one channel through and dims the other two. */
+	if(!win->mask) {
+		win->mask = SDL_CreateTexture(win->renderer,
+					SDL_PIXELFORMAT_ARGB8888,
+					SDL_TEXTUREACCESS_STATIC, MASK_TILE_W, 1);
+		if(win->mask) {
+			SDL_SetTextureBlendMode(win->mask, SDL_BLENDMODE_MUL);
+			SDL_SetTextureScaleMode(win->mask,
+						SDL_SCALEMODE_NEAREST);
+		}
+		win->mask_for = -1;		/* force a fill */
+	}
+
 	/* (Re)build the CRT effect resources at the new size. Cheap to keep around
 	 * even when the effect is off; the render path just skips them. */
 	sdl_create_crt(win, w, h);
@@ -175,55 +197,46 @@ sdl_create_texture(Window_info *win, int w, int h)
  * Curved-CRT effect (no shaders, no extra libraries).
  *
  * Built entirely on the 2D renderer:
- *   - an RGB aperture-grille "phosphor" mask (a tiled texture, MULTIPLY blend)
  *   - screen curvature via SDL_RenderGeometry: a warped vertex mesh that the GPU
  *     samples the framebuffer onto, with vignette baked into the vertex colours
  *   - bloom/glow via a downscaled (= blurred) copy redrawn additively
- *   - the scanline overlay, drawn last in host-pixel space (see
- *     sdl_render_scanlines)
+ *   - an RGB aperture-grille "phosphor" mask (MULTIPLY blend) and the scanline
+ *     overlay, both drawn last in host-pixel space (see sdl_render_overlays)
  *
- * Each frame, sdl_render_crt() composites framebuffer+mask into an offscreen
+ * Each frame, sdl_render_crt() copies the framebuffer into an offscreen
  * target, downscales it for glow, then warps both onto the curve.
  * -------------------------------------------------------------------------- */
 
-/* Fill the phosphor mask with vertical R/G/B stripes. With MULTIPLY blend each
- * column lets one channel through and dims the other two, the classic Trinitron
- * aperture-grille look. Alpha 255 so the multiply is exact.
+/* Fill the phosphor-mask tile with vertical R/G/B stripe columns, the classic
+ * Trinitron aperture-grille look. Alpha 255 so the multiply is exact.
  *
  * The off-channel "dim" level is driven by g_crt_mask (0-100): 0 leaves them at
  * 255 (mask invisible), 100 pulls them down to CRT_MASK_MIN (strongest). The
  * default is deliberately subtle. */
 static void
-sdl_fill_mask(Window_info *win, int w, int h)
+sdl_fill_mask(Window_info *win)
 {
-	word32	*buf;
-	int	x, y, col, r, g, b, dim, strength;
+	word32	buf[MASK_TILE_W];
+	int	x, col, r, g, b, dim, strength;
 
 	if(!win->mask) {
-		return;
-	}
-	buf = malloc((size_t)w * h * sizeof(word32));
-	if(!buf) {
 		return;
 	}
 	strength = g_crt_mask;
 	if(strength < 0)   { strength = 0; }
 	if(strength > 100) { strength = 100; }
 	dim = 255 - (strength * (255 - CRT_MASK_MIN) / 100);
-	for(x = 0; x < w; x++) {
+	for(x = 0; x < MASK_TILE_W; x++) {
 		col = x % 3;
 		r = g = b = dim;
 		if(col == 0)      { r = 255; }
 		else if(col == 1) { g = 255; }
 		else              { b = 255; }
-		word32 argb = 0xff000000u | ((word32)r << 16) |
+		buf[x] = 0xff000000u | ((word32)r << 16) |
 				((word32)g << 8) | (word32)b;
-		for(y = 0; y < h; y++) {
-			buf[(size_t)y * w + x] = argb;
-		}
 	}
-	SDL_UpdateTexture(win->mask, NULL, buf, w * (int)sizeof(word32));
-	free(buf);
+	SDL_UpdateTexture(win->mask, NULL, buf,
+				MASK_TILE_W * (int)sizeof(word32));
 	win->mask_for = g_crt_mask;
 }
 
@@ -307,7 +320,7 @@ sdl_build_crt_mesh(Window_info *win, int w, int h)
 	win->crt_vig_for = g_crt_vignette;
 }
 
-/* (Re)create the offscreen targets + mask + mesh at the given logical size. */
+/* (Re)create the offscreen targets + mesh at the given logical size. */
 static void
 sdl_create_crt(Window_info *win, int w, int h)
 {
@@ -315,12 +328,11 @@ sdl_create_crt(Window_info *win, int w, int h)
 
 	if(win->crt_target)  { SDL_DestroyTexture(win->crt_target);  }
 	if(win->glow_target) { SDL_DestroyTexture(win->glow_target); }
-	if(win->mask)        { SDL_DestroyTexture(win->mask);        }
-	win->crt_target = win->glow_target = win->mask = NULL;
+	win->crt_target = win->glow_target = NULL;
 
-	/* Composite target: framebuffer + mask land here, then the
-	 * curve mesh samples it. LINEAR so the warp/upscale to the window softens
-	 * like a real tube instead of showing hard pixel edges. */
+	/* Composite target: the (optionally blurred) framebuffer lands here, then
+	 * the curve mesh samples it. LINEAR so the warp/upscale to the window
+	 * softens like a real tube instead of showing hard pixel edges. */
 	win->crt_target = SDL_CreateTexture(win->renderer,
 				SDL_PIXELFORMAT_ARGB8888,
 				SDL_TEXTUREACCESS_TARGET, w, h);
@@ -337,14 +349,6 @@ sdl_create_crt(Window_info *win, int w, int h)
 				SDL_TEXTUREACCESS_TARGET, gw, gh);
 	if(win->glow_target) {
 		SDL_SetTextureScaleMode(win->glow_target, SDL_SCALEMODE_LINEAR);
-	}
-
-	win->mask = SDL_CreateTexture(win->renderer, SDL_PIXELFORMAT_ARGB8888,
-				SDL_TEXTUREACCESS_STATIC, w, h);
-	if(win->mask) {
-		SDL_SetTextureBlendMode(win->mask, SDL_BLENDMODE_MUL);
-		SDL_SetTextureScaleMode(win->mask, SDL_SCALEMODE_LINEAR);
-		sdl_fill_mask(win, w, h);
 	}
 
 	sdl_build_crt_mesh(win, w, h);
@@ -374,25 +378,45 @@ sdl_fill_overlay(Window_info *win, int intensity)
 	win->overlay_for = intensity;
 }
 
-/* Draw the scanlines over the finished frame, in *output* (host pixel) space.
- * The picture textures are all at the emulator's logical resolution, so
- * blending scanlines in that space and upscaling made each dark line ~2 host
- * pixels tall (two dim rows, two bright rows). Instead this tiles the 2-row
- * overlay 1:1 across the real output after the image has been scaled, so the
- * effect alternates on actual screen lines. Logical presentation is turned off
- * for the draw and restored right after (mouse-coordinate mapping needs it). */
+/* Output pixels per mask texel so one stripe covers ~CRT_MASK_STRIPE_PX
+ * physical screen pixels regardless of the highdpi setting. Device pixels per
+ * output pixel is the display's content scale divided by the window's pixel
+ * density (retina, highdpi=1: 2/2 -> output px ARE device px; highdpi=0: 2/1
+ * -> the OS doubles each output px). Rounded to an integer so the stripes tile
+ * evenly instead of beating against the pixel grid. */
+static float
+sdl_mask_scale(Window_info *win)
+{
+	float	density, content, scale;
+
+	density = SDL_GetWindowPixelDensity(win->window);
+	content = SDL_GetDisplayContentScale(SDL_GetDisplayForWindow(win->window));
+	if(density <= 0.0f) { density = 1.0f; }
+	if(content <= 0.0f) { content = 1.0f; }
+	scale = (float)(int)((float)CRT_MASK_STRIPE_PX * density / content
+								+ 0.5f);
+	return (scale < 1.0f) ? 1.0f : scale;
+}
+
+/* Draw the phosphor mask and scanlines over the finished frame, in *output*
+ * (host pixel) space. The picture textures are all at the emulator's logical
+ * resolution, so blending these effects in that space and upscaling stretched
+ * them along with the picture (~2+ host pixels per scanline/stripe, smeared by
+ * the LINEAR upscale). Instead the tiles go on 1:1 after the image has been
+ * scaled, so the effects land on actual screen pixels. Logical presentation is
+ * turned off for the draw and restored right after (mouse-coordinate mapping
+ * needs it). */
 static void
-sdl_render_scanlines(Window_info *win)
+sdl_render_overlays(Window_info *win)
 {
 	SDL_Renderer	*r = win->renderer;
 	SDL_FRect	dst;
 	int		ow, oh;
+	int	want_mask = (g_crt && (g_crt_mask > 0) && win->mask);
+	int	want_scan = ((g_scanline_simulator > 0) && win->overlay);
 
-	if((g_scanline_simulator <= 0) || !win->overlay) {
+	if(!want_mask && !want_scan) {
 		return;
-	}
-	if(win->overlay_for != g_scanline_simulator) {
-		sdl_fill_overlay(win, g_scanline_simulator);
 	}
 	SDL_SetRenderLogicalPresentation(r, 0, 0,
 				SDL_LOGICAL_PRESENTATION_DISABLED);
@@ -401,8 +425,21 @@ sdl_render_scanlines(Window_info *win)
 		dst.y = 0.0f;
 		dst.w = (float)ow;
 		dst.h = (float)oh;
-		/* Covers the letterbox bars too; black over black is invisible. */
-		SDL_RenderTextureTiled(r, win->overlay, NULL, 1.0f, &dst);
+		/* Both cover the letterbox bars too, invisibly: multiplying
+		 * black stays black, and blending black over black is black. */
+		if(want_mask) {
+			if(win->mask_for != g_crt_mask) {
+				sdl_fill_mask(win);
+			}
+			SDL_RenderTextureTiled(r, win->mask, NULL,
+						sdl_mask_scale(win), &dst);
+		}
+		if(want_scan) {
+			if(win->overlay_for != g_scanline_simulator) {
+				sdl_fill_overlay(win, g_scanline_simulator);
+			}
+			SDL_RenderTextureTiled(r, win->overlay, NULL, 1.0f, &dst);
+		}
 	}
 	SDL_SetRenderLogicalPresentation(r, win->width_req, win->main_height,
 		g_noaspect ? SDL_LOGICAL_PRESENTATION_STRETCH
@@ -1135,10 +1172,10 @@ sdl_render_framebuffer(Window_info *win, int w, int h)
 
 /* Render the framebuffer with the full curved-CRT effect. Assumes the changed
  * rectangles have already been uploaded into win->texture. Three passes:
- *   1. composite framebuffer + mask into crt_target (no curvature),
+ *   1. copy the (optionally blurred) framebuffer into crt_target (no curvature),
  *   2. downscale crt_target into glow_target (a cheap blur for bloom),
  *   3. warp crt_target onto the curvature mesh in the window, add the glow,
- *      then draw the scanlines over the result in host-pixel space.
+ *      then draw the mask + scanlines over the result in host-pixel space.
  * Logical presentation is disabled for the offscreen passes (we want a 1:1 fill)
  * and restored for the final on-window geometry pass. */
 static void
@@ -1157,7 +1194,7 @@ sdl_render_crt(Window_info *win)
 		}
 	}
 
-	/* --- Pass 1: composite into crt_target (1:1, no logical scaling). --- */
+	/* --- Pass 1: copy into crt_target (1:1, no logical scaling). --- */
 	SDL_SetRenderLogicalPresentation(r, 0, 0,
 				SDL_LOGICAL_PRESENTATION_DISABLED);
 	SDL_SetRenderTarget(r, win->crt_target);
@@ -1171,12 +1208,6 @@ sdl_render_crt(Window_info *win)
 	SDL_SetRenderDrawColor(r, 0, 0, 0, 0);
 	SDL_RenderClear(r);
 	sdl_render_framebuffer(win, w, h);
-	if((g_crt_mask > 0) && win->mask) {
-		if(win->mask_for != g_crt_mask) {
-			sdl_fill_mask(win, win->width_req, win->main_height);
-		}
-		SDL_RenderTexture(r, win->mask, NULL, NULL);
-	}
 
 	/* --- Pass 2: downscale crt_target -> glow_target (LINEAR = blur). --- */
 	SDL_SetRenderTarget(r, win->glow_target);
@@ -1201,11 +1232,11 @@ sdl_render_crt(Window_info *win)
 	SDL_RenderGeometry(r, win->glow_target, win->crt_verts, win->crt_nverts,
 				win->crt_idx, win->crt_nidx);
 
-	/* Scanlines go on last, in host-pixel space over the warped image, so
-	 * they stay one screen pixel regardless of window size. (They no longer
-	 * feed the glow pass; the bloom now comes from the clean picture, which
-	 * reads a touch smoother.) */
-	sdl_render_scanlines(win);
+	/* Mask and scanlines go on last, in host-pixel space over the warped
+	 * image, so they stay at fixed screen-pixel sizes regardless of window
+	 * size. (They no longer feed the glow pass; the bloom now comes from
+	 * the clean picture, which reads a touch smoother.) */
+	sdl_render_overlays(win);
 }
 
 static void
@@ -1271,7 +1302,7 @@ sdl_update_display(Window_info *win)
 		SDL_SetRenderDrawColor(win->renderer, 0, 0, 0, 255);
 		SDL_RenderClear(win->renderer);
 		sdl_render_framebuffer(win, win->width_req, win->main_height);
-		sdl_render_scanlines(win);
+		sdl_render_overlays(win);
 	}
 
 	/* Service a pending Shift+F12 capture now, while the just-drawn frame is
