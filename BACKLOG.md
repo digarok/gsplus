@@ -14,7 +14,8 @@ Effort: **S** small · **M** medium · **L** large. Priority: High / Med / Low.
   self-contained packaging (macOS `.dmg`, Linux `.tar.gz`, Windows `.zip`),
   version-from-tag.
 - **F1 — Window & display options**: `-fullscreen`, `-borderless`, `-noaspect`,
-  `-highdpi`, `-novsync`, `-nohwaccel`, window position; F11 fullscreen toggle.
+  `-highdpi`, `-nohwaccel`, window position; F11 fullscreen toggle. (`-novsync`
+  was later removed — see the vsync item under Display.)
 - **F2 — Scanline simulator**: `-scanline <0-100>`, Shift+F11 toggle.
 - **F3 — Drag-and-drop**: drop a disk image on the window to mount it (slot
   guessed from file size).
@@ -24,7 +25,7 @@ Effort: **S** small · **M** medium · **L** large. Priority: High / Med / Low.
 - **Gamepad/controller support**: SDL3 high-level Gamepad API → IIgs
   joystick/paddles, with hotplug. Select "Native Joystick 1" in the F4 config
   menu to route paddles to it.
-- **Screenshots**: Shift+F12 captures the framebuffer (`-ssdir` sets the output
+- **Screenshots**: F10 captures the framebuffer (`-ssdir` sets the output
   directory).
 
 ---
@@ -41,13 +42,15 @@ Effort: **S** small · **M** medium · **L** large. Priority: High / Med / Low.
 |---|---|---|---|
 | **Mouse capture** toggle | Med | S | Grab/release the pointer via a hotkey. |
 | Configurable **key remapping** | Low | M | Currently a fixed scancode→ADB table. |
+| **Gamepad button remapping** | Low | S | SDL_Gamepad's stable button names make a small remap table in the config menu cheap. |
 
 ## Display
 
 | Item | Pri | Eff | Notes |
 |---|---|---|---|
-| **Integer / pixel-perfect scaling** toggle | Med | S | Crisp 1×/2×/3× vs. letterbox stretch. |
+| **Integer / pixel-perfect scaling** toggle | Med | S | Crisp 1×/2×/3× vs. letterbox stretch; also stops scanline shimmer at non-integer scales. |
 | Linear-filter option | Low | S | Smooth-scaling alternative to nearest. |
+| Re-add **vsync** option properly | Low | M | Removed pre-1.38.0 (double-pacing caused half-speed + Windows audio gaps). Right fix: when vsync is on, let it drive pacing and drop the sleep-based clock — one pacer, not two. |
 
 ## Runtime / system
 
@@ -79,6 +82,24 @@ Effort: **S** small · **M** medium · **L** large. Priority: High / Med / Low.
 | **Linux AppImage** (self-contained) | Med | M | The one non-self-contained download today. |
 | **Code signing** (Windows/macOS) | Low | M | Needs a cert / Azure Trusted Signing. |
 | Local **mingw cross-compile** for fast Windows iteration | Low | S | Catch Win compile/link errors on macOS in seconds. |
+
+## Testing / infrastructure
+
+| Item | Pri | Eff | Notes |
+|---|---|---|---|
+| **CI smoke test** | High | M | Headless boot (SDL `dummy` video driver) for N emulated frames, checksum the framebuffer. Catches CPU/memory/video regressions on every PR — highest-leverage single test, especially for upstream KEGS merges. Needs a redistributable boot image or ROM-free path. |
+
+## Upstream (offer back to KEGS)
+
+Per policy: core (non-SDL) fixes get offered upstream. Current candidates,
+verified clean by review:
+
+- **VOC SHR shadow fix** — `moremem.c` `fixup_ramwrt()`, bank $E0 pages
+  $6000-$9FFF. Reword the misleading "bank 0" comment first.
+- **Windows timer fix** — `clock.c` `timeBeginPeriod(1)` + Sleep rounding;
+  winmm is already linked in upstream's vcxproj.
+- **dynapro.c dirent guard** — `_WIN32 && _MSC_VER` check; benefits any
+  mingw build of upstream.
 
 ---
 
