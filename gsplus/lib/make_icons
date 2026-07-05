@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""Generate every GSplus icon artifact from the one source image.
+
+Usage:  ./make_icons [source.png]        (default: gsplusicon.png)
+
+Reads a square source PNG (1024x1024 recommended) and writes, relative to
+this script:
+
+  gsplusicon.icns       macOS .app bundle icon (all sizes 16..512 @1x/@2x;
+                        needs the macOS `iconutil` tool -- skipped elsewhere)
+  gsplusicon.ico        Windows .exe icon (16/32/48/64/128/256, embedded by
+                        gsplus.rc.in via windres)
+  ../src/gsplus_icon.h  128x128 RGBA array passed to SDL_SetWindowIcon for
+                        the Linux/Windows window+taskbar icon at runtime
+                        (macOS skips it -- the bundle .icns is the icon)
+
+To change the app icon: replace gsplusicon.png, run this script, rebuild.
+Requires Python 3 with Pillow (pip install pillow).
+
+This replaces the manual three-step process (make_mac_icon + hand-made .ico
++ hand-generated header); make_mac_icon is kept as upstream KEGS reference.
+"""
+
+import pathlib
+import shutil
+import subprocess
+import sys
+import tempfile
+
+try:
+    from PIL import Image
+except ImportError:
+    sys.exit("Pillow is required: pip install pillow")
+
+LIB_DIR = pathlib.Path(__file__).resolve().parent
+SRC_DIR = LIB_DIR.parent / "src"
+
+ICONSET_SIZES = (16, 32, 128, 256, 512)   # iconutil names, each also @2x
+ICO_SIZES = (16, 32, 48, 64, 128, 256)
+HEADER_SIZE = 128
+
+
+def scaled(img, px):
+    return img.resize((px, px), Image.LANCZOS)
+
+
+def write_icns(img, out_path):
+    if shutil.which("iconutil") is None:
+        print(f"SKIP {out_path.name}: iconutil not found (not macOS?)")
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        iconset = pathlib.Path(tmp) / "gsplus.iconset"
+        iconset.mkdir()
+        for sz in ICONSET_SIZES:
+            scaled(img, sz).save(iconset / f"icon_{sz}x{sz}.png")
+            scaled(img, sz * 2).save(iconset / f"icon_{sz}x{sz}@2x.png")
+        subprocess.run(["iconutil", "-c", "icns", "-o", str(out_path),
+                        str(iconset)], check=True)
+    print(f"wrote {out_path.name}")
+
+
+def write_ico(img, out_path):
+    img.save(out_path, format="ICO", sizes=[(s, s) for s in ICO_SIZES])
+    print(f"wrote {out_path.name}")
+
+
+def write_header(img, out_path, source_name):
+    small = scaled(img, HEADER_SIZE)
+    data = small.tobytes()          # RGBA, row-major
+    lines = [
+        f"/* Generated from lib/{source_name} by lib/make_icons -- do not",
+        " * edit. GSplus window icon (RGBA) for SDL_SetWindowIcon. */",
+        "#ifndef GSPLUS_ICON_H",
+        "#define GSPLUS_ICON_H",
+        "",
+        f"static const int gsplus_icon_width = {HEADER_SIZE};",
+        f"static const int gsplus_icon_height = {HEADER_SIZE};",
+        f"static const unsigned char gsplus_icon_rgba[{len(data)}] = {{",
+    ]
+    for off in range(0, len(data), 16):
+        chunk = ",".join(str(b) for b in data[off:off + 16])
+        lines.append(f"  {chunk},")
+    lines[-1] = lines[-1].rstrip(",")
+    lines += ["};", "", "#endif", ""]
+    out_path.write_text("\n".join(lines))
+    print(f"wrote {out_path.relative_to(LIB_DIR.parent)} "
+          f"({HEADER_SIZE}x{HEADER_SIZE})")
+
+
+def main():
+    src = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 \
+        else LIB_DIR / "gsplusicon.png"
+    if not src.is_file():
+        sys.exit(f"source image not found: {src}")
+    img = Image.open(src).convert("RGBA")
+    if img.width != img.height:
+        sys.exit(f"source must be square, got {img.width}x{img.height}")
+    if img.width < 1024:
+        print(f"warning: {src.name} is {img.width}px; 1024px recommended")
+
+    write_icns(img, LIB_DIR / "gsplusicon.icns")
+    write_ico(img, LIB_DIR / "gsplusicon.ico")
+    write_header(img, SRC_DIR / "gsplus_icon.h", src.name)
+
+
+if __name__ == "__main__":
+    main()
