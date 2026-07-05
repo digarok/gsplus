@@ -26,7 +26,9 @@
 
 #include "defc.h"
 #include "protos_sdl.h"
-#include "gsplus_icon.h"		/* embedded RGBA window icon */
+#ifndef __APPLE__
+# include "gsplus_icon.h"	/* embedded RGBA window icon (see below) */
+#endif
 
 #ifdef _WIN32
 # include <sys/stat.h>
@@ -504,8 +506,11 @@ sdl_video_init(void)
 					g_mainwin_xpos, g_mainwin_ypos);
 	}
 
-	/* Window/taskbar icon. macOS uses the .app's icns, but this gives Linux
-	 * and Windows a proper icon while running. */
+	/* Window/taskbar icon for Linux and Windows. Not on macOS: SDL3's
+	 * cocoa backend implements this as setApplicationIconImage, which
+	 * would replace the bundle's full-res .icns dock icon with this
+	 * small bitmap. */
+#ifndef __APPLE__
 	{
 		SDL_Surface *icon = SDL_CreateSurfaceFrom(gsplus_icon_width,
 				gsplus_icon_height, SDL_PIXELFORMAT_RGBA32,
@@ -515,6 +520,7 @@ sdl_video_init(void)
 			SDL_DestroySurface(icon);
 		}
 	}
+#endif
 
 	/* "-nohwaccel 1" forces the software renderer; otherwise SDL picks the best. */
 	g_mainwin_info.renderer = SDL_CreateRenderer(g_mainwin_info.window,
