@@ -92,32 +92,31 @@ Some features that are a part of the SDL3 build:
 
 ## Controls
 
-**Additional GSplus hotkeys** — handled by the app (the SDL build), not sent to the
-emulated IIgs:
+Hotkeys are intercepted by the app rather than typed into the emulated IIgs.
+The **Source** column shows where each comes from: **KEGS/GS+** = inherited
+from the KEGS core, **GS+** = added by GSplus.
 
-| Key | Action |
-|---|---|
-| **F10** | Save a screenshot |
-| **F11** | Toggle fullscreen |
-| **Shift + F11** | Toggle the CRT scanline effect |
-| **Ctrl + F11** | Toggle the CRT curved screen effect |
-| **Drag & drop** | Drop a disk image on the window to mount it (slot guessed from size) |
+| Key | Action | Source |
+|---|---|---|
+| **F1** | Open-Apple (⌘) modifier, for keyboards without an Apple/Command key | KEGS/GS+ |
+| **F4** | Open the configuration menu (mount disks, pick a ROM, settings) | KEGS/GS+ |
+| **F5** | Toggle the status line | KEGS/GS+ |
+| **F6** | Cycle emulation speed (1 MHz / 2.8 MHz / fast) | KEGS/GS+ |
+| **F7** | Toggle the debugger | KEGS/GS+ |
+| **Shift + F7** | Toggle fast disk emulation | KEGS/GS+ |
+| **F8** | Grab / release the mouse (warp + hide pointer) | KEGS/GS+ |
+| **F9** | Invert paddles | KEGS/GS+ |
+| **Shift + F9** | Swap paddles | KEGS/GS+ |
+| **Ctrl + F9** | Copy screen text to the clipboard | KEGS/GS+ |
+| **F10** | Save a screenshot | GS+ |
+| **F11** | Toggle fullscreen | GS+ |
+| **Shift + F11** | Toggle the CRT scanline effect | GS+ |
+| **Ctrl + F11** | Toggle the CRT curved screen effect | GS+ |
+| **Ctrl + F12** | Reset the IIgs (Ctrl-Reset) | KEGS/GS+ |
 
-**Emulator hotkeys** — inherited from KEGS and handled by the emulator core:
-
-| Key | Action |
-|---|---|
-| **F4** | Open the configuration menu (mount disks, pick a ROM, settings) |
-| **F5** | Toggle the status line |
-| **F6** | Cycle emulation speed (1 MHz / 2.8 MHz / fast) |
-| **F7** | Toggle the debugger · **Shift + F7** toggles fast disk emulation |
-| **F8** | Grab / release the mouse (warp + hide pointer) |
-| **F9** | Invert paddles · **Shift + F9** swap paddles · **Ctrl + F9** copy screen text |
-| **Ctrl + F12** | Reset the IIgs (Ctrl-Reset) |
-
-On keyboards without Apple keys, **F1** acts as Open-Apple (⌘), **F2** as
-Option/Closed-Apple, and **F3** as Escape. On macOS, ⌘ key combos are forwarded
-to the emulated machine.
+You can also **drag & drop** a disk image onto the window to mount it (slot
+guessed from size). On macOS, ⌘ key combos are forwarded to the emulated
+machine.
 
 ## Building from source
 
