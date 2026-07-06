@@ -9,6 +9,7 @@
 /**********************************************************************/
 
 #include "defc.h"
+#include <math.h>
 
 extern int g_mouse_raw_x;	/* from adb.c */
 extern int g_mouse_raw_y;
@@ -22,6 +23,7 @@ int	g_joystick_trim_amount_x = 0;
 int	g_joystick_trim_amount_y = 0;
 
 int	g_joystick_type = 4;	/* 4 = Auto (gamepad if present, else keypad) */
+int	g_joystick_square_range = 1;	/* remap circular stick gate to square */
 int	g_joystick_native_type1 = -1;
 int	g_joystick_native_type2 = -1;
 int	g_joystick_native_type = -1;
@@ -34,6 +36,45 @@ int	g_paddle_val[4] = { 0, 0, 0, 0 };
 dword64	g_paddle_dfcyc[4] = { 0, 0, 0, 0 };
 		/* g_paddle_dfcyc are the dfcyc the paddle goes to 0 */
 
+
+#define STICK_DEADZONE	0.08	/* radial, as a fraction of full deflection */
+
+void
+paddle_map_circle_to_square(int *xptr, int *yptr)
+{
+	double	x, y, r, m, scale;
+
+	/* A modern gamepad stick travels in a circle, so a full diagonal
+	 *  only reaches ~71% on each axis and games expecting the square
+	 *  range of Apple joysticks never see the corners.  Stretch each
+	 *  sample along its own direction -- identity on the axes, up to
+	 *  sqrt(2) at the diagonals -- so the circular rim lands exactly on
+	 *  the square's perimeter. */
+	x = *xptr / 32767.0;
+	y = *yptr / 32767.0;
+	r = sqrt((x * x) + (y * y));
+	if(r < STICK_DEADZONE) {
+		/* Radial deadzone: sticks do not rest at exactly 0, and the
+		 *  stretch below would amplify the drift */
+		*xptr = 0;
+		*yptr = 0;
+		return;
+	}
+	/* Rescale magnitude so travel is continuous at the deadzone edge */
+	scale = (r - STICK_DEADZONE) / (1.0 - STICK_DEADZONE);
+	x = (x / r) * scale;
+	y = (y / r) * scale;
+	m = (fabs(x) > fabs(y)) ? fabs(x) : fabs(y);
+	if(m > 0.0) {
+		x = x * (scale / m);
+		y = y * (scale / m);
+	}
+	/* Clamp: some pads overshoot the unit circle near the diagonals */
+	x = (x > 1.0) ? 1.0 : ((x < -1.0) ? -1.0 : x);
+	y = (y > 1.0) ? 1.0 : ((y < -1.0) ? -1.0 : y);
+	*xptr = (int)(x * 32767.0);
+	*yptr = (int)(y * 32767.0);
+}
 
 int
 paddle_effective_joystick_type()
@@ -137,15 +178,27 @@ void
 paddle_update_trigger_dcycs(dword64 dfcyc)
 {
 	dword64	trig_dfcyc;
+	int	xy_val[2];
 	int	val, paddle_num, scale, trim;
 	int	i;
 
+	xy_val[0] = g_paddle_val[0];
+	xy_val[1] = g_paddle_val[1];
+	if(g_joystick_square_range &&
+				(paddle_effective_joystick_type() >= 2)) {
+		/* Work on a copy: some backends keep g_paddle_val[] between
+		 *  samples, so remapping in place would compound */
+		paddle_map_circle_to_square(&xy_val[0], &xy_val[1]);
+	}
 	for(i = 0; i < 4; i++) {
 		paddle_num = i;
 		if(g_swap_paddles) {
 			paddle_num = i ^ 1;
 		}
 		val = g_paddle_val[paddle_num];
+		if(paddle_num < 2) {
+			val = xy_val[paddle_num];
+		}
 		if(g_invert_paddles) {
 			val = -val;
 		}

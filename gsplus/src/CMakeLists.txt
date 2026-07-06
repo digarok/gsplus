@@ -266,6 +266,11 @@ add_executable(gsplus-sdl
 )
 target_link_libraries(gsplus-sdl PRIVATE gsplus_core_sdl SDL3::SDL3)
 
+if(UNIX AND NOT APPLE)
+    # paddles.c uses sqrt(); glibc keeps it in libm
+    target_link_libraries(gsplus-sdl PRIVATE m)
+endif()
+
 if(APPLE)
     # macOS-only: retune SDL's default menu bar so ⌘ combos pass through to the
     # emulated IIgs and GSplus quits on ⌥⌘Q. The Objective-C source needs Cocoa.
