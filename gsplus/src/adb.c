@@ -2126,7 +2126,7 @@ adb_physical_key_update(Kimage *kimage_ptr, int raw_a2code, word32 unicode_c,
 		if(ascii > 0x30 && ascii <= 0x39) {
 			g_keypad_key_is_down[ascii - 0x30] = !is_up;
 		}
-		if(g_joystick_type == 0) {
+		if(paddle_effective_joystick_type() == 0) {
 			/* If Joystick type is keypad, then do not let these */
 			/*  keypress pass on further, except for cmd/opt */
 			if(ascii == 0x30) {

@@ -250,8 +250,9 @@ Cfg_menu g_cfg_newslot7_menu[] = {
 
 Cfg_menu g_cfg_joystick_menu[] = {
 { "Joystick Configuration", g_cfg_joystick_menu, 0, 0, CFGTYPE_MENU },
-{ "Joystick Emulation,0,Keypad Joystick,1,Mouse Joystick,2,Native Joystick 1,"
-	"3,Native Joystick 2", KNMP(g_joystick_type), CFGTYPE_INT },
+{ "Joystick Emulation,4,Auto (Gamepad or Keypad),0,Keypad Joystick,"
+	"1,Mouse Joystick,2,Native Joystick 1,3,Native Joystick 2",
+	KNMP(g_joystick_type), CFGTYPE_INT },
 { "Joystick Scale X,0x100,Standard,0x119,+10%,0x133,+20%,"
 	"0x150,+30%,0xb0,-30%,0xcd,-20%,0xe7,-10%",
 		KNMP(g_joystick_scale_factor_x), CFGTYPE_INT },

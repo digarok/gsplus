@@ -79,6 +79,9 @@ Some features that are a part of the SDL3 build:
   fullscreen.
 - **Screenshot capture** - F10 writes the framebuffer to disk.
 - **Gamepad support** - cross-platform SDL_Gamepad mapped to the IIgs joystick.
+  A connected gamepad is used automatically (with hotplug); without one, the
+  numeric keypad emulates the joystick. Override in the config menu (F4) under
+  Joystick Configuration.
 - **Terminal debugger** - a REPL for the built-in 65816 debugger from the
   controlling terminal.
 - **Drag-and-drop disk loading** - drop a disk image on the window and GSplus

@@ -21,7 +21,7 @@ int	g_joystick_scale_factor_y = 0x100;
 int	g_joystick_trim_amount_x = 0;
 int	g_joystick_trim_amount_y = 0;
 
-int	g_joystick_type = 0;	/* 0 = Keypad Joystick */
+int	g_joystick_type = 4;	/* 4 = Auto (gamepad if present, else keypad) */
 int	g_joystick_native_type1 = -1;
 int	g_joystick_native_type2 = -1;
 int	g_joystick_native_type = -1;
@@ -35,17 +35,33 @@ dword64	g_paddle_dfcyc[4] = { 0, 0, 0, 0 };
 		/* g_paddle_dfcyc are the dfcyc the paddle goes to 0 */
 
 
+int
+paddle_effective_joystick_type()
+{
+	/* Auto (type 4) is resolved every time it's sampled, never stored:
+	 *  use the native joystick/gamepad if one is connected, else the
+	 *  keypad.  g_joystick_native_type1 tracks hotplug, so connecting
+	 *  or removing a gamepad mid-game switches modes automatically. */
+	if(g_joystick_type == 4) {
+		return (g_joystick_native_type1 >= 0) ? 2 : 0;
+	}
+	return g_joystick_type;
+}
+
 void
 paddle_fixup_joystick_type()
 {
+	int	type;
+
 	/* If g_joystick_type points to an illegal value, change it */
-	if(g_joystick_type == 2) {
+	type = paddle_effective_joystick_type();
+	if(type == 2) {
 		g_joystick_native_type = g_joystick_native_type1;
 		if(g_joystick_native_type1 < 0) {
 			g_joystick_type = 0;
 		}
 	}
-	if(g_joystick_type == 3) {
+	if(type == 3) {
 		g_joystick_native_type = g_joystick_native_type2;
 		if(g_joystick_native_type2 < 0) {
 			g_joystick_type = 0;
@@ -62,7 +78,7 @@ paddle_trigger(dword64 dfcyc)
 	/* Determine what all the paddle values are right now */
 	paddle_fixup_joystick_type();
 
-	switch(g_joystick_type) {
+	switch(paddle_effective_joystick_type()) {
 	case 0:		/* Keypad Joystick */
 		paddle_trigger_keypad(dfcyc);
 		break;
@@ -183,5 +199,12 @@ void
 paddle_update_buttons()
 {
 	paddle_fixup_joystick_type();
-	joystick_update_buttons();
+	if(paddle_effective_joystick_type() >= 2) {
+		joystick_update_buttons();
+	} else {
+		/* In keypad/mouse modes a connected gamepad must not drive
+		 *  the buttons either (half-working input is confusing);
+		 *  also clears bits latched before a mode switch */
+		g_paddle_buttons &= ~3;
+	}
 }
