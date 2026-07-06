@@ -92,9 +92,8 @@ Some features that are a part of the SDL3 build:
 
 ## Controls
 
-Hotkeys are intercepted by the app rather than typed into the emulated IIgs.
-The **Source** column shows where each comes from: **KEGS/GS+** = inherited
-from the KEGS core, **GS+** = added by GSplus.
+The following hotkeys let you dynamically change many of the emulator settings,
+but you can also edit most settings by hitting `F4` for the configuration menu. 
 
 | Key | Action | Source |
 |---|---|---|
@@ -115,8 +114,7 @@ from the KEGS core, **GS+** = added by GSplus.
 | **Ctrl + F12** | Reset the IIgs (Ctrl-Reset) | KEGS/GS+ |
 
 You can also **drag & drop** a disk image onto the window to mount it (slot
-guessed from size). On macOS, ⌘ key combos are forwarded to the emulated
-machine.
+guessed from size). 
 
 ## Building from source
 
@@ -180,12 +178,15 @@ what I see in every modern development shop.  Things have changed dramatically
 over the past few years.  But I want to be clear about AI usage, and that I
 feel comfortable using it as a tool that needs a lot of oversight. 
 
-KEGS is a brilliant piece of pure C, and is living proof that you don't need
-AI to write great software. Kent Dickey did the hard, beautiful work. The AI 
-here is just a pragmatic crutch to keep *my* reboot alive between the demands 
-of real life.
+KEGS is a brilliant piece of pure C, and is proof that you don't need AI to 
+write great software. Kent Dickey did the hard, beautiful work. The AI here 
+is a pragmatic crutch to keep *my* reboot alive between the demands of real 
+life.
 
-So what does GSplus actually add? A handful of **features I want for myself**.
 If you want the canonical emulator, go straight to KEGS.  It's great!
+
+I'm just over here having fun making the emulator extensions that I find 
+useful or interesting.  I hope it helps some other people connect to the 
+incredible machine that is the Apple IIgs. Peace!
 
 - Dagen
