@@ -92,32 +92,29 @@ Some features that are a part of the SDL3 build:
 
 ## Controls
 
-**Additional GSplus hotkeys** — handled by the app (the SDL build), not sent to the
-emulated IIgs:
+The following hotkeys let you dynamically change many of the emulator settings,
+but you can also edit most settings by hitting `F4` for the configuration menu. 
 
-| Key | Action |
-|---|---|
-| **F10** | Save a screenshot |
-| **F11** | Toggle fullscreen |
-| **Shift + F11** | Toggle the CRT scanline effect |
-| **Ctrl + F11** | Toggle the CRT curved screen effect |
-| **Drag & drop** | Drop a disk image on the window to mount it (slot guessed from size) |
+| Key | Action | Source |
+|---|---|---|
+| **F1** | Open-Apple (⌘) modifier, for keyboards without an Apple/Command key | KEGS/GS+ |
+| **F4** | Open the configuration menu (mount disks, pick a ROM, settings) | KEGS/GS+ |
+| **F5** | Toggle the status line | KEGS/GS+ |
+| **F6** | Cycle emulation speed (1 MHz / 2.8 MHz / fast) | KEGS/GS+ |
+| **F7** | Toggle the debugger | KEGS/GS+ |
+| **Shift + F7** | Toggle fast disk emulation | KEGS/GS+ |
+| **F8** | Grab / release the mouse (warp + hide pointer) | KEGS/GS+ |
+| **F9** | Invert paddles | KEGS/GS+ |
+| **Shift + F9** | Swap paddles | KEGS/GS+ |
+| **Ctrl + F9** | Copy screen text to the clipboard | KEGS/GS+ |
+| **F10** | Save a screenshot | GS+ |
+| **F11** | Toggle fullscreen | GS+ |
+| **Shift + F11** | Toggle the CRT scanline effect | GS+ |
+| **Ctrl + F11** | Toggle the CRT curved screen effect | GS+ |
+| **Ctrl + F12** | Reset the IIgs (Ctrl-Reset) | KEGS/GS+ |
 
-**Emulator hotkeys** — inherited from KEGS and handled by the emulator core:
-
-| Key | Action |
-|---|---|
-| **F4** | Open the configuration menu (mount disks, pick a ROM, settings) |
-| **F5** | Toggle the status line |
-| **F6** | Cycle emulation speed (1 MHz / 2.8 MHz / fast) |
-| **F7** | Toggle the debugger · **Shift + F7** toggles fast disk emulation |
-| **F8** | Grab / release the mouse (warp + hide pointer) |
-| **F9** | Invert paddles · **Shift + F9** swap paddles · **Ctrl + F9** copy screen text |
-| **Ctrl + F12** | Reset the IIgs (Ctrl-Reset) |
-
-On keyboards without Apple keys, **F1** acts as Open-Apple (⌘), **F2** as
-Option/Closed-Apple, and **F3** as Escape. On macOS, ⌘ key combos are forwarded
-to the emulated machine.
+You can also **drag & drop** a disk image onto the window to mount it (slot
+guessed from size). 
 
 ## Building from source
 
@@ -181,12 +178,15 @@ what I see in every modern development shop.  Things have changed dramatically
 over the past few years.  But I want to be clear about AI usage, and that I
 feel comfortable using it as a tool that needs a lot of oversight. 
 
-KEGS is a brilliant piece of pure C, and is living proof that you don't need
-AI to write great software. Kent Dickey did the hard, beautiful work. The AI 
-here is just a pragmatic crutch to keep *my* reboot alive between the demands 
-of real life.
+KEGS is a brilliant piece of pure C, and is proof that you don't need AI to 
+write great software. Kent Dickey did the hard, beautiful work. The AI here 
+is a pragmatic crutch to keep *my* reboot alive between the demands of real 
+life.
 
-So what does GSplus actually add? A handful of **features I want for myself**.
 If you want the canonical emulator, go straight to KEGS.  It's great!
+
+I'm just over here having fun making the emulator extensions that I find 
+useful or interesting.  I hope it helps some other people connect to the 
+incredible machine that is the Apple IIgs. Peace!
 
 - Dagen
