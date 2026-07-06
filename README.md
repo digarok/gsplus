@@ -14,9 +14,16 @@ you want the native macOS or Windows versions, use
 [KEGS](http://kegs.sourceforge.net) directly. GSplus tracks the KEGS version it's
 based on (currently 1.38).
 
-<a href="gsplus-screenshot-mac.png">
-  <img src="gsplus-screenshot-mac.png" alt="GSplus running on macOS" width="400">
-</a>
+<table>
+  <tr>
+    <td><a href="screenshots/gsplus-mac-wolf3d.png"><img src="screenshots/gsplus-mac-wolf3d.png" alt="Wolfenstein 3D running in GSplus" width="400"></a></td>
+    <td><a href="screenshots/gsplus-mac-arkanoid2.png"><img src="screenshots/gsplus-mac-arkanoid2.png" alt="Arkanoid II running in GSplus" width="400"></a></td>
+  </tr>
+  <tr>
+    <td><a href="screenshots/gsplus-mac-animasia3d.png"><img src="screenshots/gsplus-mac-animasia3d.png" alt="Animasia 3D running in GSplus" width="400"></a></td>
+    <td><a href="screenshots/gsplus-mac-3200-image.png"><img src="screenshots/gsplus-mac-3200-image.png" alt="3200-color image displayed in GSplus" width="400"></a></td>
+  </tr>
+</table>
 
 ## You'll need a ROM
 
