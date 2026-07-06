@@ -483,6 +483,8 @@ int read_vid_counters(int loc, dword64 dfcyc);
 
 
 /* paddles.c */
+void paddle_map_circle_to_square(int *xptr, int *yptr);
+int paddle_effective_joystick_type(void);
 void paddle_fixup_joystick_type(void);
 void paddle_trigger(dword64 dfcyc);
 void paddle_trigger_mouse(dword64 dfcyc);
