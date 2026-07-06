@@ -409,7 +409,7 @@ Cfg_menu g_cfg_sdl_video_menu[] = {
 };
 
 Cfg_menu g_cfg_main_menu[] = {
-{ "KEGS Configuration", g_cfg_main_menu, 0, 0, CFGTYPE_MENU },
+{ "GSplus Configuration", g_cfg_main_menu, 0, 0, CFGTYPE_MENU },
 { "Disk Configuration", g_cfg_disk_menu, 0, 0, CFGTYPE_SUBMENU },
 { "Joystick Configuration", g_cfg_joystick_menu, 0, 0, CFGTYPE_SUBMENU },
 { "ROM File Selection", g_cfg_rom_menu, 0, 0, CFGTYPE_SUBMENU },
@@ -1815,7 +1815,7 @@ config_write_config_kegs_file(int get_status)
 		return 0;
 	}
 
-	fprintf(fconf, "# KEGS configuration file version %s\n",
+	fprintf(fconf, "# GS+ / KEGS configuration file version %s\n",
 						g_kegs_version_str);
 
 	for(i = 0; i < MAX_C7_DISKS + 4; i++) {
