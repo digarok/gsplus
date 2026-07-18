@@ -393,6 +393,9 @@ else()
         # On Linux the SDL3 .so is bundled by the AppImage step in CI; a plain
         # TGZ relies on the system SDL3.
         set(CPACK_GENERATOR "TGZ")
+        # Put the CPU architecture in the archive name (GSplus-x.y.z-Linux-x86_64
+        # vs -Linux-aarch64) so the two Linux release assets don't collide.
+        set(CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
     endif()
     # No top-level "<name>-<version>" wrapper dir -- put files at the archive root.
     set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)

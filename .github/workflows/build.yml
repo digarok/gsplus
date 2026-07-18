@@ -74,7 +74,19 @@ jobs:
           path: build/*.dmg
 
   linux:
-    runs-on: ubuntu-latest
+    # One build per CPU architecture. ubuntu-24.04-arm is a native arm64 runner
+    # (free for public repos), so the ARM build needs no cross-compiling — the
+    # identical steps just run on ARM hardware. CPack stamps the architecture
+    # into the tarball name (Linux-x86_64 / Linux-aarch64) so the two release
+    # assets don't collide.
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - name: Install tools + SDL3 build deps
@@ -101,7 +113,7 @@ jobs:
         run: cd build && cpack
       - uses: actions/upload-artifact@v4
         with:
-          name: gsplus-linux
+          name: gsplus-linux-${{ matrix.arch }}
           path: build/*.tar.gz
 
   windows:
