@@ -391,7 +391,9 @@ else()
         set(CPACK_GENERATOR "ZIP")            # CI can upgrade to an NSIS installer
     else()
         # On Linux the SDL3 .so is bundled by the AppImage step in CI; a plain
-        # TGZ relies on the system SDL3.
+        # TGZ relies on the system SDL3 -- README-linux.txt tells the user how
+        # to install it (distro package or build from source).
+        install(FILES packaging/README-linux.txt DESTINATION .)
         set(CPACK_GENERATOR "TGZ")
         # Put the CPU architecture in the archive name (GSplus-x.y.z-Linux-x86_64
         # vs -Linux-aarch64) so the two Linux release assets don't collide.
@@ -400,6 +402,13 @@ else()
     # No top-level "<name>-<version>" wrapper dir -- put files at the archive root.
     set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 endif()
+
+# Every artifact ships the project README and the GPL license text (the GPL
+# requires the license to accompany distributed binaries). These paths are
+# relative to gsplus/src, so ../.. is the repository root.
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../README.md"
+              "${CMAKE_CURRENT_SOURCE_DIR}/../../LICENSE"
+        DESTINATION .)
 
 set(CPACK_PACKAGE_NAME "GSplus")
 set(CPACK_PACKAGE_VENDOR "GSplus Contributors")
