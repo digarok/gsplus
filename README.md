@@ -96,9 +96,9 @@ Some features that are a part of the SDL3 build:
 - **Drag-and-drop disk loading** - drop a disk image on the window and GSplus
   guesses the slot from its size.
 - **CRT scanline simulator** - `-scanline <0-100>`, Shift+F11 to toggle.
-- **Curved CRT effect** - `-crt 1` with `-crtcurve` / `-crtmask`, Ctrl+F11 to
-  toggle. Screen curvature, RGB phosphor mask, bloom, and vignette; composes
-  with the scanline simulator.
+- **Curved CRT effect** - `-crt 1` with `-crtcurve` / `-crtmask` / `-crtglow`
+  / `-crtvignette`, Ctrl+F11 to toggle. Screen curvature, RGB phosphor mask,
+  bloom, and vignette; composes with the scanline simulator.
 - **One cross-platform build** - the same SDL3 app and CMake build on macOS,
   Linux, and Windows, with prebuilt downloads for each.
 

@@ -10,3 +10,5 @@ gsplus_screenshot_*.png
 .agents/
 skills-lock.json
 
+# Absolute trash
+.DS_Store

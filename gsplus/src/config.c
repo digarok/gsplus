@@ -171,7 +171,8 @@ int	g_nohwaccel = 0;	/* force the software renderer */
 int	g_scanline_simulator = 0; /* CRT scanline overlay intensity, 0-100 (0=off) */
 int	g_crt = 0;		/* curved CRT effect (curvature+mask+glow+vignette) */
 int	g_crt_curve = 2;	/* CRT screen curvature amount, 0-100 (0=flat) */
-int	g_crt_mask = 5;	/* CRT phosphor-mask strength, 0-100 (0=off, subtle) */
+int	g_crt_mask = 2;	/* CRT phosphor-mask strength, 0-100 (0=off, subtle) */
+int	g_crt_glow = 8;	/* CRT glow/bloom strength, 0-100 (0=off) */
 int	g_crt_vignette = 5;	/* CRT corner darkening, 0-100 (0=off, flat brightness) */
 int	g_hblur = 0;		/* horizontal linear blur, 0-100 (0=off, sharp) */
 int	g_vblur = 0;		/* vertical linear blur, 0-100 (0=off, sharp) */
@@ -399,6 +400,7 @@ Cfg_menu g_cfg_sdl_video_menu[] = {
 { "CRT Effect (curve+mask+glow),0,Off,1,On", &g_crt, "crt", 0, CFGTYPE_INT },
 { "CRT Curvature 0-100", &g_crt_curve, "crtcurve", 0, CFGTYPE_INT },
 { "CRT Phosphor Mask 0-100", &g_crt_mask, "crtmask", 0, CFGTYPE_INT },
+{ "CRT Glow 0-100", &g_crt_glow, "crtglow", 0, CFGTYPE_INT },
 { "CRT Vignette 0-100", &g_crt_vignette, "crtvignette", 0, CFGTYPE_INT },
 { "Horizontal Blur 0-100", &g_hblur, "hblur", 0, CFGTYPE_INT },
 { "Vertical Blur 0-100", &g_vblur, "vblur", 0, CFGTYPE_INT },
@@ -1158,10 +1160,11 @@ cfg_int_update(int *iptr, int new_val)
 
 	old_val = *iptr;
 	if((iptr == &g_scanline_simulator) || (iptr == &g_crt_curve) ||
-				(iptr == &g_crt_mask) || (iptr == &g_crt_vignette) ||
+				(iptr == &g_crt_mask) || (iptr == &g_crt_glow) ||
+				(iptr == &g_crt_vignette) ||
 				(iptr == &g_hblur) || (iptr == &g_vblur)) {
 		// Scanline intensity, CRT curvature, phosphor-mask strength,
-		// vignette and horizontal/vertical blur are
+		// glow, vignette and horizontal/vertical blur are
 		// 0-100 percentages (0=off/flat, 100=max). Clamp here so they can't
 		// go negative or above 100 from any path: typed edits, +/- arrows,
 		// or a hand-edited config file.
