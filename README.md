@@ -95,6 +95,10 @@ Some features that are a part of the SDL3 build:
   controlling terminal.
 - **Drag-and-drop disk loading** - drop a disk image on the window and GSplus
   guesses the slot from its size.
+- **Centered 8-bit video modes** - 40/80-column text, GR, HGR and DHGR are
+  560 pixels wide vs. super-hires' 640; GSplus centers them instead of
+  KEGS's left-align. `-centera2 0` (or the Display Effects menu) restores
+  the KEGS behavior.
 - **CRT scanline simulator** - `-scanline <0-100>`, Shift+F11 to toggle.
 - **Curved CRT effect** - `-crt 1` with `-crtcurve` / `-crtmask` / `-crtglow`
   / `-crtvignette`, Ctrl+F11 to toggle. Screen curvature, RGB phosphor mask,
