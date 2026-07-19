@@ -2356,6 +2356,8 @@ video_out_data(void *vptr, Kimage *kimage_ptr, int out_width_act,
 		return video_out_data_scaled(vptr, kimage_ptr, out_width_act,
 								rectptr);
 	} else {
+		// Apply g_alpha_mask here too, so 1:1 output carries the same
+		//  alpha as the scaled paths below
 		out_wptr = (word32 *)vptr;
 		for(i = 0; i < height; i++) {
 			eff_y = rectptr->y + i;
@@ -2363,7 +2365,7 @@ video_out_data(void *vptr, Kimage *kimage_ptr, int out_width_act,
 			out_wptr = ((word32 *)vptr) +
 						(eff_y * out_width_act) + x;
 			for(j = 0; j < width; j++) {
-				*out_wptr++ = *wptr++;
+				*out_wptr++ = *wptr++ | g_alpha_mask;
 			}
 		}
 	}

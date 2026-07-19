@@ -60,11 +60,13 @@ typedef struct {
 						 * tiled over the output in host pixels */
 	int		mask_for;		/* g_crt_mask the mask was filled for */
 	SDL_Vertex	*crt_verts;		/* warped curvature mesh vertices */
+	SDL_Vertex	*glow_verts;		/* same mesh, glow-strength colors */
 	int		*crt_idx;		/* mesh triangle indices */
 	int		crt_nverts;
 	int		crt_nidx;
 	int		crt_curve_for;		/* g_crt_curve the mesh was built for */
 	int		crt_vig_for;		/* g_crt_vignette the mesh was built for */
+	int		crt_glow_for;		/* g_crt_glow the mesh was built for */
 	word32		*data;			/* dest buffer for video_out_data() */
 	int		active;
 	int		width_req;		/* current logical width  (pixels) */
@@ -82,6 +84,7 @@ extern int g_scanline_simulator;	/* CRT scanline overlay intensity, 0-100 */
 extern int g_crt;			/* curved CRT effect on/off */
 extern int g_crt_curve;			/* CRT screen curvature, 0-100 */
 extern int g_crt_mask;			/* CRT phosphor-mask strength, 0-100 */
+extern int g_crt_glow;			/* CRT glow/bloom strength, 0-100 */
 extern int g_crt_vignette;		/* CRT corner darkening, 0-100 */
 extern int g_hblur;			/* horizontal linear blur, 0-100 */
 extern int g_vblur;			/* vertical linear blur, 0-100 */
@@ -106,7 +109,6 @@ static int g_screenshot_requested = 0;	/* set by Shift+F12, serviced at frame en
 #define CRT_MASK_STRIPE_PX 2		/* target phosphor stripe width in device
 					 * (physical screen) pixels */
 #define CRT_GLOW_DIV	3		/* glow downsample factor (blur radius) */
-#define CRT_GLOW_LEVEL	90		/* additive bloom strength, 0-255 */
 
 /* Widths of the 2-row scanline tile and the 1-row phosphor-mask tile. Any
  * width works (they're tiled across the output; the mask just needs a multiple
@@ -250,19 +252,22 @@ sdl_fill_mask(Window_info *win)
 static void
 sdl_build_crt_mesh(Window_info *win, int w, int h)
 {
-	int	i, j, nx, ny, n, idx, vig_strength;
-	float	curve, vignette, u, v, px, py, wx, wy, r2, vig;
+	int	i, j, nx, ny, n, idx, vig_strength, glow_strength;
+	float	curve, vignette, glow, u, v, px, py, wx, wy, r2, vig;
 
 	nx = CRT_MESH_COLS + 1;
 	ny = CRT_MESH_ROWS + 1;
 	free(win->crt_verts);
+	free(win->glow_verts);
 	free(win->crt_idx);
 	win->crt_verts = malloc((size_t)nx * ny * sizeof(SDL_Vertex));
+	win->glow_verts = malloc((size_t)nx * ny * sizeof(SDL_Vertex));
 	win->crt_idx = malloc((size_t)CRT_MESH_COLS * CRT_MESH_ROWS * 6 *
 				sizeof(int));
-	if(!win->crt_verts || !win->crt_idx) {
-		free(win->crt_verts); win->crt_verts = NULL;
-		free(win->crt_idx);   win->crt_idx = NULL;
+	if(!win->crt_verts || !win->glow_verts || !win->crt_idx) {
+		free(win->crt_verts);  win->crt_verts = NULL;
+		free(win->glow_verts); win->glow_verts = NULL;
+		free(win->crt_idx);    win->crt_idx = NULL;
 		return;
 	}
 
@@ -274,6 +279,12 @@ sdl_build_crt_mesh(Window_info *win, int w, int h)
 	if(vig_strength < 0)   { vig_strength = 0; }
 	if(vig_strength > 100) { vig_strength = 100; }
 	vignette = (float)vig_strength * 0.01f;
+
+	/* 0-100 glow knob -> 0..1 additive bloom strength (0 = off). */
+	glow_strength = g_crt_glow;
+	if(glow_strength < 0)   { glow_strength = 0; }
+	if(glow_strength > 100) { glow_strength = 100; }
+	glow = (float)glow_strength * 0.01f;
 
 	n = 0;
 	for(j = 0; j < ny; j++) {
@@ -297,6 +308,15 @@ sdl_build_crt_mesh(Window_info *win, int w, int h)
 			win->crt_verts[n].color.g = vig;
 			win->crt_verts[n].color.b = vig;
 			win->crt_verts[n].color.a = 1.0f;
+			/* Glow pass: same mesh, but the bloom strength lives in
+			 * the vertex colors. SDL_RenderGeometry ignores
+			 * SDL_SetTextureColorMod (only SDL_RenderTexture applies
+			 * it), so modulating the glow texture doesn't work --
+			 * the strength must be baked in here. */
+			win->glow_verts[n] = win->crt_verts[n];
+			win->glow_verts[n].color.r = vig * glow;
+			win->glow_verts[n].color.g = vig * glow;
+			win->glow_verts[n].color.b = vig * glow;
 			n++;
 		}
 	}
@@ -320,6 +340,7 @@ sdl_build_crt_mesh(Window_info *win, int w, int h)
 	win->crt_nidx = idx;
 	win->crt_curve_for = g_crt_curve;
 	win->crt_vig_for = g_crt_vignette;
+	win->crt_glow_for = g_crt_glow;
 }
 
 /* (Re)create the offscreen targets + mesh at the given logical size. */
@@ -472,10 +493,11 @@ sdl_video_init(void)
 	video_set_red_mask(0xff0000);
 	video_set_green_mask(0x00ff00);
 	video_set_blue_mask(0x0000ff);
-	/* Mark framebuffer pixels opaque (alpha 0xff), like the mac driver does.
-	 * Without this every pixel has alpha 0, which makes the CRT glow pass
-	 * (SDL_BLENDMODE_ADD scales source RGB by source alpha) contribute
-	 * nothing, silently disabling the bloom half of the CRT effect. */
+	/* Mark framebuffer pixels opaque (alpha 0xff), like the mac driver
+	 * does, so the backbuffer/screenshots carry a consistent alpha. (Note
+	 * the core only applies this in its scaled copy paths; nothing in the
+	 * render path may depend on framebuffer alpha -- the glow pass learned
+	 * this the hard way and now adds RGB independent of alpha.) */
 	video_set_alpha_mask(0xff000000);
 	video_set_palette();
 
@@ -1191,9 +1213,11 @@ sdl_render_crt(Window_info *win)
 	int	w = win->width_req;
 	int	h = win->main_height;
 
-	/* Rebuild the mesh if the curvature or vignette knob changed at runtime. */
+	/* Rebuild the mesh if the curvature, vignette or glow knob changed at
+	 * runtime. */
 	if((win->crt_curve_for != g_crt_curve) ||
-				(win->crt_vig_for != g_crt_vignette)) {
+				(win->crt_vig_for != g_crt_vignette) ||
+				(win->crt_glow_for != g_crt_glow)) {
 		sdl_build_crt_mesh(win, w, h);
 		if(!win->crt_verts) {
 			return;
@@ -1204,20 +1228,19 @@ sdl_render_crt(Window_info *win)
 	SDL_SetRenderLogicalPresentation(r, 0, 0,
 				SDL_LOGICAL_PRESENTATION_DISABLED);
 	SDL_SetRenderTarget(r, win->crt_target);
-	/* Clear to transparent black first: the blur path accumulates additively, so
-	 * it needs a cleared target. Crucially the alpha is 0, not 255: without blur,
-	 * crt_target is a plain (NONE) copy of the framebuffer texture, whose alpha is
-	 * 0 -- which leaves the later glow pass (it ADD-blends scaled by source alpha)
-	 * dormant. Clearing to opaque here would instead switch the glow on only when
-	 * blur is enabled, washing the picture out. Matching alpha 0 keeps the CRT look
-	 * identical with blur on or off. */
+	/* Clear to black first: the blur path accumulates additively, so it
+	 * needs a cleared target. The alpha value doesn't matter -- the glow
+	 * pass adds source RGB directly, independent of alpha (see below). */
 	SDL_SetRenderDrawColor(r, 0, 0, 0, 0);
 	SDL_RenderClear(r);
 	sdl_render_framebuffer(win, w, h);
 
-	/* --- Pass 2: downscale crt_target -> glow_target (LINEAR = blur). --- */
-	SDL_SetRenderTarget(r, win->glow_target);
-	SDL_RenderTexture(r, win->crt_target, NULL, NULL);
+	/* --- Pass 2: downscale crt_target -> glow_target (LINEAR = blur).
+	 * Skipped entirely at glow 0 (as is the additive draw below). --- */
+	if(g_crt_glow > 0) {
+		SDL_SetRenderTarget(r, win->glow_target);
+		SDL_RenderTexture(r, win->crt_target, NULL, NULL);
+	}
 
 	/* --- Pass 3: warp onto the curve in the window, then add the glow. --- */
 	SDL_SetRenderTarget(r, NULL);
@@ -1232,11 +1255,23 @@ sdl_render_crt(Window_info *win)
 	SDL_RenderGeometry(r, win->crt_target, win->crt_verts, win->crt_nverts,
 				win->crt_idx, win->crt_nidx);
 
-	SDL_SetTextureBlendMode(win->glow_target, SDL_BLENDMODE_ADD);
-	SDL_SetTextureColorMod(win->glow_target, CRT_GLOW_LEVEL, CRT_GLOW_LEVEL,
-				CRT_GLOW_LEVEL);
-	SDL_RenderGeometry(r, win->glow_target, win->crt_verts, win->crt_nverts,
-				win->crt_idx, win->crt_nidx);
+	/* Additive bloom. SDL_BLENDMODE_ADD scales the source by its alpha,
+	 * which here is whatever alpha the framebuffer copy happened to carry
+	 * (opaque via the scaled video_out_data paths, 0 via the 1:1 path or
+	 * after the additive blur) -- making the bloom silently switch on and
+	 * off with window size and blur settings. Use a custom blend that adds
+	 * the source RGB directly, so the glow never depends on alpha. The
+	 * strength is in glow_verts' colors (see sdl_build_crt_mesh). */
+	if(g_crt_glow > 0) {
+		SDL_SetTextureBlendMode(win->glow_target,
+			SDL_ComposeCustomBlendMode(
+				SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE,
+				SDL_BLENDOPERATION_ADD,
+				SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE,
+				SDL_BLENDOPERATION_ADD));
+		SDL_RenderGeometry(r, win->glow_target, win->glow_verts,
+				win->crt_nverts, win->crt_idx, win->crt_nidx);
+	}
 
 	/* Mask and scanlines go on last, in host-pixel space over the warped
 	 * image, so they stay at fixed screen-pixel sizes regardless of window
