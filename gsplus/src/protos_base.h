@@ -142,6 +142,7 @@ void do_clock_data(void);
 
 /* config.c */
 int config_add_argv_override(const char *str1, const char *str2);
+void cfg_print_cli_flags(void);
 void config_set_config_kegs_name(const char *str1);
 void config_init_menus(Cfg_menu *menuptr);
 void config_init(void);

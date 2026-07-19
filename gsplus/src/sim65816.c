@@ -521,6 +521,10 @@ print_usage(const char *argv0)
 	printf("  -cfg <file>      Use <file> as the config file "
 						"(created if absent)\n");
 	printf("\n");
+	printf("Display options (config variables, override with "
+						"-<name> <value>):\n");
+	cfg_print_cli_flags();
+	printf("\n");
 	printf("Any other -<name> <value> is applied as a config variable "
 							"override.\n");
 }

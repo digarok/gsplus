@@ -583,6 +583,31 @@ int	g_menu_redraw_needed = 1;
 int g_cfg_argv_num_overrides = 0;
 char *g_cfg_argv_overrides[MAX_CFG_ARGV_OVERRIDES];
 
+/* Print the GSplus display-effect config variables as CLI flags, for
+ *  print_usage().  Driven by the menu table so the help text can't drift
+ *  from the actual options: every entry with a config-file name is listed,
+ *  using its menu label (the part of str before the value list). */
+void
+cfg_print_cli_flags()
+{
+	Cfg_menu *menuptr;
+	const char *str;
+	int	i, len;
+
+	menuptr = &g_cfg_sdl_video_menu[0];
+	for(i = 0; menuptr[i].str != 0; i++) {
+		if(!menuptr[i].name_str) {
+			continue;	/* menu title, separator or Back row */
+		}
+		str = menuptr[i].str;
+		len = 0;
+		while(str[len] && (str[len] != ',')) {
+			len++;
+		}
+		printf("  -%-14s  %.*s\n", menuptr[i].name_str, len, str);
+	}
+}
+
 int
 config_add_argv_override(const char *str1, const char *str2)
 {
