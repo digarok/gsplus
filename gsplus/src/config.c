@@ -66,6 +66,7 @@ extern int g_swap_paddles;
 extern int g_invert_paddles;
 extern int g_voc_enable;
 extern int g_status_enable;
+extern int g_video_center_a2;
 extern int g_mainwin_width;
 extern int g_mainwin_height;
 extern int g_mainwin_xpos;
@@ -396,6 +397,8 @@ Cfg_menu g_cfg_sdl_video_menu[] = {
 { "Ignore Aspect Ratio (restart required),0,No,1,Yes", &g_noaspect, "noaspect", 0, CFGTYPE_INT },
 { "High DPI (restart required),0,No,1,Yes", &g_highdpi, "highdpi", 0, CFGTYPE_INT },
 { "Force Software Renderer (restart required),0,No,1,Yes", &g_nohwaccel, "nohwaccel", 0, CFGTYPE_INT },
+{ "Center 8-bit Video Modes,0,No (KEGS left-align),1,Yes",
+			&g_video_center_a2, "centera2", 0, CFGTYPE_INT },
 { "Scanline Simulator 0-100", &g_scanline_simulator, "scanline", 0, CFGTYPE_INT },
 { "CRT Effect (curve+mask+glow),0,Off,1,On", &g_crt, "crt", 0, CFGTYPE_INT },
 { "CRT Curvature 0-100", &g_crt_curve, "crtcurve", 0, CFGTYPE_INT },

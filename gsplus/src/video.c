@@ -118,6 +118,12 @@ int	g_blue_right_shift = 0;
 
 int	g_status_enable = 1;
 int	g_status_enable_previous = 1;
+int	g_video_center_a2 = 1;		/* center 560-wide 8-bit modes in the */
+					/*  640-wide SHR frame (0: left-align */
+					/*  like upstream KEGS) */
+int	g_video_center_a2_previous = 1;
+int	g_video_a2_x_offset = 0;	/* x offset of the line being redrawn, */
+					/*  set per-line by video_refresh_line */
 char	g_status_buf[MAX_STATUS_LINES][STATUS_LINE_LENGTH + 1];
 char	*g_status_ptrs[MAX_STATUS_LINES] = { 0 };
 word16	g_pixels_widened[128];
@@ -672,6 +678,14 @@ video_update()
 		g_status_enable_previous = g_status_enable;
 		video_update_status_enable(&g_mainwin_kimage);
 	}
+	if(g_video_center_a2 != g_video_center_a2_previous) {
+		/* 8-bit-mode centering toggled: every line's x position (and
+		 *  the side borders) move, so redraw everything */
+		g_video_center_a2_previous = g_video_center_a2;
+		video_force_reparse();
+		g_full_refresh_needed = (word32)-1;
+		g_a2_screen_buffer_changed = (word32)-1;
+	}
 
 	debugger_redraw_screen(&g_debugwin_kimage);
 	if(g_config_control_panel) {
@@ -910,7 +924,7 @@ void
 update_border_line(int st_line_offset, int end_line_offset, int color)
 {
 	word32	filt_stat;
-	int	st_offset, end_offset, left, right, width, line;
+	int	st_offset, end_offset, left, right, mode_border_width, line;
 
 	line = st_line_offset >> 8;
 	if(line != (end_line_offset >> 8)) {
@@ -946,31 +960,45 @@ update_border_line(int st_line_offset, int end_line_offset, int color)
 			line = 0;
 		}
 		if(st_offset < 4) {
-			/* left side */
+			/* left side.  A centered 8-bit line starts 40 pixels
+			 *  further right, so its border is 40 wider */
+			filt_stat = g_a2_filt_stat[line];
+			mode_border_width = BORDER_WIDTH;
+			if(g_video_center_a2 && ((filt_stat &
+					(ALL_STAT_SUPER_HIRES |
+					ALL_STAT_BORDER)) == 0)) {
+				mode_border_width += 40;
+			}
 			left = st_offset;
 			right = MY_MIN(4, end_offset);
 			video_border_pixel_write(&g_mainwin_kimage,
 				g_video_act_margin_top + 2*line, 2, color,
-				(left * BORDER_WIDTH)/4,
-				(right * BORDER_WIDTH) / 4);
+				(left * mode_border_width)/4,
+				(right * mode_border_width) / 4);
 
 			g_border_sides_refresh_needed = 1;
 		}
 		if((st_offset < 48) && (end_offset >= 44)) {
-			/* right side */
+			/* right side.  8-bit modes are 80 narrower than
+			 *  super-hires; centered they only leave 40 of that
+			 *  on the right */
 			filt_stat = g_a2_filt_stat[line];
-			width = BORDER_WIDTH;
+			mode_border_width = BORDER_WIDTH;
 			if((filt_stat & ALL_STAT_SUPER_HIRES) == 0) {
-				width += 80;
+				mode_border_width += 80;
+				if(g_video_center_a2 &&
+					((filt_stat & ALL_STAT_BORDER) == 0)) {
+					mode_border_width -= 40;
+				}
 			}
 			left = MY_MAX(0, st_offset - 44);
 			right = MY_MIN(4, end_offset - 44);
 			video_border_pixel_write(&g_mainwin_kimage,
 				g_video_act_margin_top + 2*line, 2, color,
-				X_A2_WINDOW_WIDTH - width +
-						(left * width/4),
-				X_A2_WINDOW_WIDTH - width +
-						(right * width/4));
+				X_A2_WINDOW_WIDTH - mode_border_width +
+					(left * mode_border_width/4),
+				X_A2_WINDOW_WIDTH - mode_border_width +
+					(right * mode_border_width/4));
 			g_border_sides_refresh_needed = 1;
 		}
 	}
@@ -1080,6 +1108,8 @@ video_get_ch_mask(word32 mem_ptr, word32 filt_stat, int reparse)
 void
 video_update_edges(int line, int left, int right, const char *str)
 {
+	left += g_video_a2_x_offset;
+	right += g_video_a2_x_offset;
 	g_a2_line_left_edge[line] = MY_MIN(left, g_a2_line_left_edge[line]);
 	g_a2_line_right_edge[line] = MY_MAX(right, g_a2_line_right_edge[line]);
 
@@ -1948,7 +1978,17 @@ video_refresh_line(word32 line_bytes, int must_reparse, word32 filt_stat)
 	pixels_per_line = g_mainwin_kimage.a2_width_full;
 	offset = (pixels_per_line * g_video_act_margin_top) +
 						g_video_act_margin_left;
-	wptr = wptr + offset;
+	/* The 8-bit modes are 560 wide vs. super-hires' 640.  Left-aligned
+	 *  (upstream KEGS behavior) they look shifted left, so optionally
+	 *  center them: shift the line right by half the difference and let
+	 *  the side borders absorb 40 pixels each.  video_update_edges()
+	 *  applies the same offset to the change rectangles */
+	g_video_a2_x_offset = 0;
+	if(g_video_center_a2 && ((filt_stat &
+			(ALL_STAT_SUPER_HIRES | ALL_STAT_BORDER)) == 0)) {
+		g_video_a2_x_offset = (640 - 560) / 2;
+	}
+	wptr = wptr + offset + g_video_a2_x_offset;
 
 	if(filt_stat & ALL_STAT_SUPER_HIRES) {
 		g_num_lines_superhires++;
@@ -2082,14 +2122,19 @@ video_form_change_rects()
 	dword64	save_pixel_dcount;
 	word32	mask;
 	int	start, line, left_pix, right_pix, left, right, line_div8;
-	int	x, y, width, height;
+	int	x, y, width, height, mode_border_width;
 
 	kimage_ptr = &g_mainwin_kimage;
 	if(g_border_sides_refresh_needed) {
 		g_border_sides_refresh_needed = 0;
-		// Add left side border
+		// Add left side border (40 wider when 8-bit modes are
+		//  centered, to cover their shifted left edge)
+		mode_border_width = BORDER_WIDTH;
+		if(g_video_center_a2) {
+			mode_border_width += 40;
+		}
 		video_add_rect(kimage_ptr, 0, g_video_act_margin_top,
-						BORDER_WIDTH, A2_WINDOW_HEIGHT);
+					mode_border_width, A2_WINDOW_HEIGHT);
 
 		// Add right-side border.  Resend x from 560 through
 		//  X_A2_WINDOW_WIDTH
